@@ -172,7 +172,7 @@ a { color: var(--ink); }
 }
 .mod:hover { border-color: var(--ink); }
 .mod p { color: var(--muted); font-size: 15px; margin-top: 6px; }
-.status { display: inline-block; margin-top: 12px; font-size: 13.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.status { display: inline-block; font-size: 13.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
 .status.live { color: var(--stamp); background: var(--stamp-bg); }
 .status.soon { color: var(--muted); background: #EEF0F5; }
 .empty {
@@ -230,3 +230,4 @@ a { color: var(--ink); }
 .field select { width: 100%; font: 400 16px var(--body); padding: 10px 12px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); background: #fff; color: var(--text); }
 .field input[readonly] { background: #F3F5FA; color: var(--muted); }
 .row-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.mod .status { margin-top: 12px; }
