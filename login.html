@@ -90,6 +90,16 @@
   });
 
   render();
+
+  /* A real company that hasn't been set up yet: point to setup. */
+  if (!Suite.isDemo()) {
+    Suite.api("status").then(function (res) {
+      if (!res.setupDone) {
+        $("demoHint").hidden = false;
+        $("demoHint").innerHTML = 'This company isn\'t set up yet. <a href="' + Suite.link("setup.html") + '">Set it up now</a>.';
+      }
+    }).catch(function () {});
+  }
 })();
 </script>
 </body>

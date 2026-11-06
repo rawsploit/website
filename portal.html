@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/config.js"></script>
 <script src="assets/site.js"></script>
+<script src="assets/people.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -66,6 +67,7 @@
         '<button type="button" data-go="payroll">Payroll</button>' +
         '<button type="button" data-go="people">People and setup</button>';
     }
+    html += '<h4>You</h4><button type="button" data-go="password">My password</button>';
     return html;
   }
   $("nav").innerHTML = navHtml();
@@ -91,17 +93,15 @@
     return '<div class="view"><div class="empty"><h3>' + esc(m.name) + ' isn\'t connected yet</h3><p>' + esc(m.desc) +
       "</p><p>An admin connects it in People and setup. Until then, nothing here can change your data.</p></div></div>";
   }
-  function showPeople() {
-    return '<div class="view"><div class="empty"><h3>People and setup</h3><p>Add sign-ins, choose each person\'s team, and set your company name and logo.</p>' +
-      "<p>" + (Suite.isDemo() ? "The demo company can't be changed." : "Coming in the next update.") + "</p></div></div>";
-  }
 
   function go(id) {
     var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
-    var allowed = id === "home" || (id === "people" && s.role === "admin") || mods.indexOf(m) !== -1;
+    var allowed = id === "home" || id === "password" || (id === "people" && s.role === "admin") || mods.indexOf(m) !== -1;
     if (!allowed) id = "home";
-    $("view").innerHTML = id === "home" ? showHome() : id === "people" ? showPeople() : showModule(m);
-    $("viewTitle").textContent = id === "home" ? "Home" : id === "people" ? "People and setup" : m.name;
+    if (id === "people") People.renderPeople($("view"));
+    else if (id === "password") People.renderPassword($("view"));
+    else $("view").innerHTML = id === "home" ? showHome() : showModule(m);
+    $("viewTitle").textContent = id === "home" ? "Home" : id === "people" ? "People and setup" : id === "password" ? "My password" : m.name;
     document.querySelectorAll("#nav button").forEach(function (b) {
       if (b.dataset.go === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });

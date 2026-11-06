@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up your company | {site}</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body class="login-page">
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" data-page="index.html" aria-label="Home">
+      <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
+      <span class="brand-name" data-site-name>Kalavara</span>
+    </a>
+  </div>
+</header>
+
+<main class="login-main">
+  <div class="login-card" style="max-width:520px">
+    <h2>Set up your company</h2>
+    <p class="client-line">You'll do this once. Afterwards everyone signs in from the sign-in page.</p>
+
+    <p id="blocked" class="demo-hint" hidden></p>
+
+    <form id="form" novalidate>
+      <label class="field">
+        <span>Setup code</span>
+        <input id="setupCode" autocomplete="off" required placeholder="The code you were given">
+      </label>
+      <label class="field">
+        <span>Company name</span>
+        <input id="company" autocomplete="organization" required>
+      </label>
+      <label class="field">
+        <span>Logo link (optional)</span>
+        <input id="logo" type="url" placeholder="https://…">
+      </label>
+      <h3 style="margin:22px 0 12px">Your admin sign-in</h3>
+      <label class="field">
+        <span>Your name</span>
+        <input id="adminName" autocomplete="name" required>
+      </label>
+      <label class="field">
+        <span>Username</span>
+        <input id="adminUsername" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Password (at least 8 characters)</span>
+        <input id="adminPassword" type="password" autocomplete="new-password" required>
+      </label>
+      <label class="field">
+        <span>Type the password again</span>
+        <input id="confirm" type="password" autocomplete="new-password" required>
+      </label>
+      <p class="form-error" id="error" role="alert"></p>
+      <button class="btn btn-ink" id="submit" type="submit" style="width:100%">Finish setup</button>
+    </form>
+  </div>
+</main>
+
+<footer class="foot"><div class="wrap"><span data-credit></span></div></footer>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function block(text) { $("form").hidden = true; $("blocked").hidden = false; $("blocked").innerHTML = text; }
+
+  if (Suite.isDemo()) {
+    block('The demo company is already set up. <a href="' + Suite.link("login.html") + '">Go to sign in</a>.');
+    return;
+  }
+  Suite.api("status").then(function (res) {
+    if (res.setupDone) block((res.company ? Suite.esc(res.company) + " is" : "This company is") +
+      ' already set up. <a href="' + Suite.link("login.html") + '">Go to sign in</a>.');
+  }).catch(function () { /* the submit will report connection problems */ });
+
+  document.querySelectorAll("#form input").forEach(function (i) { i.addEventListener("input", function () { $("error").textContent = ""; }); });
+
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = function (id) { return $(id).value.trim(); };
+    var err = !v("setupCode") ? "Enter the setup code you were given."
+      : !v("company") ? "Enter your company name."
+      : !v("adminName") ? "Enter your name."
+      : !v("adminUsername") ? "Choose a username."
+      : $("adminPassword").value.length < 8 ? "Use a password of at least 8 characters."
+      : $("adminPassword").value !== $("confirm").value ? "The two passwords don't match."
+      : "";
+    if (err) { $("error").textContent = err; return; }
+
+    var btn = $("submit"); btn.disabled = true; btn.textContent = "Setting up…";
+    Suite.api("setup", {
+      setupCode: v("setupCode"), company: v("company"), logo: v("logo"),
+      adminName: v("adminName"), adminUsername: v("adminUsername"), adminPassword: $("adminPassword").value
+    }).then(function (res) {
+      if (!res.ok) throw new Error(res.message);
+      block("All set. " + Suite.esc(v("company")) + ' is ready. <a href="' + Suite.link("login.html") + '">Sign in as ' + Suite.esc(v("adminUsername")) + "</a>.");
+    }).catch(function (e2) {
+      $("error").textContent = e2.message || "Setup didn't finish. Check your connection and try again.";
+      btn.disabled = false; btn.textContent = "Finish setup";
+    });
+  });
+})();
+</script>
+</body>
+</html>

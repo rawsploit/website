@@ -172,7 +172,7 @@ a { color: var(--ink); }
 }
 .mod:hover { border-color: var(--ink); }
 .mod p { color: var(--muted); font-size: 15px; margin-top: 6px; }
-.mod .status { display: inline-block; margin-top: 12px; font-size: 13.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.status { display: inline-block; margin-top: 12px; font-size: 13.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
 .status.live { color: var(--stamp); background: var(--stamp-bg); }
 .status.soon { color: var(--muted); background: #EEF0F5; }
 .empty {
@@ -216,3 +216,17 @@ a { color: var(--ink); }
   .team, .team + .team { padding-left: 0; border-left: 0; }
   .bar-actions .btn-line { display: none; }
 }
+
+/* ---------- admin screens ---------- */
+.muted { color: var(--muted); font-size: 15px; }
+.row-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 22px 0 12px; }
+.tbl { width: 100%; border-collapse: collapse; background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--radius-l); overflow: hidden; }
+.tbl th { text-align: left; font: 600 14px var(--body); color: var(--muted); padding: 10px 14px; border-bottom: 2px solid var(--ink); background: #F9FAFD; }
+.tbl td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; font-size: 15.5px; }
+.tbl tr:last-child td { border-bottom: 0; }
+.panel { background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--radius-l); padding: 20px; margin-top: 18px; }
+.panel h3 { margin-bottom: 14px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; }
+.field select { width: 100%; font: 400 16px var(--body); padding: 10px 12px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); background: #fff; color: var(--text); }
+.field input[readonly] { background: #F3F5FA; color: var(--muted); }
+.row-actions { display: flex; gap: 10px; flex-wrap: wrap; }
