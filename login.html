@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in | {site}</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body class="login-page">
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" data-page="index.html" aria-label="Home">
+      <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
+      <span class="brand-name" data-site-name>Kalavara</span>
+    </a>
+  </div>
+</header>
+
+<main class="login-main">
+  <div class="login-card">
+    <div class="switch" role="group" aria-label="Who is signing in">
+      <button type="button" id="asStaff" aria-pressed="true">Staff</button>
+      <button type="button" id="asCustomer" aria-pressed="false">Customer</button>
+    </div>
+
+    <h2 id="title">Staff sign in</h2>
+    <p class="client-line">For <span data-client-name></span></p>
+
+    <form id="form" novalidate>
+      <label class="field">
+        <span id="userLabel">Username</span>
+        <input id="username" name="username" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="form-error" id="error" role="alert"></p>
+      <button class="btn btn-ink" id="submit" type="submit" style="width:100%">Sign in</button>
+    </form>
+
+    <div class="demo-hint" id="demoHint" hidden></div>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="wrap"><span data-credit></span></div>
+</footer>
+
+<script>
+(function () {
+  var kind = Suite.params.get("as") === "customer" ? "customer" : "staff";
+  var $ = function (id) { return document.getElementById(id); };
+
+  function render() {
+    $("asStaff").setAttribute("aria-pressed", kind === "staff");
+    $("asCustomer").setAttribute("aria-pressed", kind === "customer");
+    $("title").textContent = kind === "staff" ? "Staff sign in" : "Customer sign in";
+    $("userLabel").textContent = kind === "staff" ? "Username" : "Customer code";
+    $("error").textContent = "";
+    var hint = $("demoHint");
+    hint.hidden = !Suite.isDemo();
+    hint.innerHTML = kind === "staff"
+      ? "This is the demo company. Try <code>admin</code>, <code>factory</code>, <code>sales</code> or <code>accounts</code>, with the same word as the password."
+      : "This is the demo company. Try customer code <code>C1001</code> with password <code>shop</code>.";
+  }
+  $("asStaff").onclick = function () { kind = "staff"; render(); $("username").focus(); };
+  $("asCustomer").onclick = function () { kind = "customer"; render(); $("username").focus(); };
+
+  /* Already signed in? Go straight in. */
+  var s = Suite.getSession();
+  if (s) { location.replace(Suite.link(s.kind === "customer" ? "catalog.html" : "portal.html")); return; }
+
+  $("username").addEventListener("input", function () { $("error").textContent = ""; });
+  $("password").addEventListener("input", function () { $("error").textContent = ""; });
+
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = $("submit");
+    btn.disabled = true; btn.textContent = "Signing in…";
+    Suite.signIn(kind, $("username").value, $("password").value)
+      .then(function (s) { location.replace(Suite.link(s.kind === "customer" ? "catalog.html" : "portal.html")); })
+      .catch(function (err) {
+        $("error").textContent = err.message || "Sign-in failed. Check your connection and try again.";
+        btn.disabled = false; btn.textContent = "Sign in";
+      });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

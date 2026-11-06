@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{site}</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" id="side">
+    <div class="side-top">
+      <a class="brand" data-page="portal.html" aria-label="Home">
+        <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
+        <span class="brand-name" data-site-name>Kalavara</span>
+      </a>
+      <div class="side-client" data-client-name></div>
+      <div class="side-user" id="who"></div>
+    </div>
+    <nav id="nav" aria-label="Modules"></nav>
+    <div class="side-foot">
+      <button class="btn btn-line btn-small" id="signOut" type="button" style="width:100%">Sign out</button>
+      <p style="margin-top:12px" data-credit></p>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="main-bar">
+      <button class="btn btn-line btn-small menu-btn" id="menuBtn" type="button" aria-controls="side" aria-expanded="false">Menu</button>
+      <h2 id="viewTitle">Home</h2>
+      <span></span>
+    </div>
+    <div id="view"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var s = Suite.getSession();
+  if (!s || s.kind !== "staff") { location.replace(Suite.link("login.html")); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = Suite.esc;
+  var mods = Suite.modulesFor(s.role);
+  var client = Suite.client();
+
+  $("who").textContent = s.name + " · " + Suite.teamName(s.role);
+
+  /* ---- sidebar ---- */
+  function navHtml() {
+    var html = '<button type="button" data-go="home">Home</button>';
+    var shown = {};
+    var groups = s.role === "admin" ? window.TEAMS.filter(function (t) { return t.id !== "admin"; }) : [{ id: s.role, name: Suite.teamName(s.role) }];
+    groups.forEach(function (g) {
+      var list = mods.filter(function (m) { return m.teams.indexOf(g.id) !== -1 && !shown[m.id]; });
+      list.forEach(function (m) { shown[m.id] = true; });
+      if (!list.length) return;
+      html += "<h4>" + esc(g.name) + "</h4>" + list.map(function (m) {
+        return '<button type="button" data-go="' + m.id + '">' + esc(m.name) + "</button>";
+      }).join("");
+    });
+    if (s.role === "admin") {
+      html += "<h4>Admin</h4>" +
+        '<button type="button" data-go="payroll">Payroll</button>' +
+        '<button type="button" data-go="people">People and setup</button>';
+    }
+    return html;
+  }
+  $("nav").innerHTML = navHtml();
+
+  /* ---- views ---- */
+  function moduleUrl(id) { return (client.modules || {})[id] || ""; }
+
+  function showHome() {
+    var cards = mods.map(function (m) {
+      var live = !!moduleUrl(m.id);
+      return '<button class="mod" type="button" data-go="' + m.id + '"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) +
+        '</p><span class="status ' + (live ? "live" : "soon") + '">' + (live ? "Connected" : "Not connected yet") + "</span></button>";
+    }).join("");
+    return '<div class="view"><p style="color:var(--muted)">Signed in as ' + esc(s.name) +
+      '. Pick a tool to start.</p><div class="home-grid">' + cards + "</div></div>";
+  }
+  function showModule(m) {
+    var url = moduleUrl(m.id);
+    if (url) {
+      var sep = url.indexOf("?") === -1 ? "?" : "&";
+      return '<iframe class="frame" title="' + esc(m.name) + '" src="' + esc(url + sep + "t=" + encodeURIComponent(s.token)) + '"></iframe>';
+    }
+    return '<div class="view"><div class="empty"><h3>' + esc(m.name) + ' isn\'t connected yet</h3><p>' + esc(m.desc) +
+      "</p><p>An admin connects it in People and setup. Until then, nothing here can change your data.</p></div></div>";
+  }
+  function showPeople() {
+    return '<div class="view"><div class="empty"><h3>People and setup</h3><p>Add sign-ins, choose each person\'s team, and set your company name and logo.</p>' +
+      "<p>" + (Suite.isDemo() ? "The demo company can't be changed." : "Coming in the next update.") + "</p></div></div>";
+  }
+
+  function go(id) {
+    var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
+    var allowed = id === "home" || (id === "people" && s.role === "admin") || mods.indexOf(m) !== -1;
+    if (!allowed) id = "home";
+    $("view").innerHTML = id === "home" ? showHome() : id === "people" ? showPeople() : showModule(m);
+    $("viewTitle").textContent = id === "home" ? "Home" : id === "people" ? "People and setup" : m.name;
+    document.querySelectorAll("#nav button").forEach(function (b) {
+      if (b.dataset.go === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    $("side").classList.remove("open");
+    $("menuBtn").setAttribute("aria-expanded", "false");
+    if (history.replaceState) history.replaceState(null, "", Suite.link("portal.html", id === "home" ? null : { m: id }));
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-go]");
+    if (b) go(b.dataset.go);
+  });
+  $("menuBtn").onclick = function () {
+    var open = $("side").classList.toggle("open");
+    this.setAttribute("aria-expanded", open);
+  };
+  $("signOut").onclick = function () { Suite.clearSession(); location.replace(Suite.link("index.html")); };
+
+  go(Suite.params.get("m") || "home");
+})();
+</script>
+</body>
+</html>

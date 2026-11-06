@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{site}: stock, sales and accounts in one place</title>
+<meta name="description" content="Stock, sales and accounts for growing factories and distributors, in one place.">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" data-page="index.html" aria-label="Home">
+      <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
+      <span class="brand-name" data-site-name>Kalavara</span>
+    </a>
+    <div class="bar-actions">
+      <a class="btn btn-line btn-small" data-page="login.html" data-kind="customer">Customer sign in</a>
+      <a class="btn btn-ink btn-small" data-page="login.html" data-kind="staff">Staff sign in</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <h1>Every movement in the factory, written in one book.</h1>
+        <p class="lead">Stock, field sales, collections and accounts for growing manufacturers and distributors, built by someone who has run them.</p>
+        <div class="hero-actions">
+          <a class="btn btn-ink" data-page="login.html" data-kind="staff">Staff sign in</a>
+          <a class="btn btn-line" data-page="login.html" data-kind="customer">Customer sign in</a>
+        </div>
+        <p class="hero-note">Staff sign in to their team's tools. Customers browse products and prices.</p>
+      </div>
+
+      <div class="book" aria-label="Example of a day's stock and cash movements">
+        <div class="book-head">
+          <h3>Today's book</h3>
+          <span class="book-date" id="bookDate"></span>
+        </div>
+        <ul class="book-rows" id="bookRows"></ul>
+        <span class="stamp" id="bookStamp" hidden>Balanced</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="teams">
+    <div class="wrap">
+      <h2>One sign-in, the right tools for each team</h2>
+      <p class="section-intro">Each person sees only what their team needs. Managers see everything, and every number traces back to the entry that made it.</p>
+      <div class="teams" id="teamsGrid"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <h2>Getting a new company started</h2>
+      <div class="steps">
+        <div class="step"><h3>Set up your company</h3><p>Add your name, logo, plants and stores. The setup takes about fifteen minutes.</p></div>
+        <div class="step"><h3>Load opening stock</h3><p>Upload your starting stock once, from a spreadsheet, so every report starts from a true position.</p></div>
+        <div class="step"><h3>Add your people</h3><p>Give each person a sign-in and a team. They see their tools the moment they sign in.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span data-credit></span>
+    <span>Made in Kerala, India</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  /* Teams and their modules */
+  var grid = document.getElementById("teamsGrid");
+  grid.innerHTML = window.TEAMS.map(function (t) {
+    var mods = t.id === "admin"
+      ? [{ name: "All modules", desc: "Every tool across factory, sales and accounts" },
+         { name: "Payroll", desc: "Attendance and monthly salaries" },
+         { name: "People and setup", desc: "Sign-ins, teams and company settings" }]
+      : window.MODULES.filter(function (m) { return m.teams.indexOf(t.id) !== -1; });
+    return '<div class="team"><h3>' + Suite.esc(t.name) + '</h3><p class="blurb">' + Suite.esc(t.blurb) + '</p><ul>' +
+      mods.map(function (m) { return '<li><b>' + Suite.esc(m.name) + '</b><span>' + Suite.esc(m.desc) + '</span></li>'; }).join("") +
+      '</ul></div>';
+  }).join("");
+
+  /* Today's book: the day's entries write themselves in, once */
+  var rows = [
+    ["08:10", "Received: red chilli, 2 bags",          "+50 kg",   ""],
+    ["09:05", "Production: chilli powder 200 g",       "+240 pkt", ""],
+    ["09:40", "Van 001 loaded for the north route",    "−180 pkt", "out"],
+    ["12:15", "Cash collected: City Supermarket",      "₹ 8,450",  ""],
+    ["15:30", "Returned from van 001",                 "+12 pkt",  ""],
+    ["17:45", "Deposit slip matched to the day book",  "₹ 21,300", ""]
+  ];
+  var d = new Date();
+  document.getElementById("bookDate").textContent =
+    d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  var list = document.getElementById("bookRows");
+  var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function add(i) {
+    var r = rows[i];
+    var li = document.createElement("li");
+    if (!still) li.className = "new";
+    li.innerHTML = '<span class="t">' + r[0] + '</span><span class="what">' + r[1] +
+      '</span><span class="qty ' + r[3] + '">' + r[2] + '</span>';
+    list.appendChild(li);
+  }
+  if (still) { rows.forEach(function (_, i) { add(i); }); document.getElementById("bookStamp").hidden = false; }
+  else {
+    var i = 0;
+    var timer = setInterval(function () {
+      add(i++);
+      if (i === rows.length) { clearInterval(timer); setTimeout(function () { document.getElementById("bookStamp").hidden = false; }, 500); }
+    }, 650);
+  }
+})();
+</script>
+</body>
+</html>

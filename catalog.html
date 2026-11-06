@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Products | {site}</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" data-page="catalog.html" aria-label="Products">
+      <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
+      <span class="brand-name" data-client-name></span>
+    </a>
+    <div class="bar-actions">
+      <span class="side-user" id="who" style="align-self:center"></span>
+      <button class="btn btn-line btn-small" id="signOut" type="button">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top:32px;padding-bottom:48px">
+  <h1 style="font-size:34px">Products and prices</h1>
+  <div class="cat-tools">
+    <input id="q" type="search" placeholder="Search products" aria-label="Search products">
+    <div id="chips" role="group" aria-label="Category" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+  </div>
+  <p id="state" style="color:var(--muted)">Loading products…</p>
+  <div class="products" id="grid"></div>
+</main>
+
+<footer class="foot"><div class="wrap"><span data-credit></span></div></footer>
+
+<script>
+(function () {
+  var s = Suite.getSession();
+  if (!s || s.kind !== "customer") { location.replace(Suite.link("login.html", { as: "customer" })); return; }
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = Suite.esc;
+  $("who").textContent = s.name;
+  $("signOut").onclick = function () { Suite.clearSession(); location.replace(Suite.link("index.html")); };
+
+  var DEMO = [
+    { name: "Chilli Powder",    category: "Spices",  packs: [["100 g", 32], ["200 g", 60], ["500 g", 140]] },
+    { name: "Turmeric Powder",  category: "Spices",  packs: [["100 g", 28], ["250 g", 65]] },
+    { name: "Coriander Powder", category: "Spices",  packs: [["200 g", 48], ["500 g", 110]] },
+    { name: "Lime Pickle",      category: "Pickles", packs: [["300 g bottle", 95], ["1 kg pouch", 260]] },
+    { name: "Mixed Vegetable Pickle", category: "Pickles", packs: [["300 g bottle", 99]] },
+    { name: "Coconut Oil",      category: "Oils",    packs: [["500 ml", 135], ["1 L", 255]] },
+    { name: "Tea Powder",       category: "Beverages", packs: [["250 g", 120], ["1 kg", 450]] },
+    { name: "Coffee Powder",    category: "Beverages", packs: [["200 g", 160]] }
+  ];
+
+  var products = [], cat = "All";
+  var rupee = function (n) { return "₹ " + Number(n).toLocaleString("en-IN"); };
+
+  function render() {
+    var q = $("q").value.trim().toLowerCase();
+    var list = products.filter(function (p) {
+      return (cat === "All" || p.category === cat) && (!q || p.name.toLowerCase().indexOf(q) !== -1);
+    });
+    $("state").textContent = list.length ? "" : "No products match that search. Clear it to see everything.";
+    $("grid").innerHTML = list.map(function (p) {
+      var pic = p.image ? '<img src="' + esc(p.image) + '" alt="">' : esc(p.name.charAt(0));
+      return '<article class="product"><div class="pic">' + pic + '</div><div class="info"><span class="cat">' + esc(p.category) +
+        "</span><h3>" + esc(p.name) + '</h3><ul class="packs">' +
+        p.packs.map(function (k) { return "<li><span>" + esc(k[0]) + "</span><b>" + rupee(k[1]) + "</b></li>"; }).join("") +
+        "</ul></div></article>";
+    }).join("");
+  }
+  function chips() {
+    var cats = ["All"].concat(products.map(function (p) { return p.category; })
+      .filter(function (c, i, a) { return a.indexOf(c) === i; }));
+    $("chips").innerHTML = cats.map(function (c) {
+      return '<button class="chip" type="button" data-cat="' + esc(c) + '" aria-pressed="' + (c === cat) + '">' + esc(c) + "</button>";
+    }).join("");
+  }
+  $("chips").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-cat]"); if (!b) return;
+    cat = b.dataset.cat; chips(); render();
+  });
+  $("q").addEventListener("input", render);
+
+  var load = Suite.isDemo()
+    ? Promise.resolve({ ok: true, products: DEMO })
+    : Suite.api("catalog", { token: s.token });
+  load.then(function (res) {
+    if (!res.ok) throw new Error(res.message || "Couldn't load products.");
+    products = res.products || [];
+    chips(); render();
+  }).catch(function (err) {
+    $("state").textContent = (err.message || "Couldn't load products.") + " Refresh the page to try again.";
+  });
+})();
+</script>
+</body>
+</html>
