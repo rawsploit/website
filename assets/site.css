@@ -123,6 +123,24 @@ a { color: var(--ink); }
 
 /* ---------- login ---------- */
 .login-page { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+/* login backdrop: same as Accounting-Books - dark at the top, light teal glow low down,
+   soft painted-canvas texture. The header keeps its white bar; the footer turns light. */
+.login-page {
+  background-color:#073f49;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' preserveAspectRatio='none'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 .08  0 0 0 0 .1  0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23g)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' preserveAspectRatio='none'%3E%3Cfilter id='l' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.004' numOctaves='6' seed='17'/%3E%3CfeColorMatrix values='0 0 0 0 .25  0 0 0 0 .62  0 0 0 0 .6  0.45 0 0 0 -0.2'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23l)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' preserveAspectRatio='none'%3E%3Cfilter id='d' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0035' numOctaves='6' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .01  0 0 0 0 .12  0 0 0 0 .15  0.9 0 0 0 -0.3'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23d)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg,rgba(2,16,22,.95) 0%,rgba(3,24,32,.75) 22%,rgba(4,30,38,.35) 45%,transparent 65%),
+    radial-gradient(ellipse 140% 80% at 50% 100%,transparent 55%,rgba(3,26,34,.35) 100%),
+    radial-gradient(ellipse 75% 60% at 45% 92%,#22a39c 0%,#19908b 25%,#11736f 50%,#0b5a5f 80%,#084550 100%);
+  background-size:140px 140px,cover,cover,100% 100%,100% 100%,100% 100%;
+  background-attachment:fixed;
+}
+.login-page .login-card { box-shadow: 0 20px 50px rgba(0,0,0,.28); border-color: transparent; }
+.login-page .foot { border-top-color: rgba(255,255,255,.15); color: rgba(255,255,255,.75); }
+.login-page .foot a { color: #fff; }
+
 .login-main { display: grid; place-items: center; padding: 40px 16px; }
 .login-card {
   width: 100%; max-width: 440px; background: var(--sheet); border: 1px solid var(--rule-strong);
