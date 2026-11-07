@@ -101,6 +101,10 @@
 
   /* ---------- branding ---------- */
   function brand() {
+    /* login backdrop colour per client: "teal" (default) or "blue" */
+    var theme = client().theme === "blue" ? "blue" : "teal";
+    document.body.classList.remove("theme-teal", "theme-blue");
+    document.body.classList.add("theme-" + theme);
     document.querySelectorAll("[data-site-name]").forEach(function (el) { el.textContent = window.SITE.name; });
     document.querySelectorAll("[data-site-initial]").forEach(function (el) { el.textContent = window.SITE.name.charAt(0); });
     document.querySelectorAll("[data-client-name]").forEach(function (el) { el.textContent = client().name; });

@@ -38,6 +38,7 @@ window.CLIENTS = {
   demo: {
     name: "Demo Foods Pvt. Ltd.",
     logo: "",
+    theme: "teal",            /* login backdrop: "teal" or "blue" */
     api: "",
     /* demo: Accounting-Books runs as a self-contained preview (data stays in the browser tab) */
     modules: { books: "demo/accounting-books.html" }
