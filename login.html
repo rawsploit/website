@@ -81,7 +81,15 @@
 
   /* Already signed in? Go straight in. */
   var s = Suite.getSession();
-  if (s) { location.replace(Suite.link(s.kind === "customer" ? "catalog.html" : "portal.html")); return; }
+  function after(s) {
+    if (s.kind === "customer") return Suite.link("catalog.html");
+    var next = new URLSearchParams(Suite.params.get("next") || "");
+    var extra = {};
+    if (/^[a-z0-9-]{2,30}$/.test(next.get("m") || "")) extra.m = next.get("m");
+    if (extra.m && /^[a-z]{2,20}$/.test(next.get("tab") || "")) extra.tab = next.get("tab");
+    return Suite.link("portal.html", extra);
+  }
+  if (s) { location.replace(after(s)); return; }
 
   $("username").addEventListener("input", function () { $("error").textContent = ""; });
   $("password").addEventListener("input", function () { $("error").textContent = ""; });
@@ -91,7 +99,7 @@
     var btn = $("submit");
     btn.disabled = true; btn.textContent = "Signing in…";
     Suite.signIn(kind, $("username").value, $("password").value)
-      .then(function (s) { location.replace(Suite.link(s.kind === "customer" ? "catalog.html" : "portal.html")); })
+      .then(function (s) { location.replace(after(s)); })
       .catch(function (err) {
         $("error").textContent = err.message || "Sign-in failed. Check your connection and try again.";
         btn.disabled = false; btn.textContent = "Sign in";
