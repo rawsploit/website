@@ -5,9 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{site}: stock, sales and accounts in one place</title>
 <meta name="description" content="Stock, sales and accounts for growing factories and distributors, in one place.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1F2A6B">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kalavara">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/config.js"></script>
 <script src="assets/site.js"></script>
+<script src="assets/install.js"></script>
 </head>
 <body>
 
@@ -81,9 +90,9 @@
   var grid = document.getElementById("teamsGrid");
   grid.innerHTML = window.TEAMS.map(function (t) {
     var mods = t.id === "admin"
-      ? [{ name: "All modules", desc: "Every tool across factory, sales and accounts" },
-         { name: "Payroll", desc: "Attendance and monthly salaries" },
-         { name: "People and setup", desc: "Sign-ins, teams and company settings" }]
+      ? [{ name: "All modules", desc: "Every tool across factory, sales and accounts" }]
+          .concat(window.MODULES.filter(function (m) { return !m.teams.length; }))
+          .concat([{ name: "People and setup", desc: "Sign-ins, teams and company settings" }])
       : window.MODULES.filter(function (m) { return m.teams.indexOf(t.id) !== -1; });
     return '<div class="team"><h3>' + Suite.esc(t.name) + '</h3><p class="blurb">' + Suite.esc(t.blurb) + '</p><ul>' +
       mods.map(function (m) { return '<li><b>' + Suite.esc(m.name) + '</b><span>' + Suite.esc(m.desc) + '</span></li>'; }).join("") +

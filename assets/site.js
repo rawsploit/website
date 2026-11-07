@@ -9,7 +9,12 @@
   /* ---------- client ---------- */
   function clientId() {
     var id = (params.get("c") || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
-    return window.CLIENTS[id] ? id : "demo";
+    if (!window.CLIENTS[id]) {
+      try { id = localStorage.getItem("suite.client") || ""; } catch (e) { id = ""; }
+    }
+    id = window.CLIENTS[id] ? id : "demo";
+    try { localStorage.setItem("suite.client", id); } catch (e) {}
+    return id;
   }
   function client() { return window.CLIENTS[clientId()]; }
   function isDemo() { return !client().api; }

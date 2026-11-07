@@ -231,3 +231,13 @@ a { color: var(--ink); }
 .field input[readonly] { background: #F3F5FA; color: var(--muted); }
 .row-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .mod .status { margin-top: 12px; }
+
+/* ---------- install bar ---------- */
+.install-bar {
+  position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; margin: 0 auto; max-width: 560px;
+  display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 16px;
+  background: var(--sheet); color: var(--text); border: 1.5px solid var(--ink); border-radius: var(--radius-l);
+  font-size: 15.5px; box-shadow: 0 6px 24px rgba(31, 42, 107, .18);
+}
+.install-bar span { flex: 1; }
+.install-close { background: none; border: 0; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; padding: 4px 8px; }

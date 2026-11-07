@@ -12,21 +12,22 @@ window.SITE = {
 window.TEAMS = [
   { id: "factory",  name: "Factory",          blurb: "Production, stores and stock counts" },
   { id: "sales",    name: "Sales",            blurb: "Field sales, vans and collections" },
-  { id: "accounts", name: "Accounts",         blurb: "Reconciliations, receivables and P&L" },
+  { id: "accounts", name: "Accounts",         blurb: "Reconciliations, collections and P&L" },
   { id: "admin",    name: "Admin / Manager",  blurb: "Everything, plus people and setup" }
 ];
 
-/* Modules. `teams` = which roles see it (admin always sees all). */
+/* Modules. `teams` = which roles see it (admin always sees all).
+   An empty list means Admin / Manager only. */
 window.MODULES = [
   { id: "stockbook",   name: "StockBook",        teams: ["factory"],  desc: "Daily stock ledger: receipts, production, transfers, vans and adjustments." },
   { id: "stocktake",   name: "Stock Take",       teams: ["factory"],  desc: "Physical counts against book stock, with reconciliation." },
   { id: "fieldsales",  name: "Field Sales",      teams: ["sales"],    desc: "Daily sales reports from sales staff, with photo upload." },
   { id: "collections", name: "Collections",      teams: ["sales", "accounts"], desc: "Overdue shops and what each salesperson should collect today." },
-  { id: "receivables", name: "Receivables",      teams: ["accounts"], desc: "Who owes what, ageing and trends, in one dashboard." },
-  { id: "nexus",       name: "Sales Recon",      teams: ["accounts"], desc: "Matches field sales against what was booked in the accounts." },
+  { id: "nexus",       name: "Trade Recon",      teams: ["accounts"], desc: "Matches field sales against what was booked in the accounts." },
   { id: "cashrecon",   name: "Cash Recon",       teams: ["accounts"], desc: "Deposit slips against cash collected and the day book." },
   { id: "pnl",         name: "Profit & Loss",    teams: ["accounts"], desc: "Management P&L built from stock and sales." },
-  { id: "payroll",     name: "Payroll",          teams: [],           desc: "Attendance and monthly salaries for field staff." }
+  { id: "payroll",     name: "Payroll",          teams: [],           desc: "Attendance and monthly salaries for field staff." },
+  { id: "mis",         name: "MIS Dashboard",    teams: [],           desc: "Receivables, collections, P&L and sales by salesperson, for management." }
 ];
 
 /* Clients. Each client gets a link like  index.html?c=demo
