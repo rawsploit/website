@@ -102,11 +102,11 @@
   /* ---------- branding ---------- */
   function brand() {
     /* login backdrop colour per client: "teal" (default) or "blue" */
-    var theme = client().theme === "blue" ? "blue" : "teal";
-    document.body.classList.remove("theme-teal", "theme-blue");
+    var theme = ["teal", "blue", "maroon"].indexOf(client().theme) >= 0 ? client().theme : "teal";
+    document.body.classList.remove("theme-teal", "theme-blue", "theme-maroon");
     document.body.classList.add("theme-" + theme);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "blue" ? "#1D4FA8" : "#0E5E63");
+    if (meta) meta.setAttribute("content", { teal: "#0E5E63", blue: "#1D4FA8", maroon: "#7A1F2E" }[theme]);
     document.querySelectorAll("[data-site-name]").forEach(function (el) { el.textContent = window.SITE.name; });
     document.querySelectorAll("[data-site-initial]").forEach(function (el) { el.textContent = window.SITE.name.charAt(0); });
     document.querySelectorAll("[data-client-name]").forEach(function (el) { el.textContent = client().name; });
