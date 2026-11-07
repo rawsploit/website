@@ -660,7 +660,7 @@ const AB_HEADERS = {
   Items: ["Name", "HSN", "Unit", "Price", "GST Rate", "Active"],
   Tax_Rates: ["Rate %", "Label", "Active"],
   Vouchers: ["Id", "Date", "Type", "No", "Party", "Narration", "Amount", "Status",
-    "Interstate", "Created By", "Created At", "Updated By", "Updated At", "Version"],
+    "Interstate", "Created By", "Created At", "Updated By", "Updated At", "Version", "Ref No"],
   Voucher_Lines: ["Voucher Id", "Seq", "Ledger", "Debit", "Credit"],
   Invoice_Items: ["Voucher Id", "Seq", "Item", "HSN", "Qty", "Unit", "Rate", "Gross",
     "Discount", "Taxable", "GST %", "CGST", "SGST", "IGST", "Total"],
@@ -712,14 +712,29 @@ function abFeedHead_(title, from, to) {
    and number; the other ledgers follow on their own lines. */
 function abFeedDayBook(token, from, to) {
   abRequire_(token);
+  return abFeedDayBook_(from, to, {});
+}
+
+/* opts.segmentTypes: sales vouchers are typed by the party's segment
+   ("M1 Sales"), the way Trade Recon expects one sales type per segment.
+   opts.useRef: the Vch No. column carries the Bill / Ref No. when one was entered. */
+function abFeedDayBook_(from, to, opts) {
+  opts = opts || {};
   from = abIso_(from); to = abIso_(to);
   if (!from || !to || from > to) throw new Error("Pick a valid date range.");
   const rows = abFeedHead_("Day Book", from, to);
   rows.push(["Date", "Particulars", "Vch Type", "Vch No.", "Debit Amount", "Credit Amount"]);
+  const ledgers = opts.segmentTypes ? abLedgerMap_() : {};
   abBooks_().forEach(function (v) {
     if (v.date < from || v.date > to) return;
+    let type = v.type;
+    if (opts.segmentTypes && v.type === "Sales") {
+      const p = ledgers[abKey_(v.party)];
+      if (p && p.segment) type = p.segment + " Sales";
+    }
+    const no = opts.useRef && v.ref ? v.ref : v.no;
     if (v.status === "Cancelled") {
-      rows.push([abTallyDate_(v.date), "(cancelled)", v.type, v.no, "", ""]);
+      rows.push([abTallyDate_(v.date), "(cancelled)", type, no, "", ""]);
       return;
     }
     // party line first, the rest after (as Tally shows it)
@@ -728,7 +743,7 @@ function abFeedDayBook(token, from, to) {
       return (abKey_(a.ledger) === pk ? 0 : 1) - (abKey_(b.ledger) === pk ? 0 : 1) || a.seq - b.seq;
     });
     lines.forEach(function (l, i) {
-      rows.push([i === 0 ? abTallyDate_(v.date) : "", l.ledger, i === 0 ? v.type : "", i === 0 ? v.no : "",
+      rows.push([i === 0 ? abTallyDate_(v.date) : "", l.ledger, i === 0 ? type : "", i === 0 ? no : "",
         l.dr || "", l.cr || ""]);
     });
   });
@@ -738,6 +753,9 @@ function abFeedDayBook(token, from, to) {
 /* Sales Register (Sales + Credit Notes) or Receipt Register, one line per voucher. */
 function abFeedRegister(token, kind, from, to) {
   abRequire_(token);
+  return abFeedRegister_(kind, from, to);
+}
+function abFeedRegister_(kind, from, to) {
   from = abIso_(from); to = abIso_(to);
   if (!from || !to || from > to) throw new Error("Pick a valid date range.");
   const sales = kind === "Sales";
@@ -763,6 +781,9 @@ function abFeedRegister(token, kind, from, to) {
    Particulars | Debit | Credit, ending with Grand Total. */
 function abFeedOutstandings(token, asOf) {
   abRequire_(token);
+  return abFeedOutstandings_(asOf);
+}
+function abFeedOutstandings_(asOf) {
   asOf = abIso_(asOf) || abToday_();
   const ledgers = abLedgers_();
   const bal = abBalances_(abBooks_(), ledgers, asOf);
@@ -789,16 +810,96 @@ function abFeedOutstandings(token, asOf) {
   return { fileName: "Outstandings " + asOf, sheets: sheets };
 }
 
-/* Shop balances for the Collections call queue (Todays_Opening). */
+/* Shop balances for the Collections call queue (Todays_Opening).
+   Column A is the extract date ("06-Nov-2026"): Collections checks it
+   is yesterday before it builds the day's calls. */
 function abFeedShopBalances(token, asOf) {
   abRequire_(token);
+  return abFeedShopBalances_(asOf);
+}
+function abFeedShopBalances_(asOf) {
   asOf = abIso_(asOf) || abToday_();
-  const month = AB_MON_[Number(asOf.substring(5, 7)) - 1] + "-" + asOf.substring(0, 4);
+  const month = asOf.substring(8, 10) + "-" + AB_MON_[Number(asOf.substring(5, 7)) - 1] + "-" + asOf.substring(0, 4);
   const rows = [["Month", "Segment", "Shop", "Balance", "Phone", "DaysOutstanding"]];
   abOutstandingCompute_(abBooks_(), abLedgers_(), asOf, "Sundry Debtors").forEach(function (r) {
     if (r.balance > 0) rows.push([month, r.segment || "", r.party, r.balance, r.phone, r.days]);
   });
   return { fileName: "Todays_Opening " + asOf, sheets: [{ name: "Todays_Opening", rows: rows }] };
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  MODULE LINK
+ * ==========================================================
+ * Lets the other modules pull reports straight from the books,
+ * with no file export / upload. A module sends a POST to this
+ * web app's URL:
+ *
+ *   { key, company, feed, from, to, asOf, options }
+ *
+ *   feed: "daybook" | "sales" | "receipts" | "outstandings" | "shops"
+ *
+ * and gets back { ok: true, feed: { fileName, sheets:[{name, rows}] } }
+ * - the same rows as the Tally-layout export, so each module
+ * runs them through the import it already has.
+ *
+ * key = FEED_KEY (Script Property, made on the Module Link
+ * screen). Only reports are served; nothing can be written.
+ */
+
+function doPost(e) {
+  let out;
+  try {
+    const req = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+    out = { ok: true, feed: abServeFeed_(req) };
+  } catch (err) {
+    out = { ok: false, error: String(err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function abServeFeed_(req) {
+  const key = abSetting_("FEED_KEY", "");
+  if (!key) throw new Error("Module link is switched off in Accounting-Books (no feed key yet).");
+  if (!abSame_(String(req.key || ""), key)) {
+    Utilities.sleep(800);
+    throw new Error("Wrong Accounting-Books key. Copy it again from Accounting-Books → Module Link.");
+  }
+  const co = abCompanies_().filter(function (c) { return c.active && (c.id === req.company || abKey_(c.name) === abKey_(req.company)); })[0];
+  if (!co) throw new Error("No active company \"" + req.company + "\" in Accounting-Books.");
+  AB_CTX = { coId: co.id, co: co, ss: null };
+
+  const feed = String(req.feed || "");
+  if (feed === "daybook") return abFeedDayBook_(req.from, req.to, req.options || {});
+  if (feed === "sales") return abFeedRegister_("Sales", req.from, req.to);
+  if (feed === "receipts") return abFeedRegister_("Receipts", req.from, req.to);
+  if (feed === "outstandings") return abFeedOutstandings_(req.asOf);
+  if (feed === "shops") return abFeedShopBalances_(req.asOf);
+  throw new Error("Unknown report \"" + feed + "\".");
+}
+
+/* Admin screen: what to paste into each module. */
+function abLinkInfo(token) {
+  abRequire_(token, ["admin"]);
+  let url = "";
+  try { url = ScriptApp.getService().getUrl() || ""; } catch (e) { url = ""; }
+  return { url: url, key: abSetting_("FEED_KEY", ""), company: abPublicCo_(abCo_()) };
+}
+
+/* Make (or replace) the key. Modules using the old key stop until updated. */
+function abNewFeedKey(token) {
+  const who = abRequire_(token, ["admin"]);
+  const key = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
+  PropertiesService.getScriptProperties().setProperty("FEED_KEY", key);
+  abLog_(who, "Module link key changed", "", "", null, null);
+  return abLinkInfo(token);
+}
+
+function abLinkOff(token) {
+  const who = abRequire_(token, ["admin"]);
+  PropertiesService.getScriptProperties().deleteProperty("FEED_KEY");
+  abLog_(who, "Module link switched off", "", "", null, null);
+  return abLinkInfo(token);
 }
 
 /**
@@ -1421,7 +1522,7 @@ function abBooks_() {
       row: i + 2, id: abStr_(r[0]), date: abIso_(r[1]), type: abStr_(r[2]), no: abStr_(r[3]),
       party: abStr_(r[4]), narration: abStr_(r[5]), amount: abNum_(r[6]), status: abStr_(r[7]) || "Active",
       interstate: abStr_(r[8]) === "Yes", createdBy: abStr_(r[9]), createdAt: r[10],
-      updatedBy: abStr_(r[11]), updatedAt: r[12], version: Number(r[13]) || 1, lines: [], items: []
+      updatedBy: abStr_(r[11]), updatedAt: r[12], version: Number(r[13]) || 1, ref: abStr_(r[14]), lines: [], items: []
     };
   });
   const byKey = {};
@@ -1636,8 +1737,9 @@ function abSaveVoucher(token, data) {
     const version = v ? v.version + 1 : 1;
     const no = v ? v.no : abNextNo_(type, date, all);
     const key = id + "#" + version;
+    const ref = abStr_(data.ref).substring(0, 40);
     const row = [id, date, type, no, party, abStr_(data.narration), amount, "Active", interstate ? "Yes" : "No",
-      v ? v.createdBy : who.username, v ? v.createdAt : now, who.username, now, version];
+      v ? v.createdBy : who.username, v ? v.createdAt : now, who.username, now, version, ref];
 
     abAppend_(AB.SHEETS.LINES, lines.map(function (l, i) { return [key, i + 1, l.ledger, l.dr, l.cr]; }));
     abAppend_(AB.SHEETS.INV_ITEMS, items.map(function (l, i) {
@@ -1646,7 +1748,7 @@ function abSaveVoucher(token, data) {
     if (v) abSheet_(AB.SHEETS.VOUCHERS).getRange(v.row, 1, 1, row.length).setValues([row]);
     else abAppend_(AB.SHEETS.VOUCHERS, [row]);
 
-    const after = { id: id, no: no, type: type, date: date, party: party, amount: amount, narration: abStr_(data.narration),
+    const after = { id: id, no: no, ref: ref, type: type, date: date, party: party, amount: amount, narration: abStr_(data.narration),
       lines: lines, items: items.map(function (l) { return { item: l.item, qty: l.qty, rate: l.rate, taxable: l.taxable, gst: l.gst }; }) };
     abLog_(who, v ? "Altered" : "Created", id, no, before, after);
     return { id: id, no: no, version: version, amount: amount };
@@ -1678,7 +1780,7 @@ function abCancelVoucher(token, id, version, reason) {
 
 function abVoucherView_(v) {
   return {
-    id: v.id, version: v.version, date: v.date, type: v.type, no: v.no, party: v.party,
+    id: v.id, version: v.version, date: v.date, type: v.type, no: v.no, ref: v.ref, party: v.party,
     narration: v.narration, amount: v.amount, status: v.status, interstate: v.interstate,
     lines: v.lines, items: v.items, createdBy: v.createdBy, updatedBy: v.updatedBy
   };
@@ -1992,6 +2094,7 @@ var GW = [
   { k: "G", t: "GST Summary", fn: function () { go(viewGst); } },
   { sec: "Utilities" },
   { k: "E", t: "Export for modules", fn: function () { go(viewExport); } },
+  { k: "M", t: "Module Link", fn: function () { go(viewLink); }, roles: ["admin"] },
   { k: "R", t: "GST Rates", fn: function () { go(viewRates); }, roles: ["admin"] },
   { k: "U", t: "Users", fn: function () { go(viewUsers); }, roles: ["admin"] },
   { k: "W", t: "Change password", fn: function () { passwordModal(); } }
@@ -2071,6 +2174,7 @@ function viewVoucher(arg) {
   if (vt.mode === "inv") {
     var partyLabel = vt.name === "Purchase" || vt.name === "Debit Note" ? "Supplier (party A/c)" : "Party A/c name";
     html += "<div class='row'><label style='flex:2'>" + partyLabel + "<input id='vParty' class='ledger' list='dlLedgers' autocomplete='off' value='" + esc(alter ? v.party : "") + "'></label>" +
+      "<label>Bill / Ref No.<input id='vRef' class='w-amt' maxlength='40' value='" + esc(alter ? (v.ref || "") : "") + "' title='Optional: e.g. the bill number from the field sales app'></label>" +
       "<label>Tax<select id='vInter'><option value=''>Auto (by party state)</option><option value='no'>Same state: CGST + SGST</option><option value='yes'>Other state: IGST</option></select></label></div>" +
       "<p class='muted' id='vPartyInfo'></p>" +
       "<table class='grid' id='vItems'><thead><tr><th>Name of Item</th><th class='w-qty'>Qty</th><th class='w-sm'>Unit</th><th class='w-amt'>Rate</th><th class='w-pct'>Disc %</th><th class='w-pct'>GST %</th><th class='w-amt num'>Amount</th></tr></thead><tbody></tbody></table>" +
@@ -2112,6 +2216,7 @@ function viewVoucher(arg) {
     if (alter) { data.id = v.id; data.version = v.version; }
     if (vt.mode === "inv") {
       data.party = $("vParty").value;
+      data.ref = $("vRef").value;
       data.items = readItems();
       data.extraDiscount = num($("vExtra").value);
       var iv = $("vInter").value; if (iv) data.interstate = iv === "yes";
@@ -2855,6 +2960,38 @@ function companyModal(c) {
       }).catch(function (e) { $("mdOk").disabled = false; status(); toast(e.message, true); });
     });
   $("mdNo").onclick = closeModal; $("coName").focus();
+}
+
+/* ===================== module link ===================== */
+
+function viewLink() {
+  clearHooks(); title("Module Link");
+  $("view").innerHTML = "<div class='card' style='max-width:760px'><h3>Module Link</h3>" +
+    "<p class='muted'>Lets Cash Recon, P&amp;L, Trade Recon, MIS Dashboard and Collections pull reports straight from these books, with no file export or upload. " +
+    "Paste the three values below into each module's settings (Script Properties) and set <b>DATA_SOURCE</b> to <b>books</b>. Modules can only read reports; they can't change anything here.</p>" +
+    "<div id='lkOut'><p class='muted'>Loading…</p></div></div>";
+  keys(commonKeys());
+  load(call("abLinkInfo"));
+  function load(p) {
+    p.then(function (r) {
+      var row = function (k, v, note) {
+        return "<tr><td><b>" + k + "</b></td><td><input readonly value='" + esc(v || "") + "' style='width:100%;font-family:var(--mono)' onclick='this.select()'></td><td class='muted'>" + (note || "") + "</td></tr>";
+      };
+      $("lkOut").innerHTML = "<table class='grid'>" +
+        row("BOOKS_URL", r.url, r.url ? "" : "Deploy as a web app first") +
+        row("BOOKS_KEY", r.key, r.key ? "Keep it secret" : "Not made yet") +
+        row("BOOKS_COMPANY", r.company.id, esc(r.company.name)) +
+        row("DATA_SOURCE", "books", "") + "</table>" +
+        "<p class='row'><button class='btn primary' id='lkNew'>" + (r.key ? "Make a new key" : "Switch on: make a key") + "</button>" +
+        (r.key ? "<button class='btn danger' id='lkOff'>Switch off</button>" : "") + "</p>" +
+        "<p class='muted'>A new key stops modules still using the old one until you paste the new key into them. Each company has its own BOOKS_COMPANY value (press F3 to switch company).</p>";
+      $("lkNew").onclick = function () {
+        if (r.key && !confirm("Make a new key? Modules using the current key will stop until updated.")) return;
+        load(call("abNewFeedKey"));
+      };
+      if ($("lkOff")) $("lkOff").onclick = function () { if (confirm("Switch off the module link?")) load(call("abLinkOff")); };
+    }).catch(function (e) { $("lkOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+  }
 }
 
 /* ===================== users / password ===================== */
