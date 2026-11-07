@@ -25,6 +25,7 @@ window.MODULES = [
   { id: "collections", name: "Collections",      teams: ["sales", "accounts"], desc: "Overdue shops and what each salesperson should collect today." },
   { id: "nexus",       name: "Trade Recon",      teams: ["accounts"], desc: "Matches field sales against what was booked in the accounts." },
   { id: "cashrecon",   name: "Cash Recon",       teams: ["accounts"], desc: "Deposit slips against cash collected and the day book." },
+  { id: "books",       name: "Accounting-Books", teams: ["accounts"], desc: "Ledgers, GST bills, receipts and payments, with Tally-style keys. Feeds every other module." },
   { id: "pnl",         name: "Profit & Loss",    teams: ["accounts"], desc: "Management P&L built from stock and sales." },
   { id: "payroll",     name: "Payroll",          teams: [],           desc: "Attendance and monthly salaries for field staff." },
   { id: "mis",         name: "MIS Dashboard",    teams: [],           desc: "Receivables, collections, P&L and sales by salesperson, for management." }
@@ -38,6 +39,7 @@ window.CLIENTS = {
     name: "Demo Foods Pvt. Ltd.",
     logo: "",
     api: "",
-    modules: {}
+    /* demo: Accounting-Books runs as a self-contained preview (data stays in the browser tab) */
+    modules: { books: "demo/accounting-books.html" }
   }
 };

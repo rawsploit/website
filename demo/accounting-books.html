@@ -1,0 +1,2906 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>Accounting-Books</title>
+  <style>
+/* Accounting-Books - keyboard-first books screen. Designed by rawsploit@gmail.com */
+:root{
+  --ink:#1d2433; --muted:#6b7280; --paper:#fbf8f1; --panel:#ffffff; --line:#e3ddcf;
+  --band:#17375e; --band-ink:#f4f1e8; --hi:#ffd77a; --hi-ink:#1d2433; --accent:#0f766e;
+  --dr:#0f5132; --cr:#842029; --err:#b42318; --ok:#067647;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+.err{color:var(--err);min-height:1.2em}
+.num{text-align:right;font-family:var(--mono);white-space:nowrap}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--panel);padding:7px 14px;border-radius:6px}
+.btn.primary{background:var(--band);color:var(--band-ink);border-color:var(--band)}
+.btn.danger{color:var(--err)}
+.link{background:none;border:0;color:var(--band-ink);text-decoration:underline;padding:0 0 0 8px}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:4px;padding:5px 7px;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--hi);border-color:#c9a64b;background:#fffbea}
+
+/* sign-in */
+.auth{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(160deg,#17375e,#0f766e)}
+.auth-card{background:var(--panel);width:100%;max-width:380px;border-radius:12px;padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.auth-card h1{margin:0;font-size:20px}
+.auth-card h2{margin:2px 0 18px;font-size:14px;font-weight:500;color:var(--muted)}
+.auth-card label{display:block;margin:10px 0;font-size:13px;color:var(--muted)}
+.auth-card input,.auth-card select{display:block;width:100%;margin-top:4px;padding:9px}
+.auth-card .btn{width:100%;margin-top:8px;padding:10px}
+.auth-card footer{margin-top:18px;font-size:11px;color:var(--muted);text-align:center}
+.auth-logo{max-height:56px;margin-bottom:10px}
+
+/* frame */
+#app{display:flex;flex-direction:column;height:100%}
+.topbar{display:flex;align-items:center;gap:10px;background:var(--band);color:var(--band-ink);padding:7px 14px}
+.topbar .muted{color:#b9c3d3}
+.tb-left,.tb-right{flex:1}
+.tb-right{text-align:right}
+.tb-mid{font-weight:600;letter-spacing:.3px}
+.shell{flex:1;display:flex;min-height:0}
+#view{flex:1;overflow:auto;padding:16px}
+.keys{width:178px;border-left:1px solid var(--line);background:#f3efe4;overflow:auto;padding:6px}
+.keys button{display:flex;width:100%;text-align:left;gap:8px;border:0;background:none;padding:6px 8px;border-radius:4px;color:var(--ink)}
+.keys button:hover{background:var(--hi)}
+.keys button b{min-width:58px;font-family:var(--mono);font-size:12px;color:var(--band)}
+.keys button[disabled]{opacity:.4;cursor:default}
+.keys hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.statusbar{display:flex;justify-content:space-between;gap:10px;padding:4px 14px;background:#ebe5d6;font-size:12px}
+
+/* gateway */
+.gateway{max-width:420px;margin:10px auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.gateway h3{margin:0;padding:10px 14px;background:var(--band);color:var(--band-ink);font-size:14px;text-align:center}
+.gw-sec{padding:4px 0}
+.gw-sec small{display:block;padding:8px 18px 2px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-size:11px}
+.gw-item{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 26px;color:var(--ink)}
+.gw-item u{text-decoration:none;color:var(--band);font-weight:700}
+.gw-item.sel,.gw-item:hover{background:var(--hi);color:var(--hi-ink)}
+
+/* forms + vouchers */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px;max-width:1100px}
+.card h3{margin:0 0 10px;font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.row label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+.vhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.vtitle{font-size:18px;font-weight:700;color:var(--band)}
+.vno{font-family:var(--mono)}
+table.grid{width:100%;border-collapse:collapse}
+table.grid th{font-size:12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:5px 6px}
+table.grid td{padding:3px 6px;border-bottom:1px solid #f0ebdf;vertical-align:middle}
+table.grid td input,table.grid td select{width:100%}
+table.grid tfoot td{font-weight:700;border-top:2px solid var(--line)}
+table.grid tr.sel td{background:var(--hi)}
+table.grid tr.click{cursor:pointer}
+table.grid tr.click:hover td{background:#fff3cf}
+table.grid tr.cancel td{color:var(--muted);text-decoration:line-through}
+.w-drcr{width:62px}.w-amt{width:130px}.w-qty{width:80px}.w-pct{width:70px}.w-sm{width:90px}
+.totals{margin-left:auto;max-width:360px}
+.totals td{padding:3px 6px}
+.totals tr.grand td{font-size:16px;font-weight:700;border-top:2px solid var(--ink)}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;background:#eef2f7;color:var(--band)}
+.tag.ok{background:#e7f6ec;color:var(--ok)} .tag.warn{background:#fff4e5;color:#9a5b00}
+.dr{color:var(--dr)} .cr{color:var(--cr)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.two .card{margin:0}
+.rep-title{text-align:center;margin-bottom:8px}
+.rep-title b{font-size:16px}
+.indent td:first-child{padding-left:24px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%}
+.toast.show{opacity:1}.toast.bad{background:var(--err)}
+.modal{position:fixed;inset:0;background:rgba(20,24,33,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.modal-card{background:var(--panel);border-radius:10px;padding:18px;max-width:520px;width:100%;max-height:90vh;overflow:auto}
+@media (max-width:760px){
+  .keys{display:none}
+  .two{grid-template-columns:1fr}
+  #view{padding:10px}
+  .tb-mid{display:none}
+}
+@media print{
+  .topbar,.keys,.statusbar,.noprint{display:none!important}
+  #view{overflow:visible}
+}
+</style>
+
+</head>
+<body>
+<div style="background:#ffd77a;color:#1d2433;padding:6px 12px;font:13px system-ui;text-align:center">Demo: your entries stay in this browser tab only and clear on refresh. Start by creating an admin and your first company.</div>
+
+<!-- ============ SIGN-IN / FIRST SETUP ============ -->
+<div id="auth" class="auth hidden">
+  <div class="auth-card">
+    <img id="authLogo" class="auth-logo hidden" alt="">
+    <h1 id="authCompany"></h1>
+    <h2>Accounting-Books</h2>
+
+    <form id="loginForm" class="hidden" autocomplete="on">
+      <label>Username<input id="lgUser" autocomplete="username" required></label>
+      <label>Password<input id="lgPass" type="password" autocomplete="current-password" required></label>
+      <button type="submit" class="btn primary">Sign in</button>
+    </form>
+
+    <form id="setupForm" class="hidden">
+      <p class="muted">First time here. Create the admin who will manage these books.</p>
+      <label>Your name<input id="suName" required></label>
+      <label>Username<input id="suUser" required pattern="[a-zA-Z0-9._\-]{3,30}"></label>
+      <label>Password (8+ characters)<input id="suPass" type="password" minlength="8" required></label>
+      <p class="muted" style="margin-top:14px">Your first company</p>
+      <label>Company name<input id="suCo" required></label>
+      <label>State<select id="suState" required></select></label>
+      <label>GSTIN (optional)<input id="suGstin" maxlength="15"></label>
+      <button type="submit" class="btn primary">Create company &amp; open books</button>
+    </form>
+
+    <p id="portalNote" class="muted hidden">Please open Accounting-Books from your company portal.</p>
+    <p id="authErr" class="err"></p>
+    <footer>© 2026 <span class="coName"></span><br>Designed by rawsploit@gmail.com</footer>
+  </div>
+</div>
+
+<!-- ============ MAIN ============ -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="tb-left"><b class="coName"></b> <span class="muted" id="tbGst"></span> <button class="link" id="btnCo" title="Select company (F3)">F3 Company</button></div>
+    <div class="tb-mid" id="tbTitle">Gateway</div>
+    <div class="tb-right"><span id="tbDate" title="F2 to change the working date"></span> · <span id="tbUser"></span>
+      <button class="link" id="btnLogout" title="Sign out">Sign out</button></div>
+  </header>
+
+  <div class="shell">
+    <main id="view"></main>
+    <aside class="keys" id="keys"></aside>
+  </div>
+
+  <footer class="statusbar">
+    <span id="status">Ready</span>
+    <span class="muted">Esc: back · Enter: next · Ctrl+A: accept · Alt+C: create</span>
+  </footer>
+</div>
+
+<div id="toast" class="toast"></div>
+<div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
+
+<script>
+/* ---- in-browser stand-in for Google Apps Script (preview only; data lives in this tab) ---- */
+(function(){
+function mkSheet(name){var data=[];return{_data:data,getName:function(){return name},getLastRow:function(){return data.length},
+ getRange:function(r,c,nr,nc){nr=nr||1;nc=nc||1;return{
+  setValues:function(v){for(var i=0;i<nr;i++){data[r-1+i]=data[r-1+i]||[];for(var j=0;j<nc;j++)data[r-1+i][c-1+j]=v[i][j];}return this},
+  getValues:function(){var o=[];for(var i=0;i<nr;i++){var row=[];for(var j=0;j<nc;j++){var x=(data[r-1+i]||[])[c-1+j];row.push(x===undefined?"":x);}o.push(row);}return o},
+  getValue:function(){var x=(data[r-1]||[])[c-1];return x===undefined?"":x},setValue:function(v){data[r-1]=data[r-1]||[];data[r-1][c-1]=v;return this},setFontWeight:function(){return this}}},
+ setFrozenRows:function(){}}}
+var props={},cache={},files={};
+function mkSS(id,name){var sh={};return files[id]={getId:function(){return id},getName:function(){return name},getSheetByName:function(n){return sh[n]||null},insertSheet:function(n){return sh[n]=mkSheet(n)}}}
+mkSS("home","Home");
+function bytes(s){return Array.from(new TextEncoder().encode(String(s)))}
+function fakeHmac(v,k){var h=[];var s=String(k)+"|"+String(v);for(var r=0;r<32;r++){var x=2166136261^r;for(var i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)>>>0;}h.push((x&255)>127?(x&255)-256:(x&255));}return h}
+function b64(b){return btoa(String.fromCharCode.apply(null,b.map(function(x){return x&255})))}
+window.SpreadsheetApp={getActiveSpreadsheet:function(){return files.home},openById:function(id){return files[id]},create:function(n){return mkSS("f"+Object.keys(files).length,n)}};
+window.PropertiesService={getScriptProperties:function(){return{getProperty:function(k){return k in props?props[k]:null},setProperty:function(k,v){props[k]=String(v)}}}};
+window.CacheService={getScriptCache:function(){return{get:function(k){return cache[k]||null},put:function(k,v){cache[k]=v},remove:function(k){delete cache[k]}}}};
+window.LockService={getScriptLock:function(){return{waitLock:function(){},releaseLock:function(){}}}};
+window.Session={getScriptTimeZone:function(){return"Asia/Kolkata"}};
+window.Utilities={getUuid:function(){return crypto.randomUUID()},computeHmacSha256Signature:fakeHmac,base64Encode:b64,
+ base64EncodeWebSafe:function(b){return b64(b).replace(/\+/g,"-").replace(/\//g,"_")},
+ base64DecodeWebSafe:function(s){var t=atob(s.replace(/-/g,"+").replace(/_/g,"/"));return Array.from(t).map(function(c){return c.charCodeAt(0)})},
+ newBlob:function(x){return{getBytes:function(){return bytes(x)},getDataAsString:function(){return typeof x==="string"?x:new TextDecoder().decode(new Uint8Array(x.map(function(b){return b&255})))}}},
+ formatDate:function(d){var p=function(n){return(n<10?"0":"")+n};return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}};
+function runner(ok,fail){var o={withSuccessHandler:function(f){return runner(f,fail)},withFailureHandler:function(f){return runner(ok,f)}};
+ return new Proxy(o,{get:function(t,name){if(name in t)return t[name];return function(){var a=arguments;setTimeout(function(){try{var r=window[name].apply(null,a);r=JSON.parse(JSON.stringify(r===undefined?null:r));ok&&ok(r)}catch(e){console.warn(e);fail&&fail(e)}},60)}}})}
+window.google={script:{get run(){return runner(null,null)}}};
+})();
+</script>
+<script>
+/**
+ * ==========================================================
+ * Accounting-Books  -  SIGN-IN
+ * ==========================================================
+ * Two ways in:
+ *  1. From the company portal: the portal passes a signed token
+ *     (?t=...). It is checked with CORE_SECRET (Script Property
+ *     copied from the client core). The role always comes from
+ *     this app's Users tab, never from the browser.
+ *  2. On its own: username + password from the Users tab
+ *     (salted, iterated hashes - never plain text). The first
+ *     visit to an empty Users tab creates the admin.
+ *
+ * Roles: admin (everything, incl. rates and masters),
+ *        accountant (vouchers + reports), viewer (reports only).
+ */
+
+const AB_AUTH = { ITERATIONS: 300, SESSION_HOURS: 10, MIN_PASSWORD: 8, MAX_FAILED: 5, LOCK_MINUTES: 15 };
+
+function abB64url_(bytes) { return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, ""); }
+function abB64urlDecode_(s) {
+  const pad = s.length % 4 ? "====".slice(s.length % 4) : "";
+  return Utilities.newBlob(Utilities.base64DecodeWebSafe(s + pad)).getDataAsString();
+}
+function abSame_(a, b) {
+  a = String(a); b = String(b);
+  let d = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return d === 0;
+}
+
+function abHash_(password, salt, iterations) {
+  salt = salt || Utilities.getUuid().replace(/-/g, "");
+  iterations = iterations || AB_AUTH.ITERATIONS;
+  let h = Utilities.computeHmacSha256Signature(String(password), salt);
+  for (let i = 1; i < iterations; i++) h = Utilities.computeHmacSha256Signature(Utilities.base64Encode(h), salt);
+  return "v1$" + iterations + "$" + salt + "$" + Utilities.base64Encode(h);
+}
+function abCheckHash_(password, stored) {
+  const p = String(stored || "").split("$");
+  if (p.length !== 4 || p[0] !== "v1") return false;
+  return abSame_(abHash_(password, p[2], Number(p[1])), stored);
+}
+function abPasswordProblem_(pw) {
+  pw = String(pw || "");
+  if (pw.length < AB_AUTH.MIN_PASSWORD) return "Use at least " + AB_AUTH.MIN_PASSWORD + " characters.";
+  if (/^(.)\1+$/.test(pw) || /^(?:12345678|password|qwerty)/i.test(pw)) return "Pick something harder to guess.";
+  return "";
+}
+
+/* This app's own signing key (created once). */
+function abSecret_() {
+  const props = PropertiesService.getScriptProperties();
+  let s = props.getProperty("BOOKS_SECRET");
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props.setProperty("BOOKS_SECRET", s); }
+  return s;
+}
+
+function abPortalMode_() { return !!abSetting_("CORE_SECRET", ""); }
+
+/* ---------- users ---------- */
+
+function abUsers_() {
+  return abRows_(AB.SHEETS.USERS).filter(function (r) { return r[0]; }).map(function (r, i) {
+    return {
+      row: i + 2, username: abStr_(r[0]).toLowerCase(), name: abStr_(r[1]) || abStr_(r[0]),
+      role: AB.ROLES.indexOf(abStr_(r[2]).toLowerCase()) >= 0 ? abStr_(r[2]).toLowerCase() : "viewer",
+      hash: abStr_(r[3]), active: abStr_(r[4]).toLowerCase() !== "no"
+    };
+  });
+}
+function abFindUser_(username) {
+  username = abStr_(username).toLowerCase();
+  return abUsers_().filter(function (u) { return u.username === username && u.active; })[0] || null;
+}
+
+/* ---------- tokens ---------- */
+
+function abIssue_(u) {
+  const payload = abB64url_(Utilities.newBlob(JSON.stringify({
+    u: u.username, exp: Date.now() + AB_AUTH.SESSION_HOURS * 3600e3,
+    sv: abSetting_("SESSION_VERSION", "1")
+  })).getBytes());
+  return payload + "." + abB64url_(Utilities.computeHmacSha256Signature(payload, abSecret_()));
+}
+
+/* Who is asking: {username, name, role} or throws. */
+function abWho_(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length === 2) {
+    // Portal token (signed by the core)
+    const core = abSetting_("CORE_SECRET", "");
+    if (core && abSame_(abB64url_(Utilities.computeHmacSha256Signature(parts[0], core)), parts[1])) {
+      let p = null;
+      try { p = JSON.parse(abB64urlDecode_(parts[0])); } catch (e) { p = null; }
+      if (p && p.k === "staff" && Date.now() < p.exp) {
+        const u = abFindUser_(p.u);
+        if (u) return { username: u.username, name: p.n || u.name, role: u.role };
+        throw new Error("You don't have access to Accounting-Books. Ask your admin to add you.");
+      }
+    }
+    // Our own token
+    if (!abPortalMode_() && abSame_(abB64url_(Utilities.computeHmacSha256Signature(parts[0], abSecret_())), parts[1])) {
+      let p = null;
+      try { p = JSON.parse(abB64urlDecode_(parts[0])); } catch (e) { p = null; }
+      if (p && Date.now() < p.exp && String(p.sv) === abSetting_("SESSION_VERSION", "1")) {
+        const u = abFindUser_(p.u);
+        if (u) return { username: u.username, name: u.name, role: u.role };
+      }
+    }
+  }
+  throw new Error("SESSION_ENDED");
+}
+
+/*
+ * token is "signedToken~companyId". Checks the person, their role
+ * and (unless noCompany) that a company is selected, and points
+ * this call at that company's books.
+ */
+function abRequire_(token, roles, noCompany) {
+  const parts = String(token || "").split("~");
+  AB_CTX = { coId: abStr_(parts[1]), co: null, ss: null };
+  const who = abWho_(parts[0]);
+  if (roles && roles.indexOf(who.role) < 0) throw new Error("Your role (" + who.role + ") can't do this.");
+  if (!noCompany) abCo_() || (function () { throw new Error("NO_COMPANY"); })();
+  return who;
+}
+
+/* ---------- public calls ---------- */
+
+function abNeedsSetup() {
+  abEnsureHome_();
+  return { needsSetup: !abUsers_().length, portal: abPortalMode_(), states: AB_STATES };
+}
+
+/* First visit: the admin and the first company together. */
+function abCreateFirstAdmin(username, name, password, company) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  let res;
+  try {
+    abEnsureHome_();
+    if (abUsers_().length) throw new Error("Setup is already done. Please sign in.");
+    username = abStr_(username).toLowerCase();
+    if (!/^[a-z0-9._-]{3,30}$/.test(username)) throw new Error("Username: 3-30 letters, numbers, dot, dash.");
+    const prob = abPasswordProblem_(password);
+    if (prob) throw new Error(prob);
+    abCheckCompany_(company || {});
+    abAppend_(AB.SHEETS.USERS, [[username, abStr_(name) || username, "admin", abHash_(password), "Yes"]]);
+    res = abLogin(username, password);
+  } finally {
+    lock.releaseLock();
+  }
+  res.company = abSaveCompany(res.token, company);
+  return res;
+}
+
+function abLogin(username, password) {
+  if (abPortalMode_()) throw new Error("Please open Accounting-Books from your company portal.");
+  username = abStr_(username).toLowerCase();
+  const cache = CacheService.getScriptCache();
+  const failKey = "abfail:" + username;
+  const fails = Number(cache.get(failKey) || 0);
+  if (fails >= AB_AUTH.MAX_FAILED) throw new Error("Too many attempts. Try again in " + AB_AUTH.LOCK_MINUTES + " minutes.");
+  const u = abFindUser_(username);
+  if (!u || !abCheckHash_(password, u.hash)) {
+    cache.put(failKey, String(fails + 1), AB_AUTH.LOCK_MINUTES * 60);
+    throw new Error("Wrong username or password.");
+  }
+  cache.remove(failKey);
+  return { token: abIssue_(u), user: { username: u.username, name: u.name, role: u.role } };
+}
+
+
+function abChangePassword(token, oldPw, newPw) {
+  const w = abRequire_(token, null, true);
+  const u = abFindUser_(w.username);
+  if (!abCheckHash_(oldPw, u.hash)) throw new Error("Current password is wrong.");
+  const prob = abPasswordProblem_(newPw);
+  if (prob) throw new Error(prob);
+  abSheet_(AB.SHEETS.USERS).getRange(u.row, 4).setValue(abHash_(newPw));
+  return true;
+}
+
+/* Admin: list / add / update users. */
+function abListUsers(token) {
+  abRequire_(token, ["admin"], true);
+  return abUsers_().map(function (u) { return { username: u.username, name: u.name, role: u.role, active: u.active }; });
+}
+
+function abSaveUser(token, data) {
+  const me = abRequire_(token, ["admin"], true);
+  const username = abStr_(data.username).toLowerCase();
+  if (!/^[a-z0-9._-]{3,30}$/.test(username)) throw new Error("Username: 3-30 letters, numbers, dot, dash.");
+  const role = AB.ROLES.indexOf(data.role) >= 0 ? data.role : "viewer";
+  const active = data.active === false ? "No" : "Yes";
+  if (username === me.username && (role !== "admin" || active === "No")) throw new Error("You can't remove your own admin access.");
+  const sh = abSheet_(AB.SHEETS.USERS);
+  const all = abRows_(AB.SHEETS.USERS);
+  for (let i = 0; i < all.length; i++) {
+    if (abStr_(all[i][0]).toLowerCase() === username) {
+      const hash = data.password ? abHash_(abCheckNew_(data.password)) : all[i][3];
+      sh.getRange(i + 2, 1, 1, 5).setValues([[username, abStr_(data.name) || username, role, hash, active]]);
+      return true;
+    }
+  }
+  if (!data.password && !abPortalMode_()) throw new Error("Set a password for the new user.");
+  const hash = data.password ? abHash_(abCheckNew_(data.password)) : "";
+  abAppend_(AB.SHEETS.USERS, [[username, abStr_(data.name) || username, role, hash, active]]);
+  return true;
+}
+function abCheckNew_(pw) { const p = abPasswordProblem_(pw); if (p) throw new Error(p); return pw; }
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  WEB APP ENTRY
+ * Designed by rawsploit@gmail.com
+ * ==========================================================
+ */
+
+function doGet(e) {
+  const t = HtmlService.createTemplateFromFile("index");
+  const p = (e && e.parameter) || {};
+  // A portal token is only passed through when it is a real one.
+  let portal = "";
+  if (p.t) { try { abWho_(p.t); portal = String(p.t); } catch (err) { portal = ""; } }
+  t.portalToken = portal;
+  t.startTab = String(p.tab || "").replace(/[^a-z-]/gi, "");
+  t.appName = AB.APP_NAME;
+  return t.evaluate()
+    .setTitle(AB.APP_NAME)
+    .addMetaTag("viewport", "width=device-width, initial-scale=1")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(name) {
+  return HtmlService.createHtmlOutputFromFile(name).getContent();
+}
+
+/* Company name + logo for the sign-in screen (no sign-in needed). */
+function abBrand() {
+  let name = "";
+  try {
+    const list = abCompanies_().filter(function (c) { return c.active; });
+    name = list.length === 1 ? list[0].name : "";
+  } catch (e) { name = ""; }
+  return { company: name || abSetting_("COMPANY_NAME", ""), logo: AB.LOGO_URL, app: AB.APP_NAME };
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  COMPANIES
+ * ==========================================================
+ * One install can keep books for several companies (an owner
+ * with two or three firms, each with its own GSTIN). Each
+ * company has its own Google Sheet of books; users are shared.
+ * The browser sends the selected company with every call
+ * ("token~companyId"); abRequire_ picks it up.
+ */
+
+function abCompanies_() {
+  return abRows_(AB.SHEETS.COMPANIES).filter(function (r) { return abStr_(r[0]); }).map(function (r, i) {
+    return {
+      row: i + 2, id: abStr_(r[0]), name: abStr_(r[1]), address: abStr_(r[2]), state: abStr_(r[3]),
+      pincode: abStr_(r[4]), phone: abStr_(r[5]), email: abStr_(r[6]), gstin: abStr_(r[7]),
+      fyStart: Number(r[8]) || 4, sheetId: abStr_(r[9]), lockedTill: abIso_(r[10]),
+      active: abStr_(r[11]).toLowerCase() !== "no"
+    };
+  });
+}
+
+/* The company this call works on (or null). */
+function abCo_() {
+  if (AB_CTX.co) return AB_CTX.co;
+  if (!AB_CTX.coId) return null;
+  AB_CTX.co = abCompanies_().filter(function (c) { return c.id === AB_CTX.coId && c.active; })[0] || null;
+  if (!AB_CTX.co) throw new Error("NO_COMPANY");
+  return AB_CTX.co;
+}
+
+function abPublicCo_(c) {
+  return { id: c.id, name: c.name, address: c.address, state: c.state, pincode: c.pincode, phone: c.phone,
+    email: c.email, gstin: c.gstin, fyStart: c.fyStart, lockedTill: c.lockedTill, active: c.active };
+}
+
+/* F3: the companies this person can open. */
+function abListCompanies(token) {
+  const who = abRequire_(token, null, true);
+  return abCompanies_().filter(function (c) { return c.active || who.role === "admin"; }).map(abPublicCo_);
+}
+
+function abCheckCompany_(d) {
+  const name = abStr_(d.name).replace(/\s+/g, " ");
+  if (!name) throw new Error("Company name is required.");
+  if (AB_STATES.indexOf(abStr_(d.state)) < 0) throw new Error("Pick the company's state from the list.");
+  const gstin = abStr_(d.gstin).toUpperCase();
+  if (gstin && !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstin)) throw new Error("GSTIN should be 15 characters.");
+  const fy = Number(d.fyStart) || 4;
+  if (fy < 1 || fy > 12) throw new Error("Financial year start month must be 1 to 12.");
+  const locked = d.lockedTill ? abIso_(d.lockedTill) : "";
+  if (d.lockedTill && !locked) throw new Error("Books-closed date isn't a valid date.");
+  return { name: name, address: abStr_(d.address), state: abStr_(d.state), pincode: abStr_(d.pincode),
+    phone: abStr_(d.phone), email: abStr_(d.email), gstin: gstin, fyStart: fy, lockedTill: locked };
+}
+
+/*
+ * Create (no id) or alter (id) a company. Admin only.
+ * A new company gets its own spreadsheet ("Books - <name>"),
+ * except the very first, which uses the home sheet.
+ */
+function abSaveCompany(token, data) {
+  const who = abRequire_(token, ["admin"], true);
+  const c = abCheckCompany_(data);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const all = abCompanies_();
+    if (all.some(function (x) { return abKey_(x.name) === abKey_(c.name) && x.id !== data.id; })) {
+      throw new Error("A company called \"" + c.name + "\" already exists.");
+    }
+    if (data.id) {
+      const ex = all.filter(function (x) { return x.id === data.id; })[0];
+      if (!ex) throw new Error("That company no longer exists.");
+      const active = data.active === false ? "No" : "Yes";
+      abSheet_(AB.SHEETS.COMPANIES).getRange(ex.row, 2, 1, 7).setValues([[c.name, c.address, c.state, c.pincode, c.phone, c.email, c.gstin]]);
+      abSheet_(AB.SHEETS.COMPANIES).getRange(ex.row, 9).setValue(c.fyStart);
+      abSheet_(AB.SHEETS.COMPANIES).getRange(ex.row, 11, 1, 2).setValues([[c.lockedTill, active]]);
+      const fresh = abCompanies_().filter(function (x) { return x.id === ex.id; })[0];
+      AB_CTX = { coId: ex.id, co: fresh, ss: null };   // logged in its own books, even when made inactive
+      abLog_(who, active === "No" ? "Company made inactive" : "Company altered", "", c.name, abPublicCo_(ex), c);
+      return abPublicCo_(fresh);
+    }
+    const home = abHomeSS_();
+    const sheetId = all.length ? SpreadsheetApp.create("Books - " + c.name).getId() : home.getId();
+    const id = "co-" + Utilities.getUuid().substring(0, 8);
+    abAppend_(AB.SHEETS.COMPANIES, [[id, c.name, c.address, c.state, c.pincode, c.phone, c.email, c.gstin,
+      c.fyStart, sheetId, c.lockedTill, "Yes", new Date()]]);
+    AB_CTX = { coId: id, co: null, ss: null };
+    abEnsureBooks_();
+    abLog_(who, "Company created", "", c.name, null, c);
+    return abPublicCo_(abCo_());
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  CONFIG
+ * Designed by rawsploit@gmail.com
+ * ==========================================================
+ * Small-business books (ledgers, vouchers, GST) that also
+ * produce the same reports the other modules read from Tally:
+ * Day Book, Sales / Receipt Register, M1-M6 outstandings and
+ * today's shop balances. A client can run on Tally or on
+ * Accounting-Books and every module keeps working.
+ *
+ * Per-client settings are Script Properties (see README).
+ */
+
+function abSetting_(key, fallback) {
+  try {
+    const v = PropertiesService.getScriptProperties().getProperty(key);
+    return (v === null || v === "") ? fallback : String(v);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+const AB = {
+  APP_NAME: "Accounting-Books",
+
+  /* The selected company's details (see Company.js). Script
+     Properties only give the defaults for a brand-new install. */
+  get COMPANY_NAME() { const c = abCo_(); return c ? c.name : abSetting_("COMPANY_NAME", "Your Company"); },
+  get COMPANY_STATE() { const c = abCo_(); return c ? c.state : abSetting_("COMPANY_STATE", "Kerala"); },
+  get COMPANY_GSTIN() { const c = abCo_(); return c ? c.gstin : ""; },
+  get LOGO_URL() { return abSetting_("LOGO_URL", ""); },
+  /* Financial year starts in this month (4 = April). */
+  get FY_START_MONTH() { const c = abCo_(); return (c && c.fyStart) || Number(abSetting_("FY_START_MONTH", "4")) || 4; },
+  get LOCKED_TILL() { const c = abCo_(); return c ? c.lockedTill : ""; },
+  /* Debtor segments used by the MIS and Collections modules. */
+  get SEGMENTS() {
+    return abSetting_("SEGMENTS", "M1,M2,M3,M4,M5,M6").split(",")
+      .map(function (s) { return s.trim().toUpperCase(); }).filter(String);
+  },
+
+  SHEETS: {
+    LEDGERS: "Ledgers",
+    ITEMS: "Items",
+    TAX_RATES: "Tax_Rates",
+    VOUCHERS: "Vouchers",
+    LINES: "Voucher_Lines",
+    INV_ITEMS: "Invoice_Items",
+    EDIT_LOG: "Edit_Log",
+    USERS: "Users",
+    COMPANIES: "Companies"
+  },
+
+  /* Standard ledgers the posting rules use. Created on setup. */
+  LEDGER: {
+    CASH: "Cash",
+    SALES: "Sales",
+    PURCHASE: "Purchase",
+    OUT_CGST: "Output CGST",
+    OUT_SGST: "Output SGST",
+    OUT_IGST: "Output IGST",
+    IN_CGST: "Input CGST",
+    IN_SGST: "Input SGST",
+    IN_IGST: "Input IGST",
+    ROUND_OFF: "Round Off",
+    CAPITAL: "Capital Account",
+    PROFIT_LOSS: "Profit & Loss A/c"
+  },
+
+  ROLES: ["admin", "accountant", "viewer"]
+};
+
+/* Group -> nature. A = asset, L = liability, I = income, E = expense.
+   Same primary groups traders already know. */
+const AB_GROUPS = {
+  "Capital Account": "L",
+  "Reserves & Surplus": "L",
+  "Loans (Liability)": "L",
+  "Current Liabilities": "L",
+  "Sundry Creditors": "L",
+  "Duties & Taxes": "L",
+  "Provisions": "L",
+  "Fixed Assets": "A",
+  "Investments": "A",
+  "Current Assets": "A",
+  "Sundry Debtors": "A",
+  "Bank Accounts": "A",
+  "Cash-in-Hand": "A",
+  "Deposits (Asset)": "A",
+  "Loans & Advances (Asset)": "A",
+  "Stock-in-Hand": "A",
+  "Sales Accounts": "I",
+  "Direct Incomes": "I",
+  "Indirect Incomes": "I",
+  "Purchase Accounts": "E",
+  "Direct Expenses": "E",
+  "Indirect Expenses": "E"
+};
+
+/* Voucher types. "inv" = item invoice with GST; "acc" = Dr/Cr lines.
+   key is the familiar shortcut shown on screen. prefix numbers them. */
+const AB_VTYPES = {
+  "Contra":      { mode: "acc", key: "F4",      prefix: "CN" },
+  "Payment":     { mode: "acc", key: "F5",      prefix: "PY" },
+  "Receipt":     { mode: "acc", key: "F6",      prefix: "RC" },
+  "Journal":     { mode: "acc", key: "F7",      prefix: "JV" },
+  "Sales":       { mode: "inv", key: "F8",      prefix: "S",  side: "sales",    sign: 1 },
+  "Purchase":    { mode: "inv", key: "F9",      prefix: "P",  side: "purchase", sign: 1 },
+  "Credit Note": { mode: "inv", key: "Ctrl+F8", prefix: "CR", side: "sales",    sign: -1 },
+  "Debit Note":  { mode: "inv", key: "Ctrl+F9", prefix: "DR", side: "purchase", sign: -1 }
+};
+
+const AB_HEADERS = {
+  Ledgers: ["Name", "Group", "Segment", "Opening Dr", "Opening Cr", "GSTIN", "State", "Phone", "Active", "Created At"],
+  Items: ["Name", "HSN", "Unit", "Price", "GST Rate", "Active"],
+  Tax_Rates: ["Rate %", "Label", "Active"],
+  Vouchers: ["Id", "Date", "Type", "No", "Party", "Narration", "Amount", "Status",
+    "Interstate", "Created By", "Created At", "Updated By", "Updated At", "Version"],
+  Voucher_Lines: ["Voucher Id", "Seq", "Ledger", "Debit", "Credit"],
+  Invoice_Items: ["Voucher Id", "Seq", "Item", "HSN", "Qty", "Unit", "Rate", "Gross",
+    "Discount", "Taxable", "GST %", "CGST", "SGST", "IGST", "Total"],
+  Edit_Log: ["When", "User", "Action", "Voucher Id", "Vch No", "Before", "After"],
+  Users: ["Username", "Name", "Role", "Password Hash", "Active"],
+  Companies: ["Id", "Name", "Address", "State", "Pincode", "Phone", "Email", "GSTIN",
+    "FY Start Month", "Books Sheet Id", "Locked Till", "Active", "Created At"]
+};
+
+/* Tabs kept once for the whole install (not per company). */
+const AB_HOME_TABS = { Users: true, Companies: true };
+/* Books tabs inside each company's sheet. */
+const AB_BOOK_TABS = ["Ledgers", "Items", "Tax_Rates", "Vouchers", "Voucher_Lines", "Invoice_Items", "Edit_Log"];
+
+const AB_STATES = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh",
+  "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh",
+  "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra",
+  "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"];
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  FEEDS FOR THE OTHER MODULES
+ * ==========================================================
+ * Each feed is laid out exactly like the Tally export the
+ * module already reads, so a client on Accounting-Books uploads
+ * these files in the same place they would upload Tally's:
+ *
+ *   Day Book (detailed)   -> Cash Recon, P&L, Trade Recon
+ *   Sales Register        -> MIS Dashboard
+ *   Receipt Register      -> MIS Dashboard
+ *   Outstandings M1..M6   -> MIS Dashboard (one tab per segment)
+ *   Shop balances         -> Collections (Todays_Opening)
+ *
+ * The browser turns the returned rows into .xlsx / .csv files.
+ * Dates are written as Tally writes them ("1-Oct-26").
+ */
+
+function abFeedHead_(title, from, to) {
+  return [
+    [AB.COMPANY_NAME, "", "", "", "", ""],
+    [title, "", "", "", "", ""],
+    [from === to ? "For " + abTallyDate_(to) : abTallyDate_(from) + " to " + abTallyDate_(to), "", "", "", "", ""],
+    ["", "", "", "", "", ""]
+  ];
+}
+
+/* Detailed Day Book: first line of each voucher carries date, type
+   and number; the other ledgers follow on their own lines. */
+function abFeedDayBook(token, from, to) {
+  abRequire_(token);
+  from = abIso_(from); to = abIso_(to);
+  if (!from || !to || from > to) throw new Error("Pick a valid date range.");
+  const rows = abFeedHead_("Day Book", from, to);
+  rows.push(["Date", "Particulars", "Vch Type", "Vch No.", "Debit Amount", "Credit Amount"]);
+  abBooks_().forEach(function (v) {
+    if (v.date < from || v.date > to) return;
+    if (v.status === "Cancelled") {
+      rows.push([abTallyDate_(v.date), "(cancelled)", v.type, v.no, "", ""]);
+      return;
+    }
+    // party line first, the rest after (as Tally shows it)
+    const pk = abKey_(v.party);
+    const lines = v.lines.slice().sort(function (a, b) {
+      return (abKey_(a.ledger) === pk ? 0 : 1) - (abKey_(b.ledger) === pk ? 0 : 1) || a.seq - b.seq;
+    });
+    lines.forEach(function (l, i) {
+      rows.push([i === 0 ? abTallyDate_(v.date) : "", l.ledger, i === 0 ? v.type : "", i === 0 ? v.no : "",
+        l.dr || "", l.cr || ""]);
+    });
+  });
+  return { fileName: "Day Book " + from + " to " + to, sheets: [{ name: "Day Book", rows: rows }] };
+}
+
+/* Sales Register (Sales + Credit Notes) or Receipt Register, one line per voucher. */
+function abFeedRegister(token, kind, from, to) {
+  abRequire_(token);
+  from = abIso_(from); to = abIso_(to);
+  if (!from || !to || from > to) throw new Error("Pick a valid date range.");
+  const sales = kind === "Sales";
+  const types = sales ? ["Sales", "Credit Note"] : ["Receipt"];
+  const rows = abFeedHead_(sales ? "Sales Register" : "Receipt Register", from, to);
+  rows.push(["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit"]);
+  let tDr = 0, tCr = 0;
+  abActive_(abBooks_()).forEach(function (v) {
+    if (v.date < from || v.date > to || types.indexOf(v.type) < 0) return;
+    const pk = abKey_(v.party);
+    let dr = 0, cr = 0;
+    v.lines.forEach(function (l) { if (abKey_(l.ledger) === pk) { dr += l.dr; cr += l.cr; } });
+    dr = abR2_(dr); cr = abR2_(cr);
+    tDr = abR2_(tDr + dr); tCr = abR2_(tCr + cr);
+    rows.push([abTallyDate_(v.date), v.party, v.type, v.no, dr || "", cr || ""]);
+  });
+  rows.push(["Grand Total", "", "", "", tDr, tCr]);
+  return { fileName: (sales ? "Sales Register " : "Receipt Register ") + from + " to " + to,
+    sheets: [{ name: sales ? "Sales Register" : "Receipt Register", rows: rows }] };
+}
+
+/* Debtor balances as of a date, one tab per segment (M1..M6),
+   Particulars | Debit | Credit, ending with Grand Total. */
+function abFeedOutstandings(token, asOf) {
+  abRequire_(token);
+  asOf = abIso_(asOf) || abToday_();
+  const ledgers = abLedgers_();
+  const bal = abBalances_(abBooks_(), ledgers, asOf);
+  const segs = AB.SEGMENTS.slice();
+  const tabs = {};
+  segs.concat(["Unassigned"]).forEach(function (s) { tabs[s] = []; });
+  ledgers.forEach(function (l) {
+    if (l.group !== "Sundry Debtors") return;
+    const b = bal[abKey_(l.name)];
+    if (!b) return;
+    const seg = segs.indexOf(l.segment) >= 0 ? l.segment : "Unassigned";
+    tabs[seg].push([l.name, b > 0 ? b : "", b < 0 ? -b : ""]);
+  });
+  const sheets = [];
+  Object.keys(tabs).forEach(function (s) {
+    if (s === "Unassigned" && !tabs[s].length) return;
+    const list = tabs[s].sort(function (a, b) { return String(a[0]).localeCompare(String(b[0])); });
+    const dr = abR2_(list.reduce(function (t, r) { return t + (Number(r[1]) || 0); }, 0));
+    const cr = abR2_(list.reduce(function (t, r) { return t + (Number(r[2]) || 0); }, 0));
+    const rows = [[AB.COMPANY_NAME, "", ""], ["Group Summary - " + s, "", ""], ["For " + abTallyDate_(asOf), "", ""], ["", "", ""],
+      ["Particulars", "Debit", "Credit"]].concat(list).concat([["Grand Total", dr, cr]]);
+    sheets.push({ name: s, rows: rows });
+  });
+  return { fileName: "Outstandings " + asOf, sheets: sheets };
+}
+
+/* Shop balances for the Collections call queue (Todays_Opening). */
+function abFeedShopBalances(token, asOf) {
+  abRequire_(token);
+  asOf = abIso_(asOf) || abToday_();
+  const month = AB_MON_[Number(asOf.substring(5, 7)) - 1] + "-" + asOf.substring(0, 4);
+  const rows = [["Month", "Segment", "Shop", "Balance", "Phone", "DaysOutstanding"]];
+  abOutstandingCompute_(abBooks_(), abLedgers_(), asOf, "Sundry Debtors").forEach(function (r) {
+    if (r.balance > 0) rows.push([month, r.segment || "", r.party, r.balance, r.phone, r.days]);
+  });
+  return { fileName: "Todays_Opening " + asOf, sheets: [{ name: "Todays_Opening", rows: rows }] };
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  MASTERS (ledgers, items, GST rates)
+ * ==========================================================
+ */
+
+function abLedgers_() {
+  return abRows_(AB.SHEETS.LEDGERS).filter(function (r) { return abStr_(r[0]); }).map(function (r, i) {
+    return {
+      row: i + 2, name: abStr_(r[0]), group: abStr_(r[1]), segment: abStr_(r[2]).toUpperCase(),
+      openDr: abNum_(r[3]), openCr: abNum_(r[4]), gstin: abStr_(r[5]), state: abStr_(r[6]),
+      phone: abStr_(r[7]), active: abStr_(r[8]).toLowerCase() !== "no"
+    };
+  });
+}
+
+function abLedgerMap_() {
+  const m = {};
+  abLedgers_().forEach(function (l) { m[abKey_(l.name)] = l; });
+  return m;
+}
+
+function abItems_() {
+  return abRows_(AB.SHEETS.ITEMS).filter(function (r) { return abStr_(r[0]); }).map(function (r, i) {
+    return {
+      row: i + 2, name: abStr_(r[0]), hsn: abStr_(r[1]), unit: abStr_(r[2]) || "Nos",
+      price: abNum_(r[3]), gst: abNum_(r[4]), active: abStr_(r[5]).toLowerCase() !== "no"
+    };
+  });
+}
+
+function abRates_() {
+  return abRows_(AB.SHEETS.TAX_RATES).filter(function (r) { return r[0] !== "" && r[0] !== null; }).map(function (r) {
+    return { rate: abNum_(r[0]), label: abStr_(r[1]) || ("GST " + abNum_(r[0]) + "%"), active: abStr_(r[2]).toLowerCase() !== "no" };
+  }).sort(function (a, b) { return a.rate - b.rate; });
+}
+
+/* Everything the entry screens need, in one call. */
+function abMasters(token) {
+  const who = abRequire_(token);
+  abEnsureBooks_();
+  return {
+    me: who,
+    company: Object.assign(abPublicCo_(abCo_()), { logo: AB.LOGO_URL }),
+    states: AB_STATES,
+    groups: Object.keys(AB_GROUPS).map(function (g) { return { name: g, nature: AB_GROUPS[g] }; }),
+    vtypes: Object.keys(AB_VTYPES).map(function (t) { return { name: t, mode: AB_VTYPES[t].mode, key: AB_VTYPES[t].key }; }),
+    segments: AB.SEGMENTS,
+    ledgers: abLedgers_().map(function (l) { delete l.row; return l; }),
+    items: abItems_().map(function (i) { delete i.row; return i; }),
+    rates: abRates_(),
+    std: AB.LEDGER,
+    today: abToday_()
+  };
+}
+
+/* ---------- ledgers ---------- */
+
+/* data = {name, group, segment, openDr, openCr, gstin, state, phone, active, oldName} */
+function abSaveLedger(token, data) {
+  const who = abRequire_(token, ["admin", "accountant"]);
+  const name = abStr_(data.name).replace(/\s+/g, " ");
+  if (!name) throw new Error("Ledger name is required.");
+  if (!AB_GROUPS[data.group]) throw new Error("Pick a group for the ledger.");
+  const seg = abStr_(data.segment).toUpperCase();
+  if (seg && AB.SEGMENTS.indexOf(seg) < 0) throw new Error("Unknown segment " + seg + ".");
+  const gstin = abStr_(data.gstin).toUpperCase();
+  if (gstin && !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstin)) throw new Error("GSTIN should be 15 characters.");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const all = abLedgers_();
+    const oldKey = abKey_(data.oldName || "");
+    const existing = oldKey ? all.filter(function (l) { return abKey_(l.name) === oldKey; })[0] : null;
+    const clash = all.filter(function (l) { return abKey_(l.name) === abKey_(name) && l !== existing; })[0];
+    if (clash) throw new Error("A ledger called \"" + clash.name + "\" already exists.");
+    if (existing && abStdLedger_(existing.name) && abKey_(existing.name) !== abKey_(name)) {
+      throw new Error("\"" + existing.name + "\" is a standard ledger used by the posting rules - it can't be renamed.");
+    }
+
+    const row = [name, data.group, seg, abR2_(abNum_(data.openDr)), abR2_(abNum_(data.openCr)), gstin,
+      abStr_(data.state), abStr_(data.phone), data.active === false ? "No" : "Yes", existing ? "" : new Date()];
+
+    if (existing) {
+      const sh = abSheet_(AB.SHEETS.LEDGERS);
+      const created = sh.getRange(existing.row, 10).getValue();
+      row[9] = created;
+      sh.getRange(existing.row, 1, 1, row.length).setValues([row]);
+      if (abKey_(existing.name) !== abKey_(name)) abRenameInVouchers_(existing.name, name);
+      abLog_(who, "Ledger altered", "", existing.name, existing, abLedgerObj_(row));
+    } else {
+      abAppend_(AB.SHEETS.LEDGERS, [row]);
+      abLog_(who, "Ledger created", "", name, null, abLedgerObj_(row));
+    }
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function abLedgerObj_(r) {
+  return { name: r[0], group: r[1], segment: r[2], openDr: r[3], openCr: r[4], gstin: r[5], state: r[6], phone: r[7], active: r[8] };
+}
+
+function abStdLedger_(name) {
+  const k = abKey_(name);
+  return Object.keys(AB.LEDGER).some(function (x) { return abKey_(AB.LEDGER[x]) === k; });
+}
+
+/* A renamed ledger is renamed everywhere it was used. */
+function abRenameInVouchers_(oldName, newName) {
+  const k = abKey_(oldName);
+  ["LINES", "VOUCHERS"].forEach(function (t) {
+    const name = AB.SHEETS[t];
+    const col = t === "LINES" ? 2 : 4; // Ledger / Party column (0-based)
+    const rows = abRows_(name);
+    let changed = false;
+    rows.forEach(function (r) { if (abKey_(r[col]) === k) { r[col] = newName; changed = true; } });
+    if (changed) abSheet_(name).getRange(2, col + 1, rows.length, 1).setValues(rows.map(function (r) { return [r[col]]; }));
+  });
+}
+
+/* ---------- items ---------- */
+
+function abSaveItem(token, data) {
+  const who = abRequire_(token, ["admin", "accountant"]);
+  const name = abStr_(data.name).replace(/\s+/g, " ");
+  if (!name) throw new Error("Item name is required.");
+  const gst = abNum_(data.gst);
+  if (!abRates_().some(function (r) { return r.rate === gst; })) throw new Error("GST " + gst + "% isn't in the rate list. Add it under GST Rates first.");
+  const row = [name, abStr_(data.hsn), abStr_(data.unit) || "Nos", abR2_(abNum_(data.price)), gst, data.active === false ? "No" : "Yes"];
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const all = abItems_();
+    const oldKey = abKey_(data.oldName || "");
+    const existing = oldKey ? all.filter(function (i) { return abKey_(i.name) === oldKey; })[0] : null;
+    if (all.some(function (i) { return abKey_(i.name) === abKey_(name) && i !== existing; })) throw new Error("That item already exists.");
+    if (existing) {
+      abSheet_(AB.SHEETS.ITEMS).getRange(existing.row, 1, 1, row.length).setValues([row]);
+      abLog_(who, "Item altered", "", existing.name, existing, row);
+    } else {
+      abAppend_(AB.SHEETS.ITEMS, [row]);
+      abLog_(who, "Item created", "", name, null, row);
+    }
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ---------- GST rates (the "change rates" menu) ---------- */
+
+/* rates = [{rate, label, active}] - replaces the list. Admin only.
+   Old invoices keep the rate they were saved with. */
+function abSaveRates(token, rates) {
+  const who = abRequire_(token, ["admin"]);
+  const seen = {};
+  const rows = (rates || []).map(function (r) {
+    const rate = abR2_(abNum_(r.rate));
+    if (rate < 0 || rate > 100) throw new Error("A GST rate must be between 0 and 100.");
+    if (seen[rate]) throw new Error("GST " + rate + "% is listed twice.");
+    seen[rate] = true;
+    return [rate, abStr_(r.label) || ("GST " + rate + "%"), r.active === false ? "No" : "Yes"];
+  });
+  if (!rows.length) throw new Error("Keep at least one rate.");
+  const before = abRates_();
+  abRewrite_(AB.SHEETS.TAX_RATES, rows);
+  abLog_(who, "GST rates changed", "", "", before, rows);
+  return abRates_();
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  REPORTS
+ * ==========================================================
+ * Day Book, Ledger, Trial Balance, Profit & Loss, Balance
+ * Sheet, Outstandings (with ageing) and GST summary.
+ * Balances are "closing" = ledger opening + every active
+ * voucher line up to the date.
+ */
+
+function abActive_(books) { return books.filter(function (v) { return v.status !== "Cancelled"; }); }
+
+/* { LEDGERKEY: {dr, cr} } movements for vouchers with from <= date <= to */
+function abMovements_(books, from, to) {
+  const m = {};
+  abActive_(books).forEach(function (v) {
+    if ((from && v.date < from) || (to && v.date > to)) return;
+    v.lines.forEach(function (l) {
+      const k = abKey_(l.ledger);
+      m[k] = m[k] || { dr: 0, cr: 0 };
+      m[k].dr = abR2_(m[k].dr + l.dr);
+      m[k].cr = abR2_(m[k].cr + l.cr);
+    });
+  });
+  return m;
+}
+
+/* Closing balance of every ledger as of a date. + = Dr, - = Cr */
+function abBalances_(books, ledgers, asOf) {
+  const mv = abMovements_(books, "", asOf);
+  const out = {};
+  ledgers.forEach(function (l) {
+    const k = abKey_(l.name), x = mv[k] || { dr: 0, cr: 0 };
+    out[k] = abR2_(l.openDr - l.openCr + x.dr - x.cr);
+  });
+  return out;
+}
+
+function abDayBook(token, from, to) {
+  abRequire_(token);
+  from = abIso_(from) || abToday_(); to = abIso_(to) || from;
+  return abBooks_().filter(function (v) { return v.date >= from && v.date <= to; }).map(abVoucherView_);
+}
+
+function abLedgerStatement(token, name, from, to) {
+  abRequire_(token);
+  const led = abLedgerMap_()[abKey_(name)];
+  if (!led) throw new Error("No ledger called \"" + name + "\".");
+  const k = abKey_(led.name);
+  const books = abActive_(abBooks_());
+  from = abIso_(from) || abFyStart_(abToday_()); to = abIso_(to) || abToday_();
+  let bal = abR2_(led.openDr - led.openCr);
+  const rows = [];
+  let tDr = 0, tCr = 0;
+  books.forEach(function (v) {
+    if (v.date > to) return;
+    let dr = 0, cr = 0;
+    v.lines.forEach(function (l) { if (abKey_(l.ledger) === k) { dr += l.dr; cr += l.cr; } });
+    if (!dr && !cr) return;
+    if (v.date < from) { bal = abR2_(bal + dr - cr); return; }
+    // the other side, like Tally's Particulars
+    const others = v.lines.filter(function (l) { return abKey_(l.ledger) !== k; }).map(function (l) { return l.ledger; });
+    rows.push({ id: v.id, date: v.date, type: v.type, no: v.no, particulars: others.length === 1 ? others[0] : (others[0] || "") + (others.length > 1 ? " (+" + (others.length - 1) + ")" : ""),
+      narration: v.narration, dr: abR2_(dr), cr: abR2_(cr) });
+    tDr += dr; tCr += cr;
+  });
+  const opening = bal;
+  rows.forEach(function (r) { bal = abR2_(bal + r.dr - r.cr); r.balance = bal; });
+  return { ledger: led, from: from, to: to, opening: opening, rows: rows, totalDr: abR2_(tDr), totalCr: abR2_(tCr), closing: bal };
+}
+
+function abTrialBalance(token, asOf) {
+  abRequire_(token);
+  asOf = abIso_(asOf) || abToday_();
+  const ledgers = abLedgers_();
+  const bal = abBalances_(abBooks_(), ledgers, asOf);
+  const groups = {};
+  let tDr = 0, tCr = 0;
+  ledgers.forEach(function (l) {
+    const b = bal[abKey_(l.name)];
+    if (!b) return;
+    const g = groups[l.group] = groups[l.group] || { group: l.group, nature: AB_GROUPS[l.group], dr: 0, cr: 0, ledgers: [] };
+    const dr = b > 0 ? b : 0, cr = b < 0 ? -b : 0;
+    g.dr = abR2_(g.dr + dr); g.cr = abR2_(g.cr + cr);
+    g.ledgers.push({ name: l.name, dr: dr, cr: cr });
+    tDr = abR2_(tDr + dr); tCr = abR2_(tCr + cr);
+  });
+  const order = Object.keys(AB_GROUPS);
+  const list = Object.keys(groups).map(function (k) { return groups[k]; })
+    .sort(function (a, b) { return order.indexOf(a.group) - order.indexOf(b.group); });
+  return { asOf: asOf, groups: list, totalDr: tDr, totalCr: tCr, difference: abR2_(tDr - tCr) };
+}
+
+/* Profit & Loss for a period. closingStock / openingStock are
+   values typed in by the user (no stock valuation in v1). */
+function abProfitLoss(token, from, to, openingStock, closingStock) {
+  abRequire_(token);
+  to = abIso_(to) || abToday_();
+  from = abIso_(from) || abFyStart_(to);
+  const pl = abPLCompute_(abBooks_(), abLedgers_(), from, to, abNum_(openingStock), abNum_(closingStock));
+  pl.from = from; pl.to = to;
+  return pl;
+}
+
+function abPLCompute_(books, ledgers, from, to, openingStock, closingStock) {
+  const mv = abMovements_(books, from, to);
+  const sec = { "Sales Accounts": [], "Direct Incomes": [], "Purchase Accounts": [], "Direct Expenses": [], "Indirect Incomes": [], "Indirect Expenses": [] };
+  ledgers.forEach(function (l) {
+    if (!sec[l.group]) return;
+    const x = mv[abKey_(l.name)];
+    if (!x) return;
+    const nature = AB_GROUPS[l.group];
+    const amt = nature === "I" ? abR2_(x.cr - x.dr) : abR2_(x.dr - x.cr);
+    if (amt) sec[l.group].push({ name: l.name, amount: amt });
+  });
+  const sum = function (g) { return abR2_(sec[g].reduce(function (s, r) { return s + r.amount; }, 0)); };
+  const tradingIn = abR2_(sum("Sales Accounts") + sum("Direct Incomes") + closingStock);
+  const tradingOut = abR2_(sum("Purchase Accounts") + sum("Direct Expenses") + openingStock);
+  const gross = abR2_(tradingIn - tradingOut);
+  const net = abR2_(gross + sum("Indirect Incomes") - sum("Indirect Expenses"));
+  return { sections: sec, openingStock: openingStock, closingStock: closingStock, grossProfit: gross, netProfit: net };
+}
+
+function abBalanceSheet(token, asOf, closingStock) {
+  abRequire_(token);
+  asOf = abIso_(asOf) || abToday_();
+  const books = abBooks_(), ledgers = abLedgers_();
+  const bal = abBalances_(books, ledgers, asOf);
+  const fyStart = abFyStart_(asOf);
+  // profit of this year to date, and of all earlier years (not yet moved to capital)
+  const cur = abPLCompute_(books, ledgers, fyStart, asOf, 0, abNum_(closingStock)).netProfit;
+  const prevDay = abIso_(new Date(new Date(fyStart + "T00:00:00").getTime() - 86400000));
+  const earlier = abPLCompute_(books, ledgers, "", prevDay, 0, 0).netProfit;
+  // opening balances of income/expense ledgers belong to earlier years too
+  let openPL = 0;
+  ledgers.forEach(function (l) {
+    const n = AB_GROUPS[l.group];
+    if (n === "I" || n === "E") openPL = abR2_(openPL + l.openCr - l.openDr);
+  });
+
+  const side = { L: {}, A: {} };
+  ledgers.forEach(function (l) {
+    const n = AB_GROUPS[l.group];
+    if (n !== "A" && n !== "L") return;
+    const b = bal[abKey_(l.name)];
+    if (!b) return;
+    // shown on its natural side; a Dr liability shows as a minus, etc.
+    const amt = n === "A" ? b : -b;
+    side[n][l.group] = side[n][l.group] || { group: l.group, amount: 0, ledgers: [] };
+    side[n][l.group].amount = abR2_(side[n][l.group].amount + amt);
+    side[n][l.group].ledgers.push({ name: l.name, amount: abR2_(amt) });
+  });
+  const stock = abNum_(closingStock);
+  if (stock) side.A["Stock-in-Hand"] = { group: "Stock-in-Hand", amount: stock, ledgers: [{ name: "Closing Stock", amount: stock }] };
+  const pl = abR2_(cur + earlier + openPL);
+  const list = function (o) { return Object.keys(o).map(function (k) { return o[k]; }); };
+  const tot = function (o) { return abR2_(list(o).reduce(function (s, g) { return s + g.amount; }, 0)); };
+  const totalL = abR2_(tot(side.L) + pl), totalA = tot(side.A);
+  return { asOf: asOf, liabilities: list(side.L), assets: list(side.A), profitLoss: pl, currentProfit: cur,
+    totalLiabilities: totalL, totalAssets: totalA, difference: abR2_(totalA - totalL) };
+}
+
+/*
+ * Party outstandings with ageing. Bills are cleared oldest first
+ * (FIFO), so "oldest unpaid" = the date of the earliest bill not
+ * yet covered by payments; days = asOf - that date.
+ * group: "Sundry Debtors" (receivables) or "Sundry Creditors".
+ */
+function abOutstandingCompute_(books, ledgers, asOf, group) {
+  group = group || "Sundry Debtors";
+  const debtors = group === "Sundry Debtors";
+  const want = {};
+  ledgers.forEach(function (l) { if (l.group === group) want[abKey_(l.name)] = l; });
+  const flows = {};
+  Object.keys(want).forEach(function (k) {
+    const l = want[k];
+    const open = debtors ? l.openDr - l.openCr : l.openCr - l.openDr;
+    flows[k] = open ? [{ date: "", amount: abR2_(open) }] : [];
+  });
+  abActive_(books).forEach(function (v) {
+    if (v.date > asOf) return;
+    v.lines.forEach(function (l) {
+      const k = abKey_(l.ledger);
+      if (!flows[k]) return;
+      const amt = debtors ? l.dr - l.cr : l.cr - l.dr;
+      if (amt) flows[k].push({ date: v.date, amount: abR2_(amt) });
+    });
+  });
+  const asOfMs = new Date(asOf + "T00:00:00").getTime();
+  const out = [];
+  Object.keys(flows).forEach(function (k) {
+    const l = want[k];
+    const bills = [];
+    let credit = 0;
+    flows[k].forEach(function (f) {
+      if (f.amount > 0) bills.push({ date: f.date, left: f.amount });
+      else credit = abR2_(credit - f.amount);
+    });
+    bills.forEach(function (b) { const use = Math.min(b.left, credit); b.left = abR2_(b.left - use); credit = abR2_(credit - use); });
+    const open = bills.filter(function (b) { return b.left > 0.004; });
+    const balance = abR2_(open.reduce(function (s, b) { return s + b.left; }, 0) - credit);
+    if (!balance) return;
+    const oldest = open.length ? open[0].date : "";
+    const days = oldest ? Math.max(0, Math.round((asOfMs - new Date(oldest + "T00:00:00").getTime()) / 86400000)) : (open.length ? 999 : 0);
+    const age = { "0-30": 0, "31-60": 0, "61-90": 0, "90+": 0 };
+    open.forEach(function (b) {
+      const d = b.date ? Math.round((asOfMs - new Date(b.date + "T00:00:00").getTime()) / 86400000) : 999;
+      const bucket = d <= 30 ? "0-30" : d <= 60 ? "31-60" : d <= 90 ? "61-90" : "90+";
+      age[bucket] = abR2_(age[bucket] + b.left);
+    });
+    out.push({ party: l.name, segment: l.segment, phone: l.phone, balance: balance, oldest: oldest, days: days, ageing: age });
+  });
+  out.sort(function (a, b) { return b.balance - a.balance; });
+  return out;
+}
+
+function abOutstanding(token, asOf, group) {
+  abRequire_(token);
+  asOf = abIso_(asOf) || abToday_();
+  return { asOf: asOf, group: group || "Sundry Debtors", rows: abOutstandingCompute_(abBooks_(), abLedgers_(), asOf, group) };
+}
+
+/* GST summary by rate for a period: sales (output) and purchases (input). */
+function abGstSummary(token, from, to) {
+  abRequire_(token);
+  to = abIso_(to) || abToday_();
+  from = abIso_(from) || (to.substring(0, 8) + "01");
+  const res = { from: from, to: to, sales: {}, purchase: {} };
+  abActive_(abBooks_()).forEach(function (v) {
+    const vt = AB_VTYPES[v.type];
+    if (!vt || vt.mode !== "inv" || v.date < from || v.date > to) return;
+    const bucket = res[vt.side];
+    v.items.forEach(function (it) {
+      const r = bucket[it.gst] = bucket[it.gst] || { rate: it.gst, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+      ["taxable", "cgst", "sgst", "igst"].forEach(function (k) { r[k] = abR2_(r[k] + vt.sign * it[k]); });
+    });
+  });
+  ["sales", "purchase"].forEach(function (s) {
+    res[s] = Object.keys(res[s]).map(function (k) { return res[s][k]; }).sort(function (a, b) { return a.rate - b.rate; });
+  });
+  const tax = function (list) { return abR2_(list.reduce(function (t, r) { return t + r.cgst + r.sgst + r.igst; }, 0)); };
+  res.outputTax = tax(res.sales);
+  res.inputTax = tax(res.purchase);
+  res.payable = abR2_(res.outputTax - res.inputTax);
+  return res;
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  STORE (sheet access + setup)
+ * ==========================================================
+ * The HOME sheet (Script Property SPREADSHEET_ID, or the sheet
+ * this script is bound to) holds Users and the Companies list.
+ * Each company's books live in their own sheet; the first
+ * company uses the home sheet itself.
+ * Missing tabs are created with their headers.
+ */
+
+/* Per-call context: which company this request works on. */
+var AB_CTX = { coId: "", co: null, ss: null };
+
+function abHomeSS_() {
+  const id = abSetting_("SPREADSHEET_ID", "");
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+}
+
+/* The selected company's books. */
+function abSS_() {
+  if (AB_CTX.ss) return AB_CTX.ss;
+  const co = abCo_();
+  if (!co) throw new Error("NO_COMPANY");
+  const home = abHomeSS_();
+  AB_CTX.ss = co.sheetId === home.getId() ? home : SpreadsheetApp.openById(co.sheetId);
+  return AB_CTX.ss;
+}
+
+function abSheet_(name) {
+  const ss = AB_HOME_TABS[name] ? abHomeSS_() : abSS_();
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    const h = AB_HEADERS[name];
+    sh.getRange(1, 1, 1, h.length).setValues([h]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/* All data rows (no header) as arrays. */
+function abRows_(name) {
+  const sh = abSheet_(name);
+  const n = sh.getLastRow();
+  if (n < 2) return [];
+  return sh.getRange(2, 1, n - 1, AB_HEADERS[name].length).getValues();
+}
+
+function abAppend_(name, rows) {
+  if (!rows.length) return;
+  const sh = abSheet_(name);
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, AB_HEADERS[name].length).setValues(rows);
+}
+
+/* Rewrite a whole tab (header kept). Used for small master tabs only. */
+function abRewrite_(name, rows) {
+  const sh = abSheet_(name);
+  const w = AB_HEADERS[name].length;
+  const n = sh.getLastRow();
+  if (n > 1) sh.getRange(2, 1, n - 1, w).setValues(abBlank_(n - 1, w));
+  if (rows.length) sh.getRange(2, 1, rows.length, w).setValues(rows);
+}
+
+function abBlank_(n, w) {
+  const out = [];
+  for (let i = 0; i < n; i++) { const r = []; for (let j = 0; j < w; j++) r.push(""); out.push(r); }
+  return out;
+}
+
+/* ---------- small helpers ---------- */
+
+function abR2_(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function abNum_(v) {
+  if (typeof v === "number") return v;
+  const n = Number(String(v || "").replace(/[,\s₹]/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+function abStr_(v) { return String(v === null || v === undefined ? "" : v).trim(); }
+function abKey_(s) { return abStr_(s).toUpperCase().replace(/\s+/g, " "); }
+
+/* yyyy-mm-dd from a Date, a sheet value or a string. */
+function abIso_(v) {
+  if (!v) return "";
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    if (isNaN(v.getTime())) return "";
+    const p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return v.getFullYear() + "-" + p(v.getMonth() + 1) + "-" + p(v.getDate());
+  }
+  const s = abStr_(v);
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.substring(0, 10) : "";
+}
+
+const AB_MON_ = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/* "2026-10-01" -> "1-Oct-26" (Tally's date style; the modules parse this). */
+function abTallyDate_(iso) {
+  const p = String(iso).split("-");
+  return Number(p[2]) + "-" + AB_MON_[Number(p[1]) - 1] + "-" + p[0].substring(2);
+}
+
+/* Financial-year label for numbering, e.g. "26-27". */
+function abFy_(iso) {
+  const y = Number(iso.substring(0, 4)), m = Number(iso.substring(5, 7));
+  const start = m >= AB.FY_START_MONTH ? y : y - 1;
+  return String(start).substring(2) + "-" + String(start + 1).substring(2);
+}
+
+function abFyStart_(iso) {
+  const y = Number(iso.substring(0, 4)), m = Number(iso.substring(5, 7));
+  const start = m >= AB.FY_START_MONTH ? y : y - 1;
+  const mm = AB.FY_START_MONTH;
+  return start + "-" + (mm < 10 ? "0" : "") + mm + "-01";
+}
+
+function abToday_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+/* ---------- first-run setup ---------- */
+
+/* Creates every tab, the standard ledgers and the default GST rates.
+   Safe to run again: nothing that exists is changed. */
+function abEnsureHome_() {
+  Object.keys(AB_HOME_TABS).forEach(function (n) { abSheet_(n); });
+}
+
+function abEnsureBooks_() {
+  AB_BOOK_TABS.forEach(function (n) { abSheet_(n); });
+
+  const have = {};
+  abRows_(AB.SHEETS.LEDGERS).forEach(function (r) { have[abKey_(r[0])] = true; });
+  const L = AB.LEDGER, now = new Date();
+  const std = [
+    [L.CASH, "Cash-in-Hand"], [L.SALES, "Sales Accounts"], [L.PURCHASE, "Purchase Accounts"],
+    [L.OUT_CGST, "Duties & Taxes"], [L.OUT_SGST, "Duties & Taxes"], [L.OUT_IGST, "Duties & Taxes"],
+    [L.IN_CGST, "Duties & Taxes"], [L.IN_SGST, "Duties & Taxes"], [L.IN_IGST, "Duties & Taxes"],
+    [L.ROUND_OFF, "Indirect Expenses"], [L.CAPITAL, "Capital Account"]
+  ].filter(function (x) { return !have[abKey_(x[0])]; })
+    .map(function (x) { return [x[0], x[1], "", 0, 0, "", "", "", "Yes", now]; });
+  abAppend_(AB.SHEETS.LEDGERS, std);
+
+  if (!abRows_(AB.SHEETS.TAX_RATES).length) {
+    abAppend_(AB.SHEETS.TAX_RATES, [
+      [0, "Exempt / Nil", "Yes"],
+      [5, "GST 5%", "Yes"],
+      [18, "GST 18%", "Yes"]
+    ]);
+  }
+}
+
+/**
+ * ==========================================================
+ * Accounting-Books  -  VOUCHERS
+ * ==========================================================
+ * Invoice vouchers (Sales, Purchase, Credit Note, Debit Note)
+ * take item lines and post themselves:
+ *
+ *   Sales:     Dr Party          = invoice total
+ *              Cr Sales          = taxable value
+ *              Cr Output CGST + SGST (same state) or Output IGST
+ *              Round Off         = to the nearest rupee
+ *   Purchase:  the mirror image, with Input GST.
+ *   Credit / Debit Note: the reverse of Sales / Purchase.
+ *
+ * Discounts (line % and the owner's extra discount) are taken
+ * BEFORE tax, so GST is charged on the discounted value. The
+ * extra discount is shared across lines by value.
+ * Same state = CGST + SGST at half the rate each; another state
+ * (party's State differs from COMPANY_STATE) = IGST at full rate.
+ *
+ * Accounting vouchers (Contra, Payment, Receipt, Journal) are
+ * Dr / Cr lines that must balance.
+ *
+ * Nothing is ever deleted. An edit saves a new version and a
+ * cancel marks the voucher cancelled; every change goes to the
+ * Edit_Log with the before and after (the audit trail).
+ */
+
+/* ---------- edit log ---------- */
+
+function abLog_(who, action, id, ref, before, after) {
+  const cut = function (o) {
+    if (o === null || o === undefined) return "";
+    const s = JSON.stringify(o);
+    return s.length > 45000 ? s.substring(0, 45000) + "…" : s;
+  };
+  abAppend_(AB.SHEETS.EDIT_LOG, [[new Date(), who.username, action, id || "", ref || "", cut(before), cut(after)]]);
+}
+
+/* ---------- reading the books ---------- */
+
+/* Active + cancelled vouchers with their current lines. */
+function abBooks_() {
+  const vch = abRows_(AB.SHEETS.VOUCHERS).filter(function (r) { return r[0]; }).map(function (r, i) {
+    return {
+      row: i + 2, id: abStr_(r[0]), date: abIso_(r[1]), type: abStr_(r[2]), no: abStr_(r[3]),
+      party: abStr_(r[4]), narration: abStr_(r[5]), amount: abNum_(r[6]), status: abStr_(r[7]) || "Active",
+      interstate: abStr_(r[8]) === "Yes", createdBy: abStr_(r[9]), createdAt: r[10],
+      updatedBy: abStr_(r[11]), updatedAt: r[12], version: Number(r[13]) || 1, lines: [], items: []
+    };
+  });
+  const byKey = {};
+  vch.forEach(function (v) { byKey[v.id + "#" + v.version] = v; });
+  abRows_(AB.SHEETS.LINES).forEach(function (r) {
+    const v = byKey[abStr_(r[0])];
+    if (v) v.lines.push({ seq: Number(r[1]), ledger: abStr_(r[2]), dr: abNum_(r[3]), cr: abNum_(r[4]) });
+  });
+  abRows_(AB.SHEETS.INV_ITEMS).forEach(function (r) {
+    const v = byKey[abStr_(r[0])];
+    if (v) v.items.push({
+      seq: Number(r[1]), item: abStr_(r[2]), hsn: abStr_(r[3]), qty: abNum_(r[4]), unit: abStr_(r[5]),
+      rate: abNum_(r[6]), gross: abNum_(r[7]), discount: abNum_(r[8]), taxable: abNum_(r[9]),
+      gst: abNum_(r[10]), cgst: abNum_(r[11]), sgst: abNum_(r[12]), igst: abNum_(r[13]), total: abNum_(r[14])
+    });
+  });
+  vch.forEach(function (v) {
+    v.lines.sort(function (a, b) { return a.seq - b.seq; });
+    v.items.sort(function (a, b) { return a.seq - b.seq; });
+  });
+  vch.sort(function (a, b) {
+    return a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.createdAt) < String(b.createdAt) ? -1 : 1;
+  });
+  return vch;
+}
+
+/* ---------- invoice maths ---------- */
+
+/*
+ * items: [{item, hsn, qty, unit, rate, discPct, gst}]
+ * extraDiscount: rupees off the whole bill (owner discount), before tax
+ * Returns lines with taxable value and tax, plus totals.
+ */
+function abComputeInvoice_(items, extraDiscount, interstate) {
+  const lines = [];
+  let netSum = 0;
+  (items || []).forEach(function (it) {
+    const qty = abNum_(it.qty), rate = abNum_(it.rate);
+    if (!abStr_(it.item) || !qty) return;
+    if (qty < 0 || rate < 0) throw new Error("Quantity and rate can't be negative (" + it.item + ").");
+    const gross = abR2_(qty * rate);
+    const discPct = Math.min(Math.max(abNum_(it.discPct), 0), 100);
+    const lineDisc = abR2_(gross * discPct / 100);
+    const net = abR2_(gross - lineDisc);
+    netSum = abR2_(netSum + net);
+    lines.push({ item: abStr_(it.item), hsn: abStr_(it.hsn), qty: qty, unit: abStr_(it.unit) || "Nos",
+      rate: rate, gross: gross, discount: lineDisc, net: net, gst: abNum_(it.gst) });
+  });
+  if (!lines.length) throw new Error("Add at least one item with a quantity.");
+
+  let extra = abR2_(Math.max(abNum_(extraDiscount), 0));
+  if (extra > netSum) throw new Error("The extra discount is more than the bill value.");
+
+  // share the extra discount by value; the last line takes the paise left over
+  let given = 0;
+  lines.forEach(function (l, i) {
+    const share = i === lines.length - 1 ? abR2_(extra - given) : abR2_(netSum ? extra * l.net / netSum : 0);
+    given = abR2_(given + share);
+    l.discount = abR2_(l.discount + share);
+    l.taxable = abR2_(l.net - share);
+    if (interstate) {
+      l.igst = abR2_(l.taxable * l.gst / 100); l.cgst = 0; l.sgst = 0;
+    } else {
+      l.cgst = abR2_(l.taxable * l.gst / 200); l.sgst = l.cgst; l.igst = 0;
+    }
+    l.total = abR2_(l.taxable + l.cgst + l.sgst + l.igst);
+  });
+
+  const t = { gross: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
+  lines.forEach(function (l) { Object.keys(t).forEach(function (k) { t[k] = abR2_(t[k] + l[k]); }); });
+  t.grand = Math.round(t.total);
+  t.roundOff = abR2_(t.grand - t.total);
+  return { lines: lines, totals: t };
+}
+
+/* Dr/Cr postings for an invoice voucher. */
+function abInvoicePostings_(type, party, calc, interstate, mainLedger) {
+  const vt = AB_VTYPES[type], L = AB.LEDGER, t = calc.totals;
+  const sales = vt.side === "sales";
+  const main = mainLedger || (sales ? L.SALES : L.PURCHASE);
+  // "toward" = the side the party is on for a normal Sales voucher (Dr)
+  const out = [];
+  const add = function (ledger, amount, partySide) {
+    if (!amount) return;
+    // partySide true => same side as the party
+    let dr = partySide;
+    if (!sales) dr = !dr;          // purchase: party is Cr
+    if (vt.sign < 0) dr = !dr;     // notes reverse
+    if (amount < 0) { amount = -amount; dr = !dr; }
+    out.push({ ledger: ledger, dr: dr ? abR2_(amount) : 0, cr: dr ? 0 : abR2_(amount) });
+  };
+  add(party, t.grand, true);
+  add(main, t.taxable, false);
+  if (interstate) add(sales ? L.OUT_IGST : L.IN_IGST, t.igst, false);
+  else {
+    add(sales ? L.OUT_CGST : L.IN_CGST, t.cgst, false);
+    add(sales ? L.OUT_SGST : L.IN_SGST, t.sgst, false);
+  }
+  add(L.ROUND_OFF, t.roundOff, false);
+  return out;
+}
+
+
+function abInterstate_(data) {
+  if (data.interstate === true || data.interstate === false) return data.interstate;
+  const p = abLedgerMap_()[abKey_(data.party)];
+  const st = p && p.state ? abKey_(p.state) : "";
+  return !!st && st !== abKey_(AB.COMPANY_STATE);
+}
+
+/* ---------- checks ---------- */
+
+function abCheckLines_(type, lines, ledgers) {
+  if (lines.length < 2) throw new Error("A voucher needs at least two lines.");
+  let dr = 0, cr = 0;
+  lines.forEach(function (l) {
+    const led = ledgers[abKey_(l.ledger)];
+    if (!led) throw new Error("No ledger called \"" + l.ledger + "\". Create it first (Alt+C).");
+    if (!led.active) throw new Error("\"" + led.name + "\" is marked inactive.");
+    l.ledger = led.name;
+    if ((l.dr && l.cr) || (!l.dr && !l.cr)) throw new Error("Each line is either Dr or Cr (" + led.name + ").");
+    if (l.dr < 0 || l.cr < 0) throw new Error("Amounts can't be negative (" + led.name + ").");
+    dr = abR2_(dr + l.dr); cr = abR2_(cr + l.cr);
+  });
+  if (Math.abs(dr - cr) > 0.004) throw new Error("Dr " + dr.toFixed(2) + " and Cr " + cr.toFixed(2) + " don't match.");
+
+  const isCashBank = function (l) { const g = ledgers[abKey_(l.ledger)].group; return g === "Cash-in-Hand" || g === "Bank Accounts"; };
+  if (type === "Contra" && !lines.every(isCashBank)) throw new Error("Contra is only between Cash and Bank ledgers.");
+  if (type === "Receipt" && !lines.some(function (l) { return l.dr && isCashBank(l); })) throw new Error("A Receipt needs a Cash or Bank ledger on the Dr side.");
+  if (type === "Payment" && !lines.some(function (l) { return l.cr && isCashBank(l); })) throw new Error("A Payment needs a Cash or Bank ledger on the Cr side.");
+  return dr;
+}
+
+/* The "party" shown in Day Book / registers, like Tally's Particulars. */
+function abPartyOf_(type, lines, ledgers) {
+  const notCash = function (l) { const g = ledgers[abKey_(l.ledger)].group; return g !== "Cash-in-Hand" && g !== "Bank Accounts"; };
+  let pick = null;
+  if (type === "Receipt") pick = lines.filter(function (l) { return l.cr && notCash(l); })[0];
+  else if (type === "Payment") pick = lines.filter(function (l) { return l.dr && notCash(l); })[0];
+  else if (type === "Contra") pick = lines.filter(function (l) { return l.dr; })[0];
+  return (pick || lines[0]).ledger;
+}
+
+/* ---------- numbering ---------- */
+
+function abNextNo_(type, iso, existing) {
+  const base = AB_VTYPES[type].prefix + "/" + abFy_(iso) + "/";
+  let max = 0;
+  existing.forEach(function (v) {
+    if (v.no.indexOf(base) === 0) max = Math.max(max, Number(v.no.substring(base.length)) || 0);
+  });
+  return base + ("000" + (max + 1)).slice(-4);
+}
+
+/* ---------- save / cancel ---------- */
+
+/*
+ * data = { id?, version?, type, date, party, narration,
+ *          // invoice:
+ *          items:[...], extraDiscount, interstate?, mainLedger?
+ *          // accounting:
+ *          lines:[{ledger, dr, cr}] }
+ */
+function abSaveVoucher(token, data) {
+  const who = abRequire_(token, ["admin", "accountant"]);
+  const type = abStr_(data.type);
+  const vt = AB_VTYPES[type];
+  if (!vt) throw new Error("Unknown voucher type.");
+  const date = abIso_(data.date);
+  if (!date) throw new Error("Enter the voucher date.");
+  const lockedTill = AB.LOCKED_TILL;
+  if (lockedTill && date <= lockedTill) throw new Error("Books are closed up to " + abTallyDate_(lockedTill) + ".");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ledgers = abLedgerMap_();
+    let lines, items = [], party, amount, interstate = false;
+
+    if (vt.mode === "inv") {
+      const p = ledgers[abKey_(data.party)];
+      if (!p) throw new Error("Pick the party ledger (or Cash for a cash bill).");
+      party = p.name;
+      interstate = abInterstate_({ party: party, interstate: data.interstate });
+      if (data.mainLedger && !ledgers[abKey_(data.mainLedger)]) throw new Error("No ledger called \"" + data.mainLedger + "\".");
+      const calc = abComputeInvoice_(data.items, data.extraDiscount, interstate);
+      items = calc.lines;
+      lines = abInvoicePostings_(type, party, calc, interstate, data.mainLedger ? ledgers[abKey_(data.mainLedger)].name : "");
+      amount = abCheckLines_(type, lines, ledgers);
+    } else {
+      lines = (data.lines || []).filter(function (l) { return abStr_(l.ledger); }).map(function (l) {
+        return { ledger: abStr_(l.ledger), dr: abR2_(abNum_(l.dr)), cr: abR2_(abNum_(l.cr)) };
+      });
+      amount = abCheckLines_(type, lines, ledgers);
+      party = abPartyOf_(type, lines, ledgers);
+    }
+
+    const all = abBooks_();
+    let v, before = null;
+    if (data.id) {
+      v = all.filter(function (x) { return x.id === data.id; })[0];
+      if (!v) throw new Error("That voucher no longer exists.");
+      if (v.status === "Cancelled") throw new Error("A cancelled voucher can't be changed.");
+      if (Number(data.version) !== v.version) throw new Error("Someone else changed this voucher. Open it again.");
+      if (v.type !== type) throw new Error("The voucher type can't be changed. Cancel it and enter a new one.");
+      if (lockedTill && v.date <= lockedTill) throw new Error("Books are closed up to " + abTallyDate_(lockedTill) + ".");
+      before = abVoucherView_(v);
+    }
+
+    const now = new Date();
+    const id = v ? v.id : Utilities.getUuid();
+    const version = v ? v.version + 1 : 1;
+    const no = v ? v.no : abNextNo_(type, date, all);
+    const key = id + "#" + version;
+    const row = [id, date, type, no, party, abStr_(data.narration), amount, "Active", interstate ? "Yes" : "No",
+      v ? v.createdBy : who.username, v ? v.createdAt : now, who.username, now, version];
+
+    abAppend_(AB.SHEETS.LINES, lines.map(function (l, i) { return [key, i + 1, l.ledger, l.dr, l.cr]; }));
+    abAppend_(AB.SHEETS.INV_ITEMS, items.map(function (l, i) {
+      return [key, i + 1, l.item, l.hsn, l.qty, l.unit, l.rate, l.gross, l.discount, l.taxable, l.gst, l.cgst, l.sgst, l.igst, l.total];
+    }));
+    if (v) abSheet_(AB.SHEETS.VOUCHERS).getRange(v.row, 1, 1, row.length).setValues([row]);
+    else abAppend_(AB.SHEETS.VOUCHERS, [row]);
+
+    const after = { id: id, no: no, type: type, date: date, party: party, amount: amount, narration: abStr_(data.narration),
+      lines: lines, items: items.map(function (l) { return { item: l.item, qty: l.qty, rate: l.rate, taxable: l.taxable, gst: l.gst }; }) };
+    abLog_(who, v ? "Altered" : "Created", id, no, before, after);
+    return { id: id, no: no, version: version, amount: amount };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function abCancelVoucher(token, id, version, reason) {
+  const who = abRequire_(token, ["admin", "accountant"]);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const v = abBooks_().filter(function (x) { return x.id === id; })[0];
+    if (!v) throw new Error("That voucher no longer exists.");
+    if (v.status === "Cancelled") return true;
+    if (Number(version) !== v.version) throw new Error("Someone else changed this voucher. Open it again.");
+    const lockedTill = AB.LOCKED_TILL;
+    if (lockedTill && v.date <= lockedTill) throw new Error("Books are closed up to " + abTallyDate_(lockedTill) + ".");
+    const sh = abSheet_(AB.SHEETS.VOUCHERS);
+    sh.getRange(v.row, 8).setValue("Cancelled");
+    sh.getRange(v.row, 12, 1, 2).setValues([[who.username, new Date()]]);
+    abLog_(who, "Cancelled", v.id, v.no, abVoucherView_(v), { reason: abStr_(reason) });
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function abVoucherView_(v) {
+  return {
+    id: v.id, version: v.version, date: v.date, type: v.type, no: v.no, party: v.party,
+    narration: v.narration, amount: v.amount, status: v.status, interstate: v.interstate,
+    lines: v.lines, items: v.items, createdBy: v.createdBy, updatedBy: v.updatedBy
+  };
+}
+
+
+/* Edit history of one voucher (audit trail view). */
+function abVoucherHistory(token, id) {
+  abRequire_(token, ["admin", "accountant"]);
+  return abRows_(AB.SHEETS.EDIT_LOG).filter(function (r) { return abStr_(r[3]) === id; }).map(function (r) {
+    return { when: r[0] instanceof Date ? r[0].toISOString() : abStr_(r[0]), user: abStr_(r[1]), action: abStr_(r[2]) };
+  });
+}
+
+</script>
+<script>window.AB_PORTAL_TOKEN="";window.AB_START_TAB="";</script>
+<script>
+/* =========================================================
+   Accounting-Books - screen logic
+   Designed by rawsploit@gmail.com
+   Keyboard first: Enter moves to the next field, Esc goes back,
+   Ctrl+A accepts, F4-F9 open vouchers, Alt+C creates a master.
+   ========================================================= */
+
+var S = { token: "", co: "", companies: [], states: [], me: null, M: null, date: "", stack: [], cur: null, dirty: false };
+/* Screen names, kept in one place so they are easy to change. */
+var NAMES = {
+  chart: "Ledger Directory",
+  daybook: "Daily Accounts"
+};
+
+var XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function num(v) { var n = Number(String(v === null || v === undefined ? "" : v).replace(/[,\s₹]/g, "")); return isNaN(n) ? 0 : n; }
+function money(n) { n = r2(n); return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function moneyOrBlank(n) { return n ? money(n) : ""; }
+function drcr(b) { b = r2(b); return b ? money(Math.abs(b)) + (b > 0 ? " Dr" : " Cr") : "0.00"; }
+var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function niceDate(iso) {
+  if (!iso) return "";
+  var p = iso.split("-"); var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  return +p[2] + "-" + MON[+p[1] - 1] + "-" + p[0] + " " + DAYS[d.getDay()];
+}
+function shortDate(iso) { if (!iso) return ""; var p = iso.split("-"); return +p[2] + "-" + MON[+p[1] - 1] + "-" + p[0].substring(2); }
+function monthStart(iso) { return iso.substring(0, 8) + "01"; }
+function fyStart(iso) {
+  var fm = (S.M && S.M.company && S.M.company.fyStart) || 4;
+  var y = +iso.substring(0, 4), m = +iso.substring(5, 7);
+  return (m >= fm ? y : y - 1) + "-" + (fm < 10 ? "0" : "") + fm + "-01";
+}
+
+function toast(msg, bad) {
+  var t = $("toast"); t.textContent = msg; t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = "toast"; }, bad ? 4500 : 2200);
+}
+function status(msg) { $("status").textContent = msg || "Ready"; }
+
+/* Calls the server. Functions that need sign-in get the token first. */
+function api(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(function (e) {
+        var m = (e && e.message) || String(e);
+        if (m.indexOf("SESSION_ENDED") >= 0) { signOut(true); m = "Your session has ended. Please sign in again."; }
+        else if (m.indexOf("NO_COMPANY") >= 0) { S.co = ""; saveCo(); m = "Select a company first."; setTimeout(function () { if (S.token) companyGate(); }, 0); }
+        reject(new Error(m));
+      })[fn].apply(null, args);
+  });
+}
+function call(fn) {
+  var args = [S.token + "~" + (S.co || "")].concat(Array.prototype.slice.call(arguments, 1));
+  return api.apply(null, [fn].concat(args));
+}
+
+/* ===================== sign-in ===================== */
+
+function boot() {
+  api("abBrand").then(function (b) {
+    document.querySelectorAll(".coName").forEach(function (el) { el.textContent = b.company; });
+    $("authCompany").textContent = b.company;
+    if (b.logo) { $("authLogo").src = b.logo; $("authLogo").classList.remove("hidden"); }
+  }).catch(function () {});
+
+  if (window.AB_PORTAL_TOKEN) { S.token = window.AB_PORTAL_TOKEN; return enter(); }
+  try { S.token = sessionStorage.getItem("ab.token") || ""; S.co = sessionStorage.getItem("ab.co") || ""; } catch (e) { S.token = ""; }
+  if (S.token) return enter().catch(showAuth);
+  showAuth();
+}
+
+function showAuth() {
+  $("app").classList.add("hidden");
+  $("auth").classList.remove("hidden");
+  api("abNeedsSetup").then(function (r) {
+    S.states = r.states || [];
+    if (r.portal) { $("portalNote").classList.remove("hidden"); return; }
+    if (r.needsSetup) {
+      $("suState").innerHTML = S.states.map(function (s) { return "<option" + (s === "Kerala" ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("");
+      $("setupForm").classList.remove("hidden"); $("suName").focus();
+    }
+    else { $("loginForm").classList.remove("hidden"); $("lgUser").focus(); }
+  }).catch(function (e) { $("authErr").textContent = e.message; });
+}
+
+$("loginForm").addEventListener("submit", function (ev) {
+  ev.preventDefault(); $("authErr").textContent = "";
+  api("abLogin", $("lgUser").value, $("lgPass").value).then(signedIn).catch(function (e) { $("authErr").textContent = e.message; });
+});
+$("setupForm").addEventListener("submit", function (ev) {
+  ev.preventDefault(); $("authErr").textContent = "";
+  api("abCreateFirstAdmin", $("suUser").value, $("suName").value, $("suPass").value,
+    { name: $("suCo").value, state: $("suState").value, gstin: $("suGstin").value, fyStart: 4 })
+    .then(function (r) { S.co = r.company.id; saveCo(); signedIn(r); }).catch(function (e) { $("authErr").textContent = e.message; });
+});
+
+function saveCo() { try { sessionStorage.setItem("ab.co", S.co || ""); } catch (e) {} }
+
+function signedIn(r) {
+  S.token = r.token;
+  try { sessionStorage.setItem("ab.token", r.token); } catch (e) {}
+  $("lgPass").value = ""; $("suPass").value = "";
+  enter();
+}
+
+function signOut(quiet) {
+  try { sessionStorage.removeItem("ab.token"); sessionStorage.removeItem("ab.co"); } catch (e) {}
+  S.token = ""; S.co = ""; S.me = null;
+  if (window.AB_PORTAL_TOKEN) { $("app").innerHTML = "<p style='padding:30px'>Your session has ended. Open Accounting-Books again from the portal.</p>"; return; }
+  if (!quiet) toast("Signed out.");
+  showAuth();
+}
+$("btnLogout").addEventListener("click", function () { signOut(); });
+$("btnCo").addEventListener("click", function () { if (S.token) go(viewSelectCompany); });
+
+/* After sign-in: pick the company (auto when there is only one), then open its books. */
+function enter() {
+  status("Loading…");
+  return call("abListCompanies").then(function (list) {
+    S.companies = list;
+    var open = list.filter(function (c) { return c.active; });
+    if (S.co && open.some(function (c) { return c.id === S.co; })) return openBooks();
+    if (open.length === 1) { S.co = open[0].id; saveCo(); return openBooks(); }
+    $("auth").classList.add("hidden"); $("app").classList.remove("hidden");
+    S.stack = []; S.cur = null;
+    go(viewSelectCompany);
+    status();
+  });
+}
+function companyGate() { enter().catch(function (e) { toast(e.message, true); }); }
+
+function openBooks() {
+  status("Loading books…");
+  return call("abMasters").then(function (M) {
+    S.M = M; S.me = M.me; S.date = S.date || M.today; S.states = M.states;
+    $("auth").classList.add("hidden"); $("app").classList.remove("hidden");
+    document.querySelectorAll(".coName").forEach(function (el) { el.textContent = M.company.name; });
+    $("tbGst").textContent = M.company.gstin ? "GSTIN " + M.company.gstin : "";
+    $("btnCo").textContent = "F3 Company";
+    $("tbUser").textContent = M.me.name + " (" + M.me.role + ")";
+    showDate();
+    S.stack = [];
+    var start = { daybook: viewDayBook, outstanding: viewOutstanding, export: viewExport, trial: viewTrial }[window.AB_START_TAB];
+    go(start || viewGateway);
+    status();
+  });
+}
+
+function reloadMasters() {
+  return call("abMasters").then(function (M) { S.M = M; fillDatalists(); });
+}
+function showDate() { $("tbDate").textContent = niceDate(S.date); }
+function can(roles) { return S.me && roles.indexOf(S.me.role) >= 0; }
+var WRITE = ["admin", "accountant"];
+
+/* ===================== navigation ===================== */
+
+/* go(fn, arg): show a screen and remember where we came from */
+function go(fn, arg) {
+  if (S.cur) S.stack.push(S.cur);
+  S.cur = { fn: fn, arg: arg };
+  S.dirty = false;
+  fn(arg);
+}
+function back() {
+  if (S.dirty && !confirm("Quit without saving?")) return;
+  S.dirty = false;
+  var prev = S.stack.pop();
+  if (!prev) { S.cur = null; return go(viewGateway); }
+  S.cur = prev; prev.fn(prev.arg);
+}
+function refresh() { if (S.cur) S.cur.fn(S.cur.arg); }
+
+function title(t) { $("tbTitle").textContent = t; document.title = t + " · Accounting-Books"; }
+
+/* Right-hand key panel: [{k:"F2", t:"Date", fn:..., off:bool}] or "-" */
+function keys(list) {
+  var html = "";
+  list.forEach(function (x, i) {
+    if (x === "-") { html += "<hr>"; return; }
+    html += "<button data-i='" + i + "'" + (x.off ? " disabled" : "") + "><b>" + esc(x.k) + "</b>" + esc(x.t) + "</button>";
+  });
+  $("keys").innerHTML = html;
+  $("keys").querySelectorAll("button").forEach(function (b) {
+    b.addEventListener("click", function () { var x = list[+b.getAttribute("data-i")]; if (!x.off) x.fn(); });
+  });
+  S.keyList = list;
+}
+function voucherKeys() {
+  var v = [];
+  S.M.vtypes.forEach(function (t) { v.push({ k: t.key, t: t.name, fn: function () { openVoucher(t.name); }, off: !can(WRITE) }); });
+  return v;
+}
+function commonKeys(extra) {
+  return [{ k: "F2", t: "Date", fn: changeDate }, { k: "F3", t: "Company", fn: function () { go(viewSelectCompany); } }].concat(extra || []).concat(["-"]).concat(voucherKeys())
+    .concat(["-", { k: "Alt+C", t: "Create ledger", fn: function () { ledgerModal(); }, off: !can(WRITE) },
+      { k: "Esc", t: "Back", fn: back }]);
+}
+
+/* Enter moves to the next field, like Tally */
+document.addEventListener("keydown", function (e) {
+  var t = e.target;
+  var inField = t && (t.tagName === "INPUT" || t.tagName === "SELECT");
+  if (e.key === "Enter" && inField && !e.ctrlKey && !$("app").classList.contains("hidden")) {
+    if (t.getAttribute("data-noenter")) return;
+    e.preventDefault();
+    if (t.onEnter) { t.onEnter(e); return; }
+    nextField(t, e.shiftKey ? -1 : 1);
+    return;
+  }
+  if ($("app").classList.contains("hidden")) return;
+  if (!$("modal").classList.contains("hidden")) {
+    if (e.key === "Escape") { e.preventDefault(); closeModal(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && S.modalAccept) { e.preventDefault(); S.modalAccept(); }
+    return;
+  }
+  if (e.key === "Escape") { e.preventDefault(); back(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && S.accept) { e.preventDefault(); S.accept(); return; }
+  if (e.key === "F2") { e.preventDefault(); changeDate(); return; }
+  if (e.key === "F3" && !e.altKey) { e.preventDefault(); go(viewSelectCompany); return; }
+  if (e.key === "F3" && e.altKey) { e.preventDefault(); if (can(["admin"])) companyModal(); return; }
+  var fk = { F4: "Contra", F5: "Payment", F6: "Receipt", F7: "Journal", F8: "Sales", F9: "Purchase" }[e.key];
+  if (fk) {
+    e.preventDefault();
+    if (e.ctrlKey && e.key === "F8") fk = "Credit Note";
+    if (e.ctrlKey && e.key === "F9") fk = "Debit Note";
+    if (S.onVoucherKey) S.onVoucherKey(fk); else if (can(WRITE)) openVoucher(fk);
+    return;
+  }
+  if (e.altKey && e.key.toLowerCase() === "c") { e.preventDefault(); if (can(WRITE)) ledgerModal("", t && t.classList && t.classList.contains("ledger") ? t : null); return; }
+  if (S.onKey && !inField && t.tagName !== "TEXTAREA") S.onKey(e);
+});
+
+function nextField(from, dir) {
+  var scope = from.closest(".modal-card") || $("view");
+  var list = Array.prototype.filter.call(scope.querySelectorAll("input,select,textarea,button.btn"), function (el) {
+    return !el.disabled && el.offsetParent !== null && el.tabIndex !== -1 && !el.readOnly;
+  });
+  var i = list.indexOf(from);
+  var n = list[i + dir];
+  if (n) { n.focus(); if (n.select && n.tagName === "INPUT") n.select(); }
+}
+
+function changeDate() {
+  modal("<h3>Change working date</h3><p class='muted'>New vouchers are dated this day.</p>" +
+    "<input type='date' id='mdDate' value='" + S.date + "'>" +
+    "<p class='row'><button class='btn primary' id='mdOk'>OK</button><button class='btn' id='mdNo'>Cancel</button></p>",
+    function () {
+      var v = $("mdDate").value; if (!v) return;
+      S.date = v; showDate(); closeModal();
+      if (S.onDateChange) S.onDateChange(v);
+    });
+  $("mdNo").onclick = closeModal;
+  $("mdDate").focus();
+}
+
+function modal(html, accept) {
+  $("modalCard").innerHTML = html;
+  $("modal").classList.remove("hidden");
+  S.modalAccept = accept || null;
+  var ok = $("mdOk"); if (ok && accept) ok.onclick = accept;
+}
+function closeModal() { $("modal").classList.add("hidden"); S.modalAccept = null; }
+
+function clearHooks() { S.accept = null; S.onKey = null; S.onDateChange = null; S.onVoucherKey = null; }
+
+/* ===================== gateway ===================== */
+
+var GW = [
+  { sec: "Company" },
+  { k: "S", t: "Select Company", fn: function () { go(viewSelectCompany); } },
+  { k: "N", t: "New Company", fn: function () { companyModal(); }, roles: ["admin"] },
+  { k: "K", t: "Company Details", fn: function () { companyModal(S.M.company); }, roles: ["admin"] },
+  { sec: "Masters" },
+  { k: "C", t: "Create Ledger", fn: function () { ledgerModal(); }, roles: WRITE },
+  { k: "Y", t: NAMES.chart, fn: function () { go(viewChart); } },
+  { k: "I", t: "Stock Items", fn: function () { go(viewItems); } },
+  { sec: "Transactions" },
+  { k: "V", t: "Vouchers", fn: function () { openVoucher("Sales"); }, roles: WRITE },
+  { k: "D", t: NAMES.daybook, fn: function () { go(viewDayBook); } },
+  { sec: "Reports" },
+  { k: "B", t: "Balance Sheet", fn: function () { go(viewBalanceSheet); } },
+  { k: "P", t: "Profit & Loss A/c", fn: function () { go(viewPL); } },
+  { k: "T", t: "Trial Balance", fn: function () { go(viewTrial); } },
+  { k: "L", t: "Ledger", fn: function () { pickLedger(); } },
+  { k: "O", t: "Outstandings", fn: function () { go(viewOutstanding); } },
+  { k: "G", t: "GST Summary", fn: function () { go(viewGst); } },
+  { sec: "Utilities" },
+  { k: "E", t: "Export for modules", fn: function () { go(viewExport); } },
+  { k: "R", t: "GST Rates", fn: function () { go(viewRates); }, roles: ["admin"] },
+  { k: "U", t: "Users", fn: function () { go(viewUsers); }, roles: ["admin"] },
+  { k: "W", t: "Change password", fn: function () { passwordModal(); } }
+];
+
+function viewGateway() {
+  clearHooks(); title("Gateway");
+  var items = GW.filter(function (g) { return g.sec || !g.roles || can(g.roles); });
+  var html = "<div class='gateway'><h3>Gateway</h3>";
+  var idx = 0;
+  items.forEach(function (g) {
+    if (g.sec) { html += "<div class='gw-sec'><small>" + g.sec + "</small></div>"; return; }
+    var at = g.t.indexOf(g.k);
+    if (at < 0) at = g.t.toLowerCase().indexOf(g.k.toLowerCase());
+    var t = at < 0 ? "<u>" + g.k + "</u> " + esc(g.t)
+      : esc(g.t.substring(0, at)) + "<u>" + esc(g.t.charAt(at)) + "</u>" + esc(g.t.substring(at + 1));
+    html += "<button class='gw-item' data-i='" + idx + "'>" + t + "</button>";
+    g._i = idx++;
+  });
+  $("view").innerHTML = html + "</div>";
+  var acts = items.filter(function (g) { return !g.sec; });
+  var sel = 0;
+  var btns = $("view").querySelectorAll(".gw-item");
+  function paint() { btns.forEach(function (b, i) { b.classList.toggle("sel", i === sel); }); }
+  btns.forEach(function (b, i) { b.addEventListener("click", function () { acts[i].fn(); }); });
+  paint();
+  S.onKey = function (e) {
+    if (e.key === "ArrowDown") { sel = (sel + 1) % acts.length; paint(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { sel = (sel - 1 + acts.length) % acts.length; paint(); e.preventDefault(); }
+    else if (e.key === "Enter") { e.preventDefault(); acts[sel].fn(); }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+      var hit = acts.filter(function (a) { return a.k.toLowerCase() === e.key.toLowerCase(); })[0];
+      if (hit) hit.fn();
+    }
+  };
+  keys(commonKeys());
+}
+
+/* ===================== lists for typing ===================== */
+
+function fillDatalists() {
+  var ds = $("dlStates");
+  if (!ds) { ds = document.createElement("datalist"); ds.id = "dlStates"; document.body.appendChild(ds); }
+  ds.innerHTML = (S.states || []).map(function (s) { return "<option value='" + esc(s) + "'>"; }).join("");
+  var dl = $("dlLedgers");
+  if (!dl) { dl = document.createElement("datalist"); dl.id = "dlLedgers"; document.body.appendChild(dl); }
+  dl.innerHTML = S.M.ledgers.filter(function (l) { return l.active; }).map(function (l) { return "<option value='" + esc(l.name) + "'>" + esc(l.group) + "</option>"; }).join("");
+  var di = $("dlItems");
+  if (!di) { di = document.createElement("datalist"); di.id = "dlItems"; document.body.appendChild(di); }
+  di.innerHTML = S.M.items.filter(function (i) { return i.active; }).map(function (i) { return "<option value='" + esc(i.name) + "'>" + money(i.price) + " · GST " + i.gst + "%</option>"; }).join("");
+}
+function findLedger(name) {
+  var k = String(name || "").trim().toUpperCase().replace(/\s+/g, " ");
+  return S.M.ledgers.filter(function (l) { return l.name.toUpperCase() === k; })[0] || null;
+}
+function findItem(name) {
+  var k = String(name || "").trim().toUpperCase().replace(/\s+/g, " ");
+  return S.M.items.filter(function (i) { return i.name.toUpperCase() === k; })[0] || null;
+}
+function isCashBank(name) { var l = findLedger(name); return l && (l.group === "Cash-in-Hand" || l.group === "Bank Accounts"); }
+
+/* ===================== voucher entry ===================== */
+
+function openVoucher(type, existing) { go(viewVoucher, { type: type, v: existing || null }); }
+
+function viewVoucher(arg) {
+  clearHooks(); fillDatalists();
+  var vt = S.M.vtypes.filter(function (t) { return t.name === arg.type; })[0];
+  var v = arg.v;
+  var alter = !!v;
+  title((alter ? "Alteration: " : "Voucher Creation: ") + vt.name);
+
+  var html = "<div class='card'><div class='vhead'><div><span class='vtitle'>" + esc(vt.name) + "</span> " +
+    "<span class='vno muted'>No. " + esc(alter ? v.no : "(new)") + "</span></div>" +
+    "<label class='muted'>Date <input type='date' id='vDate' value='" + esc(alter ? v.date : S.date) + "'></label></div>";
+
+  if (vt.mode === "inv") {
+    var partyLabel = vt.name === "Purchase" || vt.name === "Debit Note" ? "Supplier (party A/c)" : "Party A/c name";
+    html += "<div class='row'><label style='flex:2'>" + partyLabel + "<input id='vParty' class='ledger' list='dlLedgers' autocomplete='off' value='" + esc(alter ? v.party : "") + "'></label>" +
+      "<label>Tax<select id='vInter'><option value=''>Auto (by party state)</option><option value='no'>Same state: CGST + SGST</option><option value='yes'>Other state: IGST</option></select></label></div>" +
+      "<p class='muted' id='vPartyInfo'></p>" +
+      "<table class='grid' id='vItems'><thead><tr><th>Name of Item</th><th class='w-qty'>Qty</th><th class='w-sm'>Unit</th><th class='w-amt'>Rate</th><th class='w-pct'>Disc %</th><th class='w-pct'>GST %</th><th class='w-amt num'>Amount</th></tr></thead><tbody></tbody></table>" +
+      "<div class='row' style='margin-top:10px'><label>Extra discount (₹, before tax)<input id='vExtra' class='w-amt num' value='" + (alter ? "" : "") + "'></label></div>" +
+      "<table class='totals' id='vTotals'></table>";
+  } else {
+    html += "<table class='grid' id='vLines'><thead><tr><th class='w-drcr'>Dr/Cr</th><th>Particulars</th><th class='w-amt num'>Debit</th><th class='w-amt num'>Credit</th></tr></thead><tbody></tbody>" +
+      "<tfoot><tr><td></td><td class='num'>Total</td><td class='num' id='vTotDr'></td><td class='num' id='vTotCr'></td></tr></tfoot></table>" +
+      "<p class='muted' id='vBalInfo'></p>";
+  }
+  html += "<div class='row' style='margin-top:10px'><label style='flex:1'>Narration<input id='vNarr' value='" + esc(alter ? v.narration : "") + "'></label></div>" +
+    "<div class='row noprint' style='margin-top:12px'><button class='btn primary' id='vSave'>Accept (Ctrl+A)</button>" +
+    (alter && can(WRITE) ? "<button class='btn danger' id='vCancel'>Cancel voucher (Alt+X)</button><button class='btn' id='vHist'>History</button>" : "") +
+    "<button class='btn' id='vQuit'>Quit (Esc)</button></div></div>";
+  $("view").innerHTML = html;
+
+  $("vQuit").onclick = back;
+  $("vSave").onclick = saveVoucher;
+  S.accept = saveVoucher;
+
+  if (vt.mode === "inv") setupInvoice(vt, v); else setupLines(vt, v);
+
+  if (alter) {
+    if ($("vCancel")) $("vCancel").onclick = cancelVoucher;
+    if ($("vHist")) $("vHist").onclick = function () { showHistory(v); };
+  }
+  S.onKey = function (e) { if (e.altKey && e.key.toLowerCase() === "x" && alter) cancelVoucher(); };
+  // switching type while entering: keep it simple - only for new vouchers
+  S.onVoucherKey = function (t) { if (!alter) { S.cur = null; S.dirty = false; openVoucher(t); } };
+  S.onDateChange = function (d) { if (!alter) $("vDate").value = d; };
+
+  keys([{ k: "Ctrl+A", t: "Accept", fn: saveVoucher }, { k: "F2", t: "Date", fn: changeDate }, "-"]
+    .concat(voucherKeys().map(function (x) { x.off = x.off || alter; return x; }))
+    .concat(["-", { k: "Alt+C", t: "Create ledger", fn: function () { ledgerModal(); } },
+      { k: "Alt+X", t: "Cancel voucher", fn: cancelVoucher, off: !alter }, { k: "Esc", t: "Quit", fn: back }]));
+
+  function saveVoucher() {
+    var data = { type: vt.name, date: $("vDate").value, narration: $("vNarr").value };
+    if (alter) { data.id = v.id; data.version = v.version; }
+    if (vt.mode === "inv") {
+      data.party = $("vParty").value;
+      data.items = readItems();
+      data.extraDiscount = num($("vExtra").value);
+      var iv = $("vInter").value; if (iv) data.interstate = iv === "yes";
+    } else {
+      data.lines = readLines();
+    }
+    $("vSave").disabled = true; status("Saving…");
+    call("abSaveVoucher", data).then(function (r) {
+      S.dirty = false; status();
+      toast((alter ? "Altered " : "Saved ") + r.no + " · ₹ " + money(r.amount));
+      if (alter) back();
+      else { S.cur = null; openVoucher(vt.name); }   // fresh voucher of the same type
+    }).catch(function (e) { $("vSave").disabled = false; status(); toast(e.message, true); });
+  }
+
+  function cancelVoucher() {
+    if (!alter) return;
+    var why = prompt("Cancel " + v.no + "? It stays in the books marked cancelled.\nReason:");
+    if (why === null) return;
+    call("abCancelVoucher", v.id, v.version, why).then(function () { S.dirty = false; toast(v.no + " cancelled."); back(); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+}
+
+/* ---- accounting lines (Contra / Payment / Receipt / Journal) ---- */
+
+function setupLines(vt, v) {
+  var body = $("vLines").querySelector("tbody");
+  function addRow(line) {
+    var tr = document.createElement("tr");
+    var side = line ? (line.dr ? "Dr" : "Cr") : defaultSide();
+    tr.innerHTML = "<td><select class='side'><option>Dr</option><option>Cr</option></select></td>" +
+      "<td><input class='ledger' list='dlLedgers' autocomplete='off'></td>" +
+      "<td><input class='amt dr num'></td><td><input class='amt cr num'></td>";
+    body.appendChild(tr);
+    tr.querySelector(".side").value = side;
+    if (line) { tr.querySelector(".ledger").value = line.ledger; tr.querySelector(side === "Dr" ? ".dr" : ".cr").value = line.dr || line.cr; }
+    paintSide(tr);
+    tr.querySelector(".side").addEventListener("change", function () { paintSide(tr); totals(); });
+    tr.querySelector(".ledger").addEventListener("change", function () { ledgerInfo(this); });
+    tr.querySelectorAll(".amt").forEach(function (a) { a.addEventListener("input", totals); });
+    // Enter on the amount: new line, or narration when the voucher balances
+    tr.querySelectorAll(".amt").forEach(function (a) {
+      a.onEnter = function () {
+        totals();
+        var t = sums();
+        if (Math.abs(t.dr - t.cr) < 0.005 && t.dr > 0) { $("vNarr").focus(); return; }
+        var last = body.lastElementChild;
+        if (last === tr) addRow(null);
+        var nx = tr.nextElementSibling;
+        nx.querySelector(".side").focus();
+        prefillDiff(nx);
+      };
+    });
+    return tr;
+  }
+  function paintSide(tr) {
+    var dr = tr.querySelector(".side").value === "Dr";
+    var dIn = tr.querySelector(".dr"), cIn = tr.querySelector(".cr");
+    if (dr && cIn.value) { dIn.value = cIn.value; cIn.value = ""; }
+    if (!dr && dIn.value) { cIn.value = dIn.value; dIn.value = ""; }
+    dIn.disabled = !dr; cIn.disabled = dr;
+  }
+  function defaultSide() {
+    var t = sums();
+    if (!body.children.length) return vt.name === "Receipt" ? "Cr" : "Dr";
+    return t.dr > t.cr ? "Cr" : "Dr";
+  }
+  function prefillDiff(tr) {
+    var t = sums(), diff = r2(Math.abs(t.dr - t.cr));
+    tr.querySelector(".side").value = t.dr > t.cr ? "Cr" : "Dr";
+    paintSide(tr);
+    var inp = tr.querySelector(t.dr > t.cr ? ".cr" : ".dr");
+    if (diff && !inp.value) inp.value = diff;
+  }
+  function sums() {
+    var dr = 0, cr = 0;
+    body.querySelectorAll("tr").forEach(function (tr) { dr += num(tr.querySelector(".dr").value); cr += num(tr.querySelector(".cr").value); });
+    return { dr: r2(dr), cr: r2(cr) };
+  }
+  function totals() {
+    var t = sums();
+    $("vTotDr").textContent = money(t.dr); $("vTotCr").textContent = money(t.cr);
+    var d = r2(t.dr - t.cr);
+    $("vBalInfo").innerHTML = d ? "<span class='tag warn'>Difference " + money(Math.abs(d)) + (d > 0 ? " Dr" : " Cr") + "</span>" : (t.dr ? "<span class='tag ok'>Balanced</span>" : "");
+  }
+  window.readLines = function () {
+    var out = [];
+    body.querySelectorAll("tr").forEach(function (tr) {
+      var led = tr.querySelector(".ledger").value.trim(); if (!led) return;
+      var dr = tr.querySelector(".side").value === "Dr";
+      var amt = num(tr.querySelector(dr ? ".dr" : ".cr").value); if (!amt) return;
+      out.push({ ledger: led, dr: dr ? amt : 0, cr: dr ? 0 : amt });
+    });
+    return out;
+  };
+  if (v) v.lines.forEach(addRow); else { addRow(null); addRow(null); }
+  totals();
+  body.querySelector(".side").focus();
+}
+
+function ledgerInfo(input) {
+  var l = findLedger(input.value);
+  if (!input.value) return;
+  if (!l) { status("No ledger \"" + input.value + "\" - press Alt+C to create it."); input.style.borderColor = "var(--err)"; return; }
+  input.value = l.name; input.style.borderColor = "";
+  status(l.name + " · " + l.group + (l.segment ? " · " + l.segment : "") + (l.state ? " · " + l.state : ""));
+}
+
+/* ---- item invoice (Sales / Purchase / Credit Note / Debit Note) ---- */
+
+function setupInvoice(vt, v) {
+  var body = $("vItems").querySelector("tbody");
+  var rateOpts = S.M.rates.filter(function (r) { return r.active; }).map(function (r) { return "<option value='" + r.rate + "'>" + r.rate + "</option>"; }).join("");
+  var purchase = vt.name === "Purchase" || vt.name === "Debit Note";
+
+  function addRow(it) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = "<td><input class='item' list='dlItems' autocomplete='off'></td><td><input class='qty num'></td>" +
+      "<td><input class='unit'></td><td><input class='rate num'></td><td><input class='disc num'></td>" +
+      "<td><select class='gst'>" + rateOpts + "</select></td><td class='num amt'></td>";
+    body.appendChild(tr);
+    if (it) {
+      tr.querySelector(".item").value = it.item; tr.querySelector(".qty").value = it.qty; tr.querySelector(".unit").value = it.unit;
+      tr.querySelector(".rate").value = it.rate; tr.querySelector(".gst").value = it.gst;
+    } else {
+      var five = S.M.rates.filter(function (r) { return r.rate === 5; })[0];
+      if (five) tr.querySelector(".gst").value = 5;
+    }
+    tr.querySelector(".item").addEventListener("change", function () {
+      var i = findItem(this.value);
+      if (i) {
+        this.value = i.name;
+        tr.querySelector(".unit").value = i.unit;
+        if (!tr.querySelector(".rate").value) tr.querySelector(".rate").value = i.price || "";
+        tr.querySelector(".gst").value = i.gst;
+        tr.dataset.hsn = i.hsn || "";
+      }
+      calc();
+    });
+    tr.querySelectorAll("input,select").forEach(function (x) { x.addEventListener("input", calc); x.addEventListener("change", calc); });
+    // Enter on an empty item name ends the item list
+    tr.querySelector(".item").onEnter = function () {
+      if (!tr.querySelector(".item").value.trim()) { $("vExtra").focus(); return; }
+      nextField(tr.querySelector(".item"), 1);
+    };
+    tr.querySelector(".gst").onEnter = function () {
+      calc();
+      if (body.lastElementChild === tr) addRow(null);
+      tr.nextElementSibling.querySelector(".item").focus();
+    };
+    return tr;
+  }
+
+  window.readItems = function () {
+    var out = [];
+    body.querySelectorAll("tr").forEach(function (tr) {
+      var name = tr.querySelector(".item").value.trim(); if (!name) return;
+      out.push({ item: name, hsn: tr.dataset.hsn || "", qty: num(tr.querySelector(".qty").value), unit: tr.querySelector(".unit").value,
+        rate: num(tr.querySelector(".rate").value), discPct: num(tr.querySelector(".disc").value), gst: num(tr.querySelector(".gst").value) });
+    });
+    return out;
+  };
+
+  function interstate() {
+    var iv = $("vInter").value;
+    if (iv) return iv === "yes";
+    var p = findLedger($("vParty").value);
+    return !!(p && p.state && p.state.toUpperCase() !== String(S.M.company.state).toUpperCase());
+  }
+
+  function calc() {
+    var items = readItems(), inter = interstate();
+    var res = computeInvoice(items, num($("vExtra").value), inter);
+    var rows = body.querySelectorAll("tr");
+    var k = 0;
+    rows.forEach(function (tr) {
+      if (!tr.querySelector(".item").value.trim()) { tr.querySelector(".amt").textContent = ""; return; }
+      var l = res.lines[k++];
+      tr.querySelector(".amt").textContent = l ? money(l.net) : "";
+    });
+    var t = res.totals, h = "";
+    h += "<tr><td>Value after line discounts</td><td class='num'>" + money(r2(t.gross - (t.discount - t.extra))) + "</td></tr>";
+    if (t.extra) h += "<tr><td>Extra discount</td><td class='num'>- " + money(t.extra) + "</td></tr>";
+    h += "<tr><td>Taxable value</td><td class='num'>" + money(t.taxable) + "</td></tr>";
+    var pre = purchase ? "Input " : "Output ";
+    if (inter) h += "<tr><td>" + pre + "IGST</td><td class='num'>" + money(t.igst) + "</td></tr>";
+    else h += "<tr><td>" + pre + "CGST</td><td class='num'>" + money(t.cgst) + "</td></tr><tr><td>" + pre + "SGST</td><td class='num'>" + money(t.sgst) + "</td></tr>";
+    if (t.roundOff) h += "<tr><td>Round off</td><td class='num'>" + (t.roundOff > 0 ? "" : "- ") + money(Math.abs(t.roundOff)) + "</td></tr>";
+    h += "<tr class='grand'><td>Total</td><td class='num'>₹ " + money(t.grand) + "</td></tr>";
+    $("vTotals").innerHTML = h;
+  }
+
+  $("vParty").addEventListener("change", function () {
+    ledgerInfo(this);
+    var p = findLedger(this.value);
+    $("vPartyInfo").textContent = p ? (p.group + (p.gstin ? " · GSTIN " + p.gstin : "") + (p.state ? " · " + p.state : "") +
+      (interstate() ? " · IGST" : " · CGST + SGST")) : "";
+    calc();
+  });
+  $("vInter").addEventListener("change", calc);
+  $("vExtra").addEventListener("input", calc);
+  $("vExtra").onEnter = function () { $("vNarr").focus(); };
+  $("vNarr").onEnter = function () { $("vSave").focus(); };
+
+  if (v) {
+    // rebuild the screen from the saved lines; line discount is folded into the rate's discount on re-save
+    $("vInter").value = v.interstate ? "yes" : "no";
+    v.items.forEach(function (it) {
+      var tr = addRow(it);
+      var lineDiscPct = it.gross ? r2((it.discount) / it.gross * 100) : 0;
+      tr.querySelector(".disc").value = lineDiscPct || "";
+      tr.dataset.hsn = it.hsn || "";
+    });
+    $("vPartyInfo").textContent = "Saved discounts (incl. any extra discount) are shown as a % per line.";
+  } else addRow(null);
+  calc();
+  $("vParty").focus();
+}
+
+/* Same maths as the server (the server re-checks on save). */
+function computeInvoice(items, extraDiscount, interstate) {
+  var lines = [], netSum = 0;
+  items.forEach(function (it) {
+    if (!it.item || !it.qty) return;
+    var gross = r2(it.qty * it.rate);
+    var pct = Math.min(Math.max(it.discPct || 0, 0), 100);
+    var d = r2(gross * pct / 100), net = r2(gross - d);
+    netSum = r2(netSum + net);
+    lines.push({ gross: gross, discount: d, net: net, gst: it.gst });
+  });
+  var extra = r2(Math.min(Math.max(extraDiscount || 0, 0), netSum)), given = 0;
+  var t = { gross: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0, extra: extra };
+  lines.forEach(function (l, i) {
+    var share = i === lines.length - 1 ? r2(extra - given) : r2(netSum ? extra * l.net / netSum : 0);
+    given = r2(given + share);
+    l.discount = r2(l.discount + share); l.taxable = r2(l.net - share);
+    if (interstate) { l.igst = r2(l.taxable * l.gst / 100); l.cgst = l.sgst = 0; }
+    else { l.cgst = r2(l.taxable * l.gst / 200); l.sgst = l.cgst; l.igst = 0; }
+    l.total = r2(l.taxable + l.cgst + l.sgst + l.igst);
+    ["gross", "discount", "taxable", "cgst", "sgst", "igst", "total"].forEach(function (k) { t[k] = r2(t[k] + l[k]); });
+  });
+  t.grand = Math.round(t.total); t.roundOff = r2(t.grand - t.total);
+  return { lines: lines, totals: t };
+}
+
+function showHistory(v) {
+  call("abVoucherHistory", v.id).then(function (list) {
+    modal("<h3>History of " + esc(v.no) + "</h3><table class='grid'><tr><th>When</th><th>Who</th><th>What</th></tr>" +
+      list.map(function (h) { return "<tr><td>" + esc(new Date(h.when).toLocaleString("en-IN")) + "</td><td>" + esc(h.user) + "</td><td>" + esc(h.action) + "</td></tr>"; }).join("") +
+      "</table><p class='muted'>Every change is kept in the Edit Log and can't be switched off.</p><p><button class='btn' id='mdOk'>Close</button></p>", closeModal);
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+/* ===================== masters ===================== */
+
+function ledgerModal(name, returnTo) {
+  fillDatalists();
+  var l = name ? findLedger(name) : null;
+  var prefill = !l && returnTo && returnTo.value ? returnTo.value : "";
+  var gOpts = S.M.groups.map(function (g) { return "<option" + (l && l.group === g.name ? " selected" : "") + ">" + esc(g.name) + "</option>"; }).join("");
+  var sOpts = "<option value=''>-</option>" + S.M.segments.map(function (s) { return "<option" + (l && l.segment === s ? " selected" : "") + ">" + s + "</option>"; }).join("");
+  modal("<h3>" + (l ? "Ledger Alteration" : "Ledger Creation") + "</h3><div class='row'>" +
+    "<label style='flex:1 1 100%'>Name<input id='lgName' value='" + esc(l ? l.name : prefill) + "'></label>" +
+    "<label style='flex:1'>Under (group)<select id='lgGroup'>" + gOpts + "</select></label>" +
+    "<label>Segment<select id='lgSeg'>" + sOpts + "</select></label>" +
+    "<label>Opening Dr<input id='lgODr' class='num w-amt' value='" + (l && l.openDr ? l.openDr : "") + "'></label>" +
+    "<label>Opening Cr<input id='lgOCr' class='num w-amt' value='" + (l && l.openCr ? l.openCr : "") + "'></label>" +
+    "<label>State<input id='lgState' list='dlStates' autocomplete='off' value='" + esc(l ? l.state : S.M.company.state) + "'></label>" +
+    "<label>GSTIN<input id='lgGstin' value='" + esc(l ? l.gstin : "") + "'></label>" +
+    "<label>Phone<input id='lgPhone' value='" + esc(l ? l.phone : "") + "'></label>" +
+    (l ? "<label>Active<select id='lgActive'><option value='yes'>Yes</option><option value='no'" + (l.active ? "" : " selected") + ">No</option></select></label>" : "") +
+    "</div><p class='row'><button class='btn primary' id='mdOk'>Accept (Ctrl+A)</button><button class='btn' id='mdNo'>Cancel</button></p>",
+    function () {
+      var data = { oldName: l ? l.name : "", name: $("lgName").value, group: $("lgGroup").value, segment: $("lgSeg").value,
+        openDr: $("lgODr").value, openCr: $("lgOCr").value, state: $("lgState").value, gstin: $("lgGstin").value,
+        phone: $("lgPhone").value, active: $("lgActive") ? $("lgActive").value === "yes" : true };
+      call("abSaveLedger", data).then(function () {
+        closeModal(); toast("Ledger saved.");
+        return reloadMasters().then(function () {
+          if (returnTo) { returnTo.value = data.name; returnTo.dispatchEvent(new Event("change")); returnTo.focus(); }
+          else if (S.cur && (S.cur.fn === viewChart)) refresh();
+        });
+      }).catch(function (e) { toast(e.message, true); });
+    });
+  $("mdNo").onclick = closeModal;
+  if (!l && !prefill) {
+    // sensible default group
+    $("lgGroup").value = "Sundry Debtors";
+  }
+  $("lgName").focus();
+}
+
+function viewChart() {
+  clearHooks(); title(NAMES.chart);
+  var by = {};
+  S.M.ledgers.forEach(function (l) { (by[l.group] = by[l.group] || []).push(l); });
+  var html = "<div class='card'><h3>" + NAMES.chart + " <span class='muted'>(" + S.M.ledgers.length + " ledgers) · click a ledger to alter it</span></h3>" +
+    "<input id='chFind' placeholder='Type to find a ledger…' style='width:100%;margin-bottom:8px'><table class='grid' id='chTbl'><tbody>";
+  S.M.groups.forEach(function (g) {
+    var list = (by[g.name] || []).sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (!list.length) return;
+    html += "<tr><td colspan='4'><b>" + esc(g.name) + "</b></td></tr>";
+    list.forEach(function (l) {
+      html += "<tr class='click indent' data-n='" + esc(l.name) + "'><td>" + esc(l.name) + (l.active ? "" : " <span class='tag'>inactive</span>") + "</td><td>" + esc(l.segment) + "</td><td>" + esc(l.state) + "</td><td class='num'>" +
+        (l.openDr ? money(l.openDr) + " Dr" : l.openCr ? money(l.openCr) + " Cr" : "") + "</td></tr>";
+    });
+  });
+  $("view").innerHTML = html + "</tbody></table></div>";
+  $("chTbl").querySelectorAll("tr.click").forEach(function (tr) {
+    tr.addEventListener("click", function () { if (can(WRITE)) ledgerModal(tr.getAttribute("data-n")); else go(viewLedger, tr.getAttribute("data-n")); });
+  });
+  $("chFind").addEventListener("input", function () {
+    var q = this.value.toLowerCase();
+    $("chTbl").querySelectorAll("tr.click").forEach(function (tr) { tr.style.display = tr.getAttribute("data-n").toLowerCase().indexOf(q) >= 0 ? "" : "none"; });
+  });
+  $("chFind").focus();
+  keys(commonKeys());
+}
+
+function viewItems() {
+  clearHooks(); title("Stock Items");
+  var html = "<div class='card'><h3>Stock Items</h3><table class='grid'><thead><tr><th>Name</th><th>HSN</th><th>Unit</th><th class='num'>Price</th><th class='num'>GST %</th><th></th></tr></thead><tbody>";
+  S.M.items.forEach(function (i) {
+    html += "<tr class='click' data-n='" + esc(i.name) + "'><td>" + esc(i.name) + "</td><td>" + esc(i.hsn) + "</td><td>" + esc(i.unit) + "</td><td class='num'>" + money(i.price) + "</td><td class='num'>" + i.gst + "</td><td>" + (i.active ? "" : "<span class='tag'>inactive</span>") + "</td></tr>";
+  });
+  if (!S.M.items.length) html += "<tr><td colspan='6' class='muted'>No items yet.</td></tr>";
+  $("view").innerHTML = html + "</tbody></table>" + (can(WRITE) ? "<p><button class='btn primary' id='itNew'>Create item</button></p>" : "") + "</div>";
+  if ($("itNew")) $("itNew").onclick = function () { itemModal(); };
+  $("view").querySelectorAll("tr.click").forEach(function (tr) { tr.addEventListener("click", function () { if (can(WRITE)) itemModal(tr.getAttribute("data-n")); }); });
+  keys(commonKeys([{ k: "Alt+I", t: "Create item", fn: function () { itemModal(); }, off: !can(WRITE) }]));
+  S.onKey = function (e) { if (e.altKey && e.key.toLowerCase() === "i" && can(WRITE)) itemModal(); };
+}
+
+function itemModal(name) {
+  var it = name ? findItem(name) : null;
+  var rOpts = S.M.rates.map(function (r) { return "<option value='" + r.rate + "'" + ((it ? it.gst : 5) === r.rate ? " selected" : "") + ">" + esc(r.label) + "</option>"; }).join("");
+  modal("<h3>" + (it ? "Item Alteration" : "Item Creation") + "</h3><div class='row'>" +
+    "<label style='flex:1 1 100%'>Name<input id='itName' value='" + esc(it ? it.name : "") + "'></label>" +
+    "<label>HSN<input id='itHsn' value='" + esc(it ? it.hsn : "") + "'></label><label>Unit<input id='itUnit' value='" + esc(it ? it.unit : "Nos") + "'></label>" +
+    "<label>Price<input id='itPrice' class='num w-amt' value='" + (it ? it.price : "") + "'></label><label>GST<select id='itGst'>" + rOpts + "</select></label>" +
+    (it ? "<label>Active<select id='itActive'><option value='yes'>Yes</option><option value='no'" + (it.active ? "" : " selected") + ">No</option></select></label>" : "") +
+    "</div><p class='row'><button class='btn primary' id='mdOk'>Accept (Ctrl+A)</button><button class='btn' id='mdNo'>Cancel</button></p>",
+    function () {
+      call("abSaveItem", { oldName: it ? it.name : "", name: $("itName").value, hsn: $("itHsn").value, unit: $("itUnit").value,
+        price: $("itPrice").value, gst: num($("itGst").value), active: $("itActive") ? $("itActive").value === "yes" : true })
+        .then(function () { closeModal(); toast("Item saved."); return reloadMasters().then(function () { if (S.cur && S.cur.fn === viewItems) refresh(); }); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  $("mdNo").onclick = closeModal; $("itName").focus();
+}
+
+function viewRates() {
+  clearHooks(); title("GST Rates");
+  var rows = S.M.rates.map(function (r) { return rateRow(r); }).join("");
+  $("view").innerHTML = "<div class='card' style='max-width:560px'><h3>GST Rates</h3>" +
+    "<p class='muted'>Same state: CGST and SGST are half the rate each (5% = 2.5% + 2.5%). Other state: IGST at the full rate. " +
+    "Changing a rate here only affects new bills; saved bills keep their rate.</p>" +
+    "<table class='grid' id='rtTbl'><thead><tr><th>Rate %</th><th>Label</th><th>In use</th><th></th></tr></thead><tbody>" + rows + "</tbody></table>" +
+    "<p class='row'><button class='btn' id='rtAdd'>Add rate</button><button class='btn primary' id='rtSave'>Save rates (Ctrl+A)</button></p></div>";
+  function rateRow(r) {
+    return "<tr><td><input class='rt num w-qty' value='" + r.rate + "'></td><td><input class='lb' value='" + esc(r.label) + "'></td>" +
+      "<td><select class='ac'><option value='yes'>Yes</option><option value='no'" + (r.active ? "" : " selected") + ">No</option></select></td>" +
+      "<td><button class='btn danger del' tabindex='-1'>Remove</button></td></tr>";
+  }
+  function wire() { $("rtTbl").querySelectorAll(".del").forEach(function (b) { b.onclick = function () { b.closest("tr").remove(); }; }); }
+  wire();
+  $("rtAdd").onclick = function () { $("rtTbl").querySelector("tbody").insertAdjacentHTML("beforeend", rateRow({ rate: "", label: "", active: true })); wire(); };
+  function save() {
+    var list = [];
+    $("rtTbl").querySelectorAll("tbody tr").forEach(function (tr) {
+      var v = tr.querySelector(".rt").value.trim(); if (v === "") return;
+      list.push({ rate: num(v), label: tr.querySelector(".lb").value, active: tr.querySelector(".ac").value === "yes" });
+    });
+    call("abSaveRates", list).then(function () { toast("GST rates saved."); return reloadMasters(); }).then(refresh).catch(function (e) { toast(e.message, true); });
+  }
+  $("rtSave").onclick = save; S.accept = save;
+  keys(commonKeys([{ k: "Ctrl+A", t: "Save rates", fn: save }]));
+}
+
+/* ===================== reports ===================== */
+
+function rangeBar(id, from, to, onGo) {
+  return "<div class='row noprint' id='" + id + "'><label>From<input type='date' class='rf' value='" + from + "'></label>" +
+    "<label>To<input type='date' class='rt' value='" + to + "'></label><button class='btn' data-go>Show</button>" +
+    "<button class='btn' data-print>Print</button></div>";
+}
+function wireRange(id, onGo) {
+  var bar = $(id);
+  bar.querySelector("[data-go]").onclick = function () { onGo(bar.querySelector(".rf").value, bar.querySelector(".rt").value); };
+  bar.querySelector("[data-print]").onclick = function () { window.print(); };
+  bar.querySelector(".rt").onEnter = function () { bar.querySelector("[data-go]").click(); };
+}
+
+function viewDayBook(arg) {
+  clearHooks(); title(NAMES.daybook);
+  arg = arg || { from: S.date, to: S.date };
+  if (S.cur) S.cur.arg = arg;
+  $("view").innerHTML = "<div class='card'>" + rangeBar("dbBar", arg.from, arg.to) + "<div id='dbOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireRange("dbBar", function (f, t) { viewDayBook({ from: f, to: t }); });
+  S.onDateChange = function (d) { viewDayBook({ from: d, to: d }); };
+  keys(commonKeys([{ k: "Enter", t: "Alter voucher", fn: function () { openSel(); } }, { k: "Alt+X", t: "Cancel voucher", fn: function () { cancelSel(); }, off: !can(WRITE) }]));
+  var list = [], sel = 0;
+  function openSel() { var v = list[sel]; if (!v) return; if (v.status === "Cancelled") return toast("This voucher is cancelled."); if (can(WRITE)) openVoucher(v.type, v); else showVoucher(v); }
+  function cancelSel() {
+    var v = list[sel]; if (!v || v.status === "Cancelled" || !can(WRITE)) return;
+    var why = prompt("Cancel " + v.no + "? Reason:"); if (why === null) return;
+    call("abCancelVoucher", v.id, v.version, why).then(function () { toast(v.no + " cancelled."); viewDayBook(arg); }).catch(function (e) { toast(e.message, true); });
+  }
+  call("abDayBook", arg.from, arg.to).then(function (rows) {
+    list = rows;
+    var tDr = 0, tCr = 0;
+    var h = "<div class='rep-title'><b>" + NAMES.daybook + "</b><br><span class='muted'>" + shortDate(arg.from) + (arg.to !== arg.from ? " to " + shortDate(arg.to) : "") + "</span></div>" +
+      "<table class='grid' id='dbTbl'><thead><tr><th>Date</th><th>Particulars</th><th>Vch Type</th><th>Vch No.</th><th class='num'>Debit</th><th class='num'>Credit</th></tr></thead><tbody>";
+    rows.forEach(function (v, i) {
+      var pl = v.lines.filter(function (l) { return l.ledger.toUpperCase() === v.party.toUpperCase(); })[0] || { dr: v.amount, cr: 0 };
+      if (v.status !== "Cancelled") { tDr += pl.dr; tCr += pl.cr; }
+      h += "<tr class='click" + (v.status === "Cancelled" ? " cancel" : "") + "' data-i='" + i + "'><td>" + shortDate(v.date) + "</td><td>" +
+        esc(v.status === "Cancelled" ? "(cancelled) " + v.party : v.party) + "</td><td>" + esc(v.type) + "</td><td>" + esc(v.no) + "</td><td class='num'>" +
+        moneyOrBlank(pl.dr) + "</td><td class='num'>" + moneyOrBlank(pl.cr) + "</td></tr>";
+    });
+    if (!rows.length) h += "<tr><td colspan='6' class='muted'>No vouchers for this period. Press F2 to change the date.</td></tr>";
+    h += "</tbody><tfoot><tr><td colspan='4' class='num'>Total</td><td class='num'>" + money(tDr) + "</td><td class='num'>" + money(tCr) + "</td></tr></tfoot></table>";
+    $("dbOut").innerHTML = h;
+    var trs = $("dbOut").querySelectorAll("tr.click");
+    function paint() { trs.forEach(function (tr, i) { tr.classList.toggle("sel", i === sel); }); }
+    trs.forEach(function (tr, i) { tr.addEventListener("click", function () { sel = i; paint(); openSel(); }); });
+    paint();
+    S.onKey = function (e) {
+      if (e.key === "ArrowDown") { sel = Math.min(sel + 1, list.length - 1); paint(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); paint(); e.preventDefault(); }
+      else if (e.key === "Enter") openSel();
+      else if (e.altKey && e.key.toLowerCase() === "x") cancelSel();
+    };
+  }).catch(function (e) { $("dbOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function showVoucher(v) {
+  modal("<h3>" + esc(v.type) + " " + esc(v.no) + "</h3><p class='muted'>" + niceDate(v.date) + "</p><table class='grid'>" +
+    v.lines.map(function (l) { return "<tr><td>" + esc(l.ledger) + "</td><td class='num'>" + moneyOrBlank(l.dr) + "</td><td class='num'>" + moneyOrBlank(l.cr) + "</td></tr>"; }).join("") +
+    "</table><p>" + esc(v.narration) + "</p><p><button class='btn' id='mdOk'>Close</button></p>", closeModal);
+}
+
+function pickLedger() {
+  fillDatalists();
+  modal("<h3>Ledger</h3><label>Name of ledger<input id='pkLed' class='ledger' list='dlLedgers' autocomplete='off' style='width:100%'></label>" +
+    "<p class='row'><button class='btn primary' id='mdOk'>Show</button></p>", function () {
+      var l = findLedger($("pkLed").value); if (!l) return toast("Pick a ledger from the list.", true);
+      closeModal(); go(viewLedger, { name: l.name });
+    });
+  $("pkLed").onEnter = S.modalAccept;
+  $("pkLed").focus();
+}
+
+function viewLedger(arg) {
+  clearHooks();
+  if (typeof arg === "string") arg = { name: arg };
+  arg.from = arg.from || fyStart(S.date); arg.to = arg.to || S.date;
+  title("Ledger: " + arg.name);
+  $("view").innerHTML = "<div class='card'>" + rangeBar("lgBar", arg.from, arg.to) + "<div id='lgOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireRange("lgBar", function (f, t) { arg.from = f; arg.to = t; viewLedger(arg); });
+  keys(commonKeys([{ k: "Alt+L", t: "Another ledger", fn: pickLedger }]));
+  S.onKey = function (e) { if (e.altKey && e.key.toLowerCase() === "l") pickLedger(); };
+  call("abLedgerStatement", arg.name, arg.from, arg.to).then(function (r) {
+    var h = "<div class='rep-title'><b>" + esc(r.ledger.name) + "</b> <span class='muted'>(" + esc(r.ledger.group) + ")</span><br><span class='muted'>" + shortDate(r.from) + " to " + shortDate(r.to) + "</span></div>" +
+      "<table class='grid'><thead><tr><th>Date</th><th>Particulars</th><th>Vch Type</th><th>Vch No.</th><th class='num'>Debit</th><th class='num'>Credit</th><th class='num'>Balance</th></tr></thead><tbody>" +
+      "<tr><td></td><td><i>Opening Balance</i></td><td></td><td></td><td></td><td></td><td class='num'>" + drcr(r.opening) + "</td></tr>";
+    r.rows.forEach(function (x) {
+      h += "<tr><td>" + shortDate(x.date) + "</td><td>" + esc(x.particulars) + (x.narration ? "<br><small class='muted'>" + esc(x.narration) + "</small>" : "") + "</td><td>" + esc(x.type) + "</td><td>" + esc(x.no) +
+        "</td><td class='num'>" + moneyOrBlank(x.dr) + "</td><td class='num'>" + moneyOrBlank(x.cr) + "</td><td class='num'>" + drcr(x.balance) + "</td></tr>";
+    });
+    h += "</tbody><tfoot><tr><td colspan='4' class='num'>Current Total</td><td class='num'>" + money(r.totalDr) + "</td><td class='num'>" + money(r.totalCr) + "</td><td class='num'>" + drcr(r.closing) + "</td></tr></tfoot></table>";
+    $("lgOut").innerHTML = h;
+  }).catch(function (e) { $("lgOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function asOfBar(id, asOf, extra) {
+  return "<div class='row noprint' id='" + id + "'><label>As on<input type='date' class='ao' value='" + asOf + "'></label>" + (extra || "") +
+    "<button class='btn' data-go>Show</button><button class='btn' data-print>Print</button></div>";
+}
+function wireAsOf(id, onGo) {
+  var bar = $(id);
+  bar.querySelector("[data-go]").onclick = function () { onGo(bar); };
+  bar.querySelector("[data-print]").onclick = function () { window.print(); };
+}
+
+function viewTrial(arg) {
+  clearHooks(); title("Trial Balance");
+  arg = arg || { asOf: S.date, detail: false };
+  $("view").innerHTML = "<div class='card' style='max-width:760px'>" + asOfBar("tbBar", arg.asOf, "<label>Detail<select class='dt'><option value='0'>Groups</option><option value='1'" + (arg.detail ? " selected" : "") + ">Ledgers</option></select></label>") + "<div id='tbOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireAsOf("tbBar", function (bar) { viewTrial({ asOf: bar.querySelector(".ao").value, detail: bar.querySelector(".dt").value === "1" }); });
+  keys(commonKeys([{ k: "Alt+F1", t: "Detail on/off", fn: function () { viewTrial({ asOf: arg.asOf, detail: !arg.detail }); } }]));
+  S.onKey = function (e) { if (e.altKey && e.key === "F1") viewTrial({ asOf: arg.asOf, detail: !arg.detail }); };
+  call("abTrialBalance", arg.asOf).then(function (r) {
+    var h = "<div class='rep-title'><b>Trial Balance</b><br><span class='muted'>as on " + shortDate(r.asOf) + "</span></div><table class='grid'><thead><tr><th>Particulars</th><th class='num'>Debit</th><th class='num'>Credit</th></tr></thead><tbody>";
+    r.groups.forEach(function (g) {
+      h += "<tr><td><b>" + esc(g.group) + "</b></td><td class='num'>" + moneyOrBlank(g.dr) + "</td><td class='num'>" + moneyOrBlank(g.cr) + "</td></tr>";
+      if (arg.detail) g.ledgers.forEach(function (l) {
+        h += "<tr class='indent click' data-n='" + esc(l.name) + "'><td>" + esc(l.name) + "</td><td class='num'>" + moneyOrBlank(l.dr) + "</td><td class='num'>" + moneyOrBlank(l.cr) + "</td></tr>";
+      });
+    });
+    h += "</tbody><tfoot><tr><td>Grand Total</td><td class='num'>" + money(r.totalDr) + "</td><td class='num'>" + money(r.totalCr) + "</td></tr></tfoot></table>";
+    if (r.difference) h += "<p class='err'>Difference in opening balances: " + drcr(r.difference) + ". Check the opening Dr/Cr of your ledgers.</p>";
+    $("tbOut").innerHTML = h;
+    $("tbOut").querySelectorAll("tr.click").forEach(function (tr) { tr.addEventListener("click", function () { go(viewLedger, { name: tr.getAttribute("data-n"), to: arg.asOf }); }); });
+  }).catch(function (e) { $("tbOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function viewPL(arg) {
+  clearHooks(); title("Profit & Loss A/c");
+  arg = arg || { from: fyStart(S.date), to: S.date, os: "", cs: "" };
+  $("view").innerHTML = "<div class='card'>" + rangeBar("plBar", arg.from, arg.to) +
+    "<div class='row noprint' style='margin-top:6px'><label>Opening stock ₹<input id='plOS' class='num w-amt' value='" + esc(arg.os) + "'></label><label>Closing stock ₹<input id='plCS' class='num w-amt' value='" + esc(arg.cs) + "'></label></div>" +
+    "<div id='plOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireRange("plBar", function (f, t) { viewPL({ from: f, to: t, os: $("plOS").value, cs: $("plCS").value }); });
+  keys(commonKeys());
+  call("abProfitLoss", arg.from, arg.to, num(arg.os), num(arg.cs)).then(function (r) {
+    function block(t, list) {
+      var s = 0, h = "";
+      list.forEach(function (x) { s += x.amount; h += "<tr class='indent'><td>" + esc(x.name) + "</td><td class='num'>" + money(x.amount) + "</td></tr>"; });
+      return { html: list.length ? "<tr><td><b>" + t + "</b></td><td class='num'><b>" + money(s) + "</b></td></tr>" + h : "", sum: r2(s) };
+    }
+    var S_ = r.sections;
+    var left = "", right = "";
+    if (r.openingStock) left += "<tr><td><b>Opening Stock</b></td><td class='num'><b>" + money(r.openingStock) + "</b></td></tr>";
+    left += block("Purchase Accounts", S_["Purchase Accounts"]).html + block("Direct Expenses", S_["Direct Expenses"]).html;
+    right += block("Sales Accounts", S_["Sales Accounts"]).html + block("Direct Incomes", S_["Direct Incomes"]).html;
+    if (r.closingStock) right += "<tr><td><b>Closing Stock</b></td><td class='num'><b>" + money(r.closingStock) + "</b></td></tr>";
+    if (r.grossProfit >= 0) left += "<tr><td><b>Gross Profit</b></td><td class='num'><b>" + money(r.grossProfit) + "</b></td></tr>";
+    else right += "<tr><td><b>Gross Loss</b></td><td class='num'><b>" + money(-r.grossProfit) + "</b></td></tr>";
+    var left2 = block("Indirect Expenses", S_["Indirect Expenses"]).html, right2 = "";
+    if (r.grossProfit >= 0) right2 += "<tr><td><b>Gross Profit b/f</b></td><td class='num'><b>" + money(r.grossProfit) + "</b></td></tr>";
+    else left2 = "<tr><td><b>Gross Loss b/f</b></td><td class='num'><b>" + money(-r.grossProfit) + "</b></td></tr>" + left2;
+    right2 += block("Indirect Incomes", S_["Indirect Incomes"]).html;
+    if (r.netProfit >= 0) left2 += "<tr><td><b>Net Profit</b></td><td class='num'><b>" + money(r.netProfit) + "</b></td></tr>";
+    else right2 += "<tr><td><b>Net Loss</b></td><td class='num'><b>" + money(-r.netProfit) + "</b></td></tr>";
+    $("plOut").innerHTML = "<div class='rep-title'><b>Profit &amp; Loss A/c</b><br><span class='muted'>" + shortDate(r.from) + " to " + shortDate(r.to) + "</span></div>" +
+      "<div class='two'><div class='card'><h3>Particulars (Dr)</h3><table class='grid'>" + left + left2 + "</table></div>" +
+      "<div class='card'><h3>Particulars (Cr)</h3><table class='grid'>" + right + right2 + "</table></div></div>" +
+      "<p class='muted'>Stock values are typed in (no stock valuation yet).</p>";
+  }).catch(function (e) { $("plOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function viewBalanceSheet(arg) {
+  clearHooks(); title("Balance Sheet");
+  arg = arg || { asOf: S.date, cs: "" };
+  $("view").innerHTML = "<div class='card'>" + asOfBar("bsBar", arg.asOf, "<label>Closing stock ₹<input class='cs num w-amt' value='" + esc(arg.cs) + "'></label>") + "<div id='bsOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireAsOf("bsBar", function (bar) { viewBalanceSheet({ asOf: bar.querySelector(".ao").value, cs: bar.querySelector(".cs").value }); });
+  keys(commonKeys());
+  call("abBalanceSheet", arg.asOf, num(arg.cs)).then(function (r) {
+    function side(list, plRow) {
+      var h = "";
+      list.forEach(function (g) {
+        h += "<tr><td><b>" + esc(g.group) + "</b></td><td class='num'><b>" + money(g.amount) + "</b></td></tr>";
+        g.ledgers.forEach(function (l) { h += "<tr class='indent'><td>" + esc(l.name) + "</td><td class='num'>" + money(l.amount) + "</td></tr>"; });
+      });
+      return h + (plRow || "");
+    }
+    var pl = "<tr><td><b>Profit &amp; Loss A/c</b></td><td class='num'><b>" + money(r.profitLoss) + "</b></td></tr>";
+    $("bsOut").innerHTML = "<div class='rep-title'><b>Balance Sheet</b><br><span class='muted'>as at " + shortDate(r.asOf) + "</span></div><div class='two'>" +
+      "<div class='card'><h3>Liabilities</h3><table class='grid'>" + side(r.liabilities, pl) + "<tfoot><tr><td>Total</td><td class='num'>" + money(r.totalLiabilities) + "</td></tr></tfoot></table></div>" +
+      "<div class='card'><h3>Assets</h3><table class='grid'>" + side(r.assets) + "<tfoot><tr><td>Total</td><td class='num'>" + money(r.totalAssets) + "</td></tr></tfoot></table></div></div>" +
+      (r.difference ? "<p class='err'>Difference " + money(r.difference) + " - opening balances don't tally.</p>" : "");
+  }).catch(function (e) { $("bsOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function viewOutstanding(arg) {
+  clearHooks(); title("Outstandings");
+  arg = arg || { asOf: S.date, group: "Sundry Debtors", seg: "" };
+  var segs = "<option value=''>All</option>" + S.M.segments.map(function (s) { return "<option" + (arg.seg === s ? " selected" : "") + ">" + s + "</option>"; }).join("");
+  $("view").innerHTML = "<div class='card'>" + asOfBar("osBar", arg.asOf,
+    "<label>Of<select class='gp'><option" + (arg.group === "Sundry Debtors" ? " selected" : "") + ">Sundry Debtors</option><option" + (arg.group === "Sundry Creditors" ? " selected" : "") + ">Sundry Creditors</option></select></label>" +
+    "<label>Segment<select class='sg'>" + segs + "</select></label>") + "<div id='osOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireAsOf("osBar", function (bar) { viewOutstanding({ asOf: bar.querySelector(".ao").value, group: bar.querySelector(".gp").value, seg: bar.querySelector(".sg").value }); });
+  keys(commonKeys());
+  call("abOutstanding", arg.asOf, arg.group).then(function (r) {
+    var rows = r.rows.filter(function (x) { return !arg.seg || x.segment === arg.seg; });
+    var t = { bal: 0, a: 0, b: 0, c: 0, d: 0 };
+    var h = "<div class='rep-title'><b>" + (arg.group === "Sundry Debtors" ? "Bills Receivable" : "Bills Payable") + "</b><br><span class='muted'>as on " + shortDate(r.asOf) + "</span></div>" +
+      "<table class='grid'><thead><tr><th>Party</th><th>Seg</th><th>Phone</th><th class='num'>0-30</th><th class='num'>31-60</th><th class='num'>61-90</th><th class='num'>90+</th><th class='num'>Balance</th><th class='num'>Days</th></tr></thead><tbody>";
+    rows.forEach(function (x) {
+      t.bal += x.balance; t.a += x.ageing["0-30"]; t.b += x.ageing["31-60"]; t.c += x.ageing["61-90"]; t.d += x.ageing["90+"];
+      h += "<tr class='click' data-n='" + esc(x.party) + "'><td>" + esc(x.party) + "</td><td>" + esc(x.segment) + "</td><td>" + esc(x.phone) + "</td><td class='num'>" + moneyOrBlank(x.ageing["0-30"]) + "</td><td class='num'>" +
+        moneyOrBlank(x.ageing["31-60"]) + "</td><td class='num'>" + moneyOrBlank(x.ageing["61-90"]) + "</td><td class='num'>" + moneyOrBlank(x.ageing["90+"]) + "</td><td class='num'><b>" + money(x.balance) + "</b></td><td class='num'>" + x.days + "</td></tr>";
+    });
+    if (!rows.length) h += "<tr><td colspan='9' class='muted'>Nothing outstanding.</td></tr>";
+    h += "</tbody><tfoot><tr><td colspan='3'>Total (" + rows.length + ")</td><td class='num'>" + money(t.a) + "</td><td class='num'>" + money(t.b) + "</td><td class='num'>" + money(t.c) + "</td><td class='num'>" + money(t.d) + "</td><td class='num'>" + money(t.bal) + "</td><td></td></tr></tfoot></table>";
+    $("osOut").innerHTML = h;
+    $("osOut").querySelectorAll("tr.click").forEach(function (tr) { tr.addEventListener("click", function () { go(viewLedger, { name: tr.getAttribute("data-n"), to: arg.asOf }); }); });
+  }).catch(function (e) { $("osOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function viewGst(arg) {
+  clearHooks(); title("GST Summary");
+  arg = arg || { from: monthStart(S.date), to: S.date };
+  $("view").innerHTML = "<div class='card' style='max-width:860px'>" + rangeBar("gsBar", arg.from, arg.to) + "<div id='gsOut' style='margin-top:10px'><p class='muted'>Loading…</p></div></div>";
+  wireRange("gsBar", function (f, t) { viewGst({ from: f, to: t }); });
+  keys(commonKeys());
+  call("abGstSummary", arg.from, arg.to).then(function (r) {
+    function tbl(t, list) {
+      var h = "<h3>" + t + "</h3><table class='grid'><thead><tr><th>Rate</th><th class='num'>Taxable</th><th class='num'>CGST</th><th class='num'>SGST</th><th class='num'>IGST</th></tr></thead><tbody>";
+      list.forEach(function (x) { h += "<tr><td>" + x.rate + "%</td><td class='num'>" + money(x.taxable) + "</td><td class='num'>" + money(x.cgst) + "</td><td class='num'>" + money(x.sgst) + "</td><td class='num'>" + money(x.igst) + "</td></tr>"; });
+      if (!list.length) h += "<tr><td colspan='5' class='muted'>None.</td></tr>";
+      return h + "</tbody></table>";
+    }
+    $("gsOut").innerHTML = "<div class='rep-title'><b>GST Summary</b><br><span class='muted'>" + shortDate(r.from) + " to " + shortDate(r.to) + "</span></div>" +
+      tbl("Outward supplies (sales less credit notes)", r.sales) + "<br>" + tbl("Inward supplies (purchases less debit notes)", r.purchase) +
+      "<table class='totals' style='margin-top:12px'><tr><td>Output tax</td><td class='num'>" + money(r.outputTax) + "</td></tr><tr><td>Input tax credit</td><td class='num'>" + money(r.inputTax) + "</td></tr>" +
+      "<tr class='grand'><td>" + (r.payable >= 0 ? "Tax payable" : "Excess credit") + "</td><td class='num'>₹ " + money(Math.abs(r.payable)) + "</td></tr></table>" +
+      "<p class='muted'>A working summary to help prepare returns. File returns from the GST portal or with your accountant.</p>";
+  }).catch(function (e) { $("gsOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+/* ===================== export for modules ===================== */
+
+function viewExport() {
+  clearHooks(); title("Export for modules");
+  var from = monthStart(S.date), to = S.date;
+  $("view").innerHTML = "<div class='card' style='max-width:760px'><h3>Export for the other modules</h3>" +
+    "<p class='muted'>These files are laid out exactly like the Tally exports the modules read. Upload them in the same place you would upload Tally's.</p>" +
+    "<div class='row'><label>From<input type='date' id='exFrom' value='" + from + "'></label><label>To / as on<input type='date' id='exTo' value='" + to + "'></label></div>" +
+    "<table class='grid' style='margin-top:12px'><thead><tr><th>Report</th><th>Used by</th><th></th></tr></thead><tbody>" +
+    exRow("daybook", NAMES.daybook + " (in Tally's detailed Day Book layout)", "Cash Recon, P&amp;L, Trade Recon", true) +
+    exRow("sales", "Sales Register", "MIS Dashboard") +
+    exRow("receipts", "Receipt Register", "MIS Dashboard") +
+    exRow("outstanding", "Outstandings M1-M6 (as on 'To' date)", "MIS Dashboard") +
+    exRow("shops", "Shop balances (as on 'To' date)", "Collections") +
+    "</tbody></table></div>";
+  function exRow(k, t, who, csv) {
+    return "<tr><td>" + t + "</td><td class='muted'>" + who + "</td><td><button class='btn' data-x='" + k + "'>Excel</button>" + (csv ? " <button class='btn' data-c='" + k + "'>CSV</button>" : "") + "</td></tr>";
+  }
+  $("view").querySelectorAll("[data-x],[data-c]").forEach(function (b) {
+    b.addEventListener("click", function () { runExport(b.getAttribute("data-x") || b.getAttribute("data-c"), !!b.getAttribute("data-c")); });
+  });
+  keys(commonKeys());
+}
+
+function runExport(kind, csv) {
+  var f = $("exFrom").value, t = $("exTo").value;
+  var p = kind === "daybook" ? call("abFeedDayBook", f, t)
+    : kind === "sales" ? call("abFeedRegister", "Sales", f, t)
+    : kind === "receipts" ? call("abFeedRegister", "Receipts", f, t)
+    : kind === "outstanding" ? call("abFeedOutstandings", t)
+    : call("abFeedShopBalances", t);
+  status("Preparing file…");
+  p.then(function (feed) {
+    if (csv) {
+      var text = feed.sheets[0].rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+      download(new Blob([text], { type: "text/csv" }), feed.fileName + ".csv");
+      status(); return;
+    }
+    return loadXlsx().then(function () {
+      var wb = XLSX.utils.book_new();
+      feed.sheets.forEach(function (s) { XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), s.name.substring(0, 31)); });
+      XLSX.writeFile(wb, feed.fileName + ".xlsx");
+      status();
+    });
+  }).catch(function (e) { status(); toast(e.message, true); });
+}
+function csvCell(v) { v = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function download(blob, name) {
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    var s = document.createElement("script"); s.src = XLSX_URL; s.onload = res;
+    s.onerror = function () { rej(new Error("Couldn't load the Excel writer. Check the internet connection, or use CSV.")); };
+    document.head.appendChild(s);
+  });
+}
+
+/* ===================== companies ===================== */
+
+function viewSelectCompany() {
+  clearHooks(); title("Select Company");
+  $("view").innerHTML = "<div class='gateway'><h3>List of Companies</h3><div id='coList'><p class='muted' style='padding:10px 18px'>Loading…</p></div></div>";
+  keys([{ k: "Enter", t: "Open company", fn: function () { openSel(); } },
+    { k: "Alt+F3", t: "New company", fn: function () { companyModal(); }, off: !can(["admin"]) }, "-",
+    { k: "Esc", t: "Back", fn: function () { if (S.M) back(); } }]);
+  var list = [], sel = 0;
+  function openSel() {
+    var c = list[sel]; if (!c) return;
+    if (!c.active) return toast("This company is marked inactive. Open Company Details to reactivate it.", true);
+    S.co = c.id; saveCo(); S.stack = []; S.cur = null; S.date = "";
+    openBooks().then(function () { toast("Opened " + c.name + "."); }).catch(function (e) { toast(e.message, true); });
+  }
+  call("abListCompanies").then(function (rows) {
+    list = rows; S.companies = rows;
+    sel = Math.max(0, list.findIndex(function (c) { return c.id === S.co; }));
+    if (!rows.length) {
+      $("coList").innerHTML = "<p class='muted' style='padding:10px 18px'>No companies yet." + (can(["admin"]) ? " Press Alt+F3 to create one." : " Ask your admin to create one.") + "</p>";
+      return;
+    }
+    $("coList").innerHTML = rows.map(function (c, i) {
+      return "<button class='gw-item' data-i='" + i + "'><b>" + esc(c.name) + "</b>" + (c.id === S.co ? " <span class='tag ok'>open</span>" : "") +
+        (c.active ? "" : " <span class='tag'>inactive</span>") + "<br><small class='muted'>" + esc(c.state) + (c.gstin ? " · GSTIN " + esc(c.gstin) : "") + "</small></button>";
+    }).join("");
+    var btns = $("coList").querySelectorAll(".gw-item");
+    function paint() { btns.forEach(function (b, i) { b.classList.toggle("sel", i === sel); }); }
+    btns.forEach(function (b, i) { b.addEventListener("click", function () { sel = i; paint(); openSel(); }); });
+    paint();
+    S.onKey = function (e) {
+      if (e.key === "ArrowDown") { sel = Math.min(sel + 1, list.length - 1); paint(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); paint(); e.preventDefault(); }
+      else if (e.key === "Enter") { e.preventDefault(); openSel(); }
+    };
+  }).catch(function (e) { $("coList").innerHTML = "<p class='err' style='padding:10px 18px'>" + esc(e.message) + "</p>"; });
+}
+
+/* Create (no c) or alter (c) a company. */
+function companyModal(c) {
+  var states = (S.states || []).map(function (s) { return "<option" + ((c ? c.state : "Kerala") === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("");
+  var months = MON.map(function (m, i) { return "<option value='" + (i + 1) + "'" + ((c ? c.fyStart : 4) === i + 1 ? " selected" : "") + ">" + m + "</option>"; }).join("");
+  modal("<h3>" + (c ? "Company Alteration" : "Company Creation") + "</h3><div class='row'>" +
+    "<label style='flex:1 1 100%'>Name<input id='coName' value='" + esc(c ? c.name : "") + "'></label>" +
+    "<label style='flex:1 1 100%'>Mailing address<input id='coAddr' value='" + esc(c ? c.address : "") + "'></label>" +
+    "<label style='flex:1'>State<select id='coState'>" + states + "</select></label>" +
+    "<label>Pincode<input id='coPin' class='w-sm' value='" + esc(c ? c.pincode : "") + "'></label>" +
+    "<label>Phone<input id='coPhone' value='" + esc(c ? c.phone : "") + "'></label>" +
+    "<label>E-mail<input id='coMail' value='" + esc(c ? c.email : "") + "'></label>" +
+    "<label>GSTIN<input id='coGst' maxlength='15' value='" + esc(c ? c.gstin : "") + "'></label>" +
+    "<label>Financial year from<select id='coFy'>" + months + "</select></label>" +
+    (c ? "<label>Books closed up to<input type='date' id='coLock' value='" + esc(c.lockedTill || "") + "'></label>" +
+      "<label>Active<select id='coAct'><option value='yes'>Yes</option><option value='no'" + (c.active === false ? " selected" : "") + ">No</option></select></label>" : "") +
+    "</div>" + (c ? "" : "<p class='muted'>A new company gets its own Google Sheet for its books. Users are shared across companies.</p>") +
+    "<p class='row'><button class='btn primary' id='mdOk'>Accept (Ctrl+A)</button><button class='btn' id='mdNo'>Cancel</button></p>",
+    function () {
+      var data = { id: c ? c.id : "", name: $("coName").value, address: $("coAddr").value, state: $("coState").value,
+        pincode: $("coPin").value, phone: $("coPhone").value, email: $("coMail").value, gstin: $("coGst").value,
+        fyStart: +$("coFy").value, lockedTill: $("coLock") ? $("coLock").value : "", active: $("coAct") ? $("coAct").value === "yes" : true };
+      $("mdOk").disabled = true; status(c ? "Saving…" : "Creating company books…");
+      call("abSaveCompany", data).then(function (co) {
+        closeModal(); status();
+        if (c && c.id === S.co) { toast("Company details saved."); return openBooks(); }
+        if (c) { toast("Company details saved."); if (S.cur && S.cur.fn === viewSelectCompany) refresh(); return; }
+        toast("Company " + co.name + " created.");
+        S.co = co.id; saveCo(); S.stack = []; S.cur = null; S.date = "";
+        return openBooks();
+      }).catch(function (e) { $("mdOk").disabled = false; status(); toast(e.message, true); });
+    });
+  $("mdNo").onclick = closeModal; $("coName").focus();
+}
+
+/* ===================== users / password ===================== */
+
+function viewUsers() {
+  clearHooks(); title("Users");
+  $("view").innerHTML = "<div class='card' style='max-width:680px'><h3>Users</h3><div id='usOut'><p class='muted'>Loading…</p></div>" +
+    "<p><button class='btn primary' id='usNew'>Add user</button></p><p class='muted'>admin: everything · accountant: vouchers and reports · viewer: reports only.</p></div>";
+  $("usNew").onclick = function () { userModal(); };
+  keys(commonKeys());
+  call("abListUsers").then(function (list) {
+    $("usOut").innerHTML = "<table class='grid'><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Active</th></tr></thead><tbody>" +
+      list.map(function (u) { return "<tr class='click' data-u='" + esc(JSON.stringify(u)) + "'><td>" + esc(u.username) + "</td><td>" + esc(u.name) + "</td><td>" + esc(u.role) + "</td><td>" + (u.active ? "Yes" : "No") + "</td></tr>"; }).join("") + "</tbody></table>";
+    $("usOut").querySelectorAll("tr.click").forEach(function (tr) { tr.addEventListener("click", function () { userModal(JSON.parse(tr.getAttribute("data-u"))); }); });
+  }).catch(function (e) { $("usOut").innerHTML = "<p class='err'>" + esc(e.message) + "</p>"; });
+}
+
+function userModal(u) {
+  modal("<h3>" + (u ? "Alter user" : "Add user") + "</h3><div class='row'>" +
+    "<label>Username<input id='uU' value='" + esc(u ? u.username : "") + "'" + (u ? " readonly" : "") + "></label>" +
+    "<label>Name<input id='uN' value='" + esc(u ? u.name : "") + "'></label>" +
+    "<label>Role<select id='uR'><option>accountant</option><option>viewer</option><option>admin</option></select></label>" +
+    "<label>Active<select id='uA'><option value='yes'>Yes</option><option value='no'>No</option></select></label>" +
+    "<label style='flex:1 1 100%'>" + (u ? "New password (leave blank to keep)" : "Password (8+ characters)") + "<input id='uP' type='password' autocomplete='new-password'></label>" +
+    "</div><p class='row'><button class='btn primary' id='mdOk'>Save</button><button class='btn' id='mdNo'>Cancel</button></p>",
+    function () {
+      call("abSaveUser", { username: $("uU").value, name: $("uN").value, role: $("uR").value, active: $("uA").value === "yes", password: $("uP").value })
+        .then(function () { closeModal(); toast("User saved."); refresh(); }).catch(function (e) { toast(e.message, true); });
+    });
+  if (u) { $("uR").value = u.role; $("uA").value = u.active ? "yes" : "no"; }
+  $("mdNo").onclick = closeModal; (u ? $("uN") : $("uU")).focus();
+}
+
+function passwordModal() {
+  if (window.AB_PORTAL_TOKEN) return toast("Change your password from the portal.");
+  modal("<h3>Change password</h3><label>Current<input id='pwO' type='password' style='width:100%'></label><label>New (8+ characters)<input id='pwN' type='password' style='width:100%'></label>" +
+    "<p class='row'><button class='btn primary' id='mdOk'>Change</button><button class='btn' id='mdNo'>Cancel</button></p>",
+    function () { call("abChangePassword", $("pwO").value, $("pwN").value).then(function () { closeModal(); toast("Password changed."); }).catch(function (e) { toast(e.message, true); }); });
+  $("mdNo").onclick = closeModal; $("pwO").focus();
+}
+
+/* unsaved-changes guard for voucher screens */
+$("view").addEventListener("input", function () { if (S.cur && S.cur.fn === viewVoucher) S.dirty = true; });
+
+boot();
+</script>
+
+</body>
+</html>
