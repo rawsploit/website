@@ -27,7 +27,18 @@ input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:4p
 input:focus,select:focus,textarea:focus{outline:2px solid var(--hi);border-color:#c9a64b;background:#fffbea}
 
 /* sign-in */
-.auth{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(160deg,#17375e,#0f766e)}
+/* login backdrop: rich teal, soft cloudy mottling, fine grain, darker toward the top-right edge */
+.auth{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px;
+  background-color:#0f6b70;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 .1  0 0 0 0 .12  0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23g)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1000' height='700'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.006 .009' numOctaves='5' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 .01  0 0 0 0 .13  0 0 0 0 .17  1.3 0 0 0 -0.42'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23c)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1000' height='700'%3E%3Cfilter id='l'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.008 .011' numOctaves='4' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 .2  0 0 0 0 .62  0 0 0 0 .6  0.9 0 0 0 -0.38'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23l)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 65% 75% at 100% 0%,rgba(5,32,48,.9),transparent 70%),
+    radial-gradient(ellipse 45% 60% at 100% 100%,rgba(6,40,55,.55),transparent 70%),
+    linear-gradient(100deg,#127674 0%,#0f6b70 50%,#0a4f5e 100%);
+  background-size:140px 140px,cover,cover,cover,cover,cover;
+  background-attachment:fixed}
 .auth-card{background:var(--panel);width:100%;max-width:380px;border-radius:12px;padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .auth-card h1{margin:0;font-size:20px}
 .auth-card h2{margin:2px 0 18px;font-size:14px;font-weight:500;color:var(--muted)}
