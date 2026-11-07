@@ -105,6 +105,8 @@
     var theme = client().theme === "blue" ? "blue" : "teal";
     document.body.classList.remove("theme-teal", "theme-blue");
     document.body.classList.add("theme-" + theme);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "blue" ? "#1D4FA8" : "#0E5E63");
     document.querySelectorAll("[data-site-name]").forEach(function (el) { el.textContent = window.SITE.name; });
     document.querySelectorAll("[data-site-initial]").forEach(function (el) { el.textContent = window.SITE.name.charAt(0); });
     document.querySelectorAll("[data-client-name]").forEach(function (el) { el.textContent = client().name; });

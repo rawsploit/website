@@ -1,7 +1,7 @@
 /* Service worker: makes the site installable, keeps the app shell
    available offline, and shows a "No signal" page when offline.
    Bump VERSION whenever the shell files change. */
-const VERSION = "suite-v12";
+const VERSION = "suite-v13";
 const SHELL = [
   "./", "index.html", "login.html", "portal.html", "catalog.html", "setup.html", "offline.html",
   "assets/site.css", "assets/site.js", "assets/config.js", "assets/people.js", "assets/install.js",

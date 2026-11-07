@@ -11,6 +11,18 @@
   --band:#17375e; --band-ink:#f4f1e8; --hi:#ffd77a; --hi-ink:#1d2433; --accent:#0f766e;
   --dr:#0f5132; --cr:#842029; --err:#b42318; --ok:#067647;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --side:#f3efe4; --status:#ebe5d6; --focus-line:#c9a64b; --focus-bg:#fffbea; --row-hover:#fff3cf;
+}
+/* Colour themes: every accent follows the login backdrop (THEME = teal | blue). */
+body.theme-teal{
+  --band:#0b4f57; --band-ink:#eefaf8; --accent:#0f766e;
+  --hi:#bfe7e0; --hi-ink:#06343a; --paper:#f3f8f7; --line:#d3e5e2;
+  --side:#e6f1ef; --status:#d9ebe8; --focus-line:#2a9d92; --focus-bg:#f0fbf9; --row-hover:#e3f4f1;
+}
+body.theme-blue{
+  --band:#163a7d; --band-ink:#eef4ff; --accent:#2456b4;
+  --hi:#cddcfb; --hi-ink:#0d2452; --paper:#f4f6fb; --line:#d6deef;
+  --side:#e8eef9; --status:#dce5f5; --focus-line:#3b6fd1; --focus-bg:#f2f6ff; --row-hover:#e6eeff;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -24,7 +36,7 @@ button{font:inherit;cursor:pointer}
 .btn.danger{color:var(--err)}
 .link{background:none;border:0;color:var(--band-ink);text-decoration:underline;padding:0 0 0 8px}
 input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:4px;padding:5px 7px;background:#fff;color:var(--ink)}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--hi);border-color:#c9a64b;background:#fffbea}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--hi);border-color:var(--focus-line);background:var(--focus-bg)}
 
 /* sign-in */
 
@@ -71,13 +83,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--hi);border-color
 .tb-mid{font-weight:600;letter-spacing:.3px}
 .shell{flex:1;display:flex;min-height:0}
 #view{flex:1;overflow:auto;padding:16px}
-.keys{width:178px;border-left:1px solid var(--line);background:#f3efe4;overflow:auto;padding:6px}
+.keys{width:178px;border-left:1px solid var(--line);background:var(--side);overflow:auto;padding:6px}
 .keys button{display:flex;width:100%;text-align:left;gap:8px;border:0;background:none;padding:6px 8px;border-radius:4px;color:var(--ink)}
 .keys button:hover{background:var(--hi)}
 .keys button b{min-width:58px;font-family:var(--mono);font-size:12px;color:var(--band)}
 .keys button[disabled]{opacity:.4;cursor:default}
 .keys hr{border:0;border-top:1px solid var(--line);margin:6px 0}
-.statusbar{display:flex;justify-content:space-between;gap:10px;padding:4px 14px;background:#ebe5d6;font-size:12px}
+.statusbar{display:flex;justify-content:space-between;gap:10px;padding:4px 14px;background:var(--status);font-size:12px}
 
 /* gateway */
 .gateway{max-width:420px;margin:10px auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -103,7 +115,7 @@ table.grid td input,table.grid td select{width:100%}
 table.grid tfoot td{font-weight:700;border-top:2px solid var(--line)}
 table.grid tr.sel td{background:var(--hi)}
 table.grid tr.click{cursor:pointer}
-table.grid tr.click:hover td{background:#fff3cf}
+table.grid tr.click:hover td{background:var(--row-hover)}
 table.grid tr.cancel td{color:var(--muted);text-decoration:line-through}
 .w-drcr{width:62px}.w-amt{width:130px}.w-qty{width:80px}.w-pct{width:70px}.w-sm{width:90px}
 .totals{margin-left:auto;max-width:360px}
@@ -134,7 +146,7 @@ table.grid tr.cancel td{color:var(--muted);text-decoration:line-through}
 </style>
 
 </head>
-<body>
+<body class="theme-teal">
 <div style="background:#ffd77a;color:#1d2433;padding:6px 12px;font:13px system-ui;text-align:center">Demo: your entries stay in this browser tab only and clear on refresh. Start by creating an admin and your first company.</div>
 
 <!-- ============ SIGN-IN / FIRST SETUP ============ -->
@@ -1892,6 +1904,7 @@ function call(fn) {
 function boot() {
   api("abBrand").then(function (b) {
     document.body.classList.toggle("theme-blue", b.theme === "blue");
+    document.body.classList.toggle("theme-teal", b.theme !== "blue");
     document.querySelectorAll(".coName").forEach(function (el) { el.textContent = b.company; });
     $("authCompany").textContent = b.company;
     if (b.logo) { $("authLogo").src = b.logo; $("authLogo").classList.remove("hidden"); }
