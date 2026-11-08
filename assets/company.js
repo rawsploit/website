@@ -248,6 +248,10 @@
     body.querySelector("#dsFile").onchange = function () {
       var file = this.files[0]; if (!file) return;
       readSheet(file).then(function (rows) {
+        if (rows.columns.category !== undefined || rows.columns.uom !== undefined || rows.columns.sku !== undefined) {
+          throw new Error("This looks like a products file (it has category / unit / SKU columns). Upload it in step 5, Products.");
+        }
+        if (rows.columns.name === undefined) throw new Error("The file needs a \"name\" column (plus area, phone, gstin, state).");
         rows.forEach(function (r) {
           var st = STATES.filter(function (s) { return s.toLowerCase() === String(r.state || "").trim().toLowerCase(); })[0] || "";
           addRow({ name: r.name, area: r.area, phone: r.phone, gstin: r.gstin, state: st });
@@ -304,7 +308,13 @@
       var file = this.files[0]; this.value = ""; if (!file) return;
       var box = body.querySelector("#pdCheck");
       box.innerHTML = '<p class="muted">Reading ' + esc(file.name) + "…</p>";
-      readSheet(file).then(function (rows) { review(box, rows, root); })
+      readSheet(file).then(function (rows) {
+        var c = rows.columns;
+        if (c.category === undefined || c.uom === undefined) {
+          throw new Error("This doesn't look like a products file: it needs at least the columns name, category and uom. Download the template to see the layout.");
+        }
+        review(box, rows, root);
+      })
         .catch(function (e) { box.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
     };
     var cat = "All";
@@ -458,11 +468,13 @@
         var at = head.findIndex(function (h) { return ALIASES[k].indexOf(h) >= 0; });
         if (at >= 0) map[k] = at;
       });
-      return aoa.slice(1).filter(function (r) { return r.some(function (c) { return String(c).trim() !== ""; }); }).map(function (r) {
+      var rows = aoa.slice(1).filter(function (r) { return r.some(function (c) { return String(c).trim() !== ""; }); }).map(function (r) {
         var o = {};
         Object.keys(map).forEach(function (k) { o[k] = String(r[map[k]] === undefined ? "" : r[map[k]]).trim(); });
         return o;
       });
+      rows.columns = map;
+      return rows;
     });
   }
   function downloadTemplate(kind) {
