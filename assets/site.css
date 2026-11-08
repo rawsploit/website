@@ -302,3 +302,27 @@ a { color: var(--ink); }
 }
 .install-bar span { flex: 1; }
 .install-close { background: none; border: 0; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; padding: 4px 8px; }
+
+/* ---------- company setup wizard ---------- */
+.wiz-steps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.wiz-step { display: flex; align-items: center; gap: 8px; font: 600 15px var(--body); padding: 8px 14px 8px 8px; border-radius: 999px;
+  border: 1.5px solid var(--rule-strong); background: var(--sheet); color: var(--ink); cursor: pointer; }
+.wiz-step b { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--tint-2); color: var(--ink); font-size: 13px; }
+.wiz-step.done b { background: var(--stamp-bg); color: var(--stamp); }
+.wiz-step.on { border-color: var(--ink); background: var(--ink); color: #fff; }
+.wiz-step.on b { background: #fff; color: var(--ink); }
+.wiz-sub { margin: 16px 0 8px; font: 600 16px var(--head); color: var(--ink); }
+.tbl .cell, input.cell, select.cell { width: 100%; font: 400 15px var(--body); padding: 7px 9px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); background: #fff; color: var(--text); }
+.tbl .cell:focus, input.cell:focus, select.cell:focus { border-color: var(--ink); outline: none; box-shadow: 0 0 0 3px var(--tint-3); }
+.tbl .cell[readonly] { background: #F3F5FA; color: var(--muted); }
+.tbl td small { display: block; margin-top: 3px; font-size: 12px; }
+.tbl tr.off td { color: var(--muted); }
+.wiz-errs { margin: 6px 0 10px 18px; font-size: 15px; color: var(--danger); max-height: 260px; overflow: auto; }
+.wiz-errs li { margin: 3px 0; }
+.ok-msg { color: var(--stamp); font-weight: 600; }
+.wiz-help { margin: 4px 0 12px; }
+.wiz-help summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.wiz-review { margin-top: 12px; padding: 14px; border: 1px dashed var(--rule-strong); border-radius: var(--radius-s); background: var(--paper); }
+@media (max-width: 720px) {
+  .tbl { display: block; overflow-x: auto; }
+}

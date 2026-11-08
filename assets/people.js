@@ -166,7 +166,8 @@
 
   function company(body) {
     var cl = Suite.client();
-    body.innerHTML = '<form class="panel" novalidate style="max-width:560px"><h3>Company</h3>' +
+    body.innerHTML = '<p class="demo-hint" style="max-width:560px;margin-top:0">Plants, sales routes, distributors and products are in <a href="' + Suite.link("portal.html", { m: "company" }) + '">Company setup</a>.</p>' +
+      '<form class="panel" novalidate style="max-width:560px"><h3>Company</h3>' +
       '<label class="field"><span>Company name</span><input name="company" value="' + esc(cl.name) + '" required></label>' +
       '<label class="field"><span>Logo link</span><input name="logo" type="url" value="' + esc(cl.logo || "") + '" placeholder="https://…"></label>' +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">Save company</button></div></form>' +

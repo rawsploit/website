@@ -17,6 +17,7 @@
 <script src="assets/site.js"></script>
 <script src="assets/install.js"></script>
 <script src="assets/people.js"></script>
+<script src="assets/company.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -77,7 +78,7 @@
     if (s.role === "admin") {
       html += "<h4>Admin</h4>" + mods.filter(function (m) { return !m.teams.length; }).map(function (m) {
         return '<button type="button" data-go="' + m.id + '">' + esc(m.name) + "</button>";
-      }).join("") + '<button type="button" data-go="people">People and setup</button>';
+      }).join("") + '<button type="button" data-go="company">Company setup</button><button type="button" data-go="people">People and setup</button>';
     }
     html += '<h4>You</h4><button type="button" data-go="password">My password</button>';
     return html;
@@ -109,12 +110,13 @@
 
   function go(id) {
     var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
-    var allowed = id === "home" || id === "password" || (id === "people" && s.role === "admin") || mods.indexOf(m) !== -1;
+    var allowed = id === "home" || id === "password" || ((id === "people" || id === "company") && s.role === "admin") || mods.indexOf(m) !== -1;
     if (!allowed) id = "home";
     if (id === "people") People.renderPeople($("view"));
+    else if (id === "company") Company.render($("view"));
     else if (id === "password") People.renderPassword($("view"));
     else $("view").innerHTML = id === "home" ? showHome() : showModule(m);
-    $("viewTitle").textContent = id === "home" ? "Home" : id === "people" ? "People and setup" : id === "password" ? "My password" : m.name;
+    $("viewTitle").textContent = id === "home" ? "Home" : id === "people" ? "People and setup" : id === "company" ? "Company setup" : id === "password" ? "My password" : m.name;
     document.querySelectorAll("#nav button").forEach(function (b) {
       if (b.dataset.go === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
