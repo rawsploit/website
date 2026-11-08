@@ -118,7 +118,7 @@
     body.innerHTML = '<div class="panel" style="max-width:760px"><h3>2. Plants</h3>' +
       '<label class="field" style="max-width:260px"><span>How many plants do you have?</span><input id="plN" type="number" min="1" max="20" value="' + Math.max(active.length, 1) + '"></label>' +
       '<table class="tbl" id="plTbl"><thead><tr><th>Plant name</th><th style="width:150px">Short code</th></tr></thead><tbody></tbody></table>' +
-      '<p class="muted" style="margin-top:10px">The short code (2–4 letters, e.g. SOP) starts the ID of every place in that plant. Leave it blank and one is made from the name. It can\'t change later.</p>' +
+      '<p class="muted" style="margin-top:10px">The short code (2–4 letters, e.g. MNP) starts the ID of every place in that plant. Leave it blank and one is made from the name. It can\'t change later.</p>' +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="button" id="plSave">Save plants</button></div></div>' +
       '<div id="plPlaces"></div>';
     var tbody = body.querySelector("#plTbl tbody");
@@ -130,7 +130,7 @@
       while (cur.length < n) cur.push({ plant_id: "", name: "", code: "" });
       cur = cur.slice(0, n);
       tbody.innerHTML = cur.map(function (p, i) {
-        return '<tr data-id="' + esc(p.plant_id) + '"><td><input class="cell nm" value="' + esc(p.name) + '" placeholder="e.g. ' + (i ? "Detergent Plant" : "Soap Plant") + '"></td>' +
+        return '<tr data-id="' + esc(p.plant_id) + '"><td><input class="cell nm" value="' + esc(p.name) + '" placeholder="e.g. ' + (i ? "Plant 2" : "Main Plant") + '"></td>' +
           '<td><input class="cell cd" value="' + esc(p.code) + '" maxlength="4"' + (p.plant_id ? " readonly" : "") + ' placeholder="auto"></td></tr>';
       }).join("");
     }
@@ -206,8 +206,8 @@
       cur = cur.slice(0, n);
       tbody.innerHTML = cur.map(function (r) {
         return '<tr><td><input class="cell id" value="' + esc(r.route_id) + '" maxlength="10"></td>' +
-          '<td><input class="cell nm" value="' + esc(r.name) + '" placeholder="e.g. Aluva – Angamaly"></td>' +
-          '<td><input class="cell vn" value="' + esc(r.van) + '" placeholder="KL-07-AB-1234"></td>' +
+          '<td><input class="cell nm" value="' + esc(r.name) + '" placeholder="e.g. North Route"></td>' +
+          '<td><input class="cell vn" value="' + esc(r.van) + '" placeholder="Vehicle number"></td>' +
           '<td><input class="cell sp" value="' + esc(r.salesperson) + '"></td>' +
           '<td><select class="cell pl">' + plants.map(function (p) { return '<option value="' + esc(p.plant_id) + '"' + (p.plant_id === r.plant_id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></td></tr>";
       }).join("");
@@ -283,7 +283,7 @@
       '<label class="btn btn-ink btn-small" style="cursor:pointer">Upload filled file<input type="file" id="pdFile" accept=".xlsx,.xls,.csv" hidden></label></div>' +
       '<details class="wiz-help"><summary>How to fill the columns</summary><table class="tbl" style="margin-top:8px"><tbody>' +
       '<tr><td><b>sku</b></td><td>Your item code. Optional: leave blank and one is made (FG-0001…). Keep it the same when you upload again.</td></tr>' +
-      '<tr><td><b>name</b></td><td>Item name, e.g. <i>Neem Bath Soap</i>.</td></tr>' +
+      '<tr><td><b>name</b></td><td>Item name, e.g. <i>Product A</i>.</td></tr>' +
       '<tr><td><b>category</b></td><td>RM, PM, SFG or FG (the words "Raw material", "Finished goods"… also work).</td></tr>' +
       '<tr><td><b>plant</b></td><td>Plant name or code: ' + plants.map(function (p) { return "<i>" + esc(p.name) + "</i> (" + esc(p.code) + ")"; }).join(", ") +
       '. Blank = used by every plant (normal for RM and PM).' + (plants.length > 1 ? " SFG and FG need a plant." : "") + "</td></tr>" +
@@ -469,11 +469,11 @@
     var plants = P.plants.filter(function (p) { return p.active; });
     var p1 = plants[0] ? plants[0].name : "Plant 1", p2 = plants[1] ? plants[1].name : p1;
     var rows = [TEMPLATE_COLS,
-      ["", "Caustic Soda", "RM", "", "Kg", "", "62", "2815", "18", "yes"],
-      ["", "Soap Wrapper 75g", "PM", "", "Nos", "", "0.90", "4819", "18", "yes"],
-      ["", "Soap Noodles", "SFG", p1, "Kg", "", "95", "", "", "yes"],
-      ["", "Neem Bath Soap", "FG", p1, "Nos", "75 g", "28", "3401", "5", "yes"],
-      ["", "Detergent Powder", "FG", p2, "Pkt", "1 kg", "105", "3402", "18", "yes"]];
+      ["", "Example raw material", "RM", "", "Kg", "", "50", "", "18", "yes"],
+      ["", "Example packing material", "PM", "", "Nos", "", "1.50", "", "18", "yes"],
+      ["", "Example semi-finished item", "SFG", p1, "Kg", "", "80", "", "", "yes"],
+      ["", "Example product", "FG", p1, "Nos", "100 g", "40", "", "5", "yes"],
+      ["", "Example product", "FG", p2, "Nos", "500 g", "150", "", "18", "yes"]];
     if (kind === "csv") {
       var text = rows.map(function (r) { return r.map(function (v) { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\r\n");
       save(new Blob([text], { type: "text/csv" }), "products-template.csv");
