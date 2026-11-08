@@ -45,10 +45,12 @@ window.CLIENTS = {
   },
   /* first real test deployment (Kalavara Demo folder, sample data only) */
   test: {
-    name: "Kalavara Test Foods",
+    name: "Kalavara Hygiene",
     logo: "",
     theme: "teal",
     api: "https://script.google.com/macros/s/AKfycbzKTnow9_xb_wGqdjVl7x2S6UQ7ndaW2NNJ9cpsonrNses7gAZY9stDMasQ2v9Bxhk3tg/exec",
-    modules: {}
+    modules: {
+      books: "https://script.google.com/macros/s/AKfycbyxVzvFGf2LCfk3Q2UFgBNgHNCWazi0xkcgUjnaanFAyhc99NXbEzTBi2nNiKflVFF0/exec"
+    }
   }
 };
