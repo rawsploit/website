@@ -50,7 +50,8 @@ window.CLIENTS = {
     theme: "teal",
     api: "https://script.google.com/macros/s/AKfycbzKTnow9_xb_wGqdjVl7x2S6UQ7ndaW2NNJ9cpsonrNses7gAZY9stDMasQ2v9Bxhk3tg/exec",
     modules: {
-      books: "https://script.google.com/macros/s/AKfycbyxVzvFGf2LCfk3Q2UFgBNgHNCWazi0xkcgUjnaanFAyhc99NXbEzTBi2nNiKflVFF0/exec"
+      books: "https://script.google.com/macros/s/AKfycbyxVzvFGf2LCfk3Q2UFgBNgHNCWazi0xkcgUjnaanFAyhc99NXbEzTBi2nNiKflVFF0/exec",
+      stockbook: "https://script.google.com/macros/s/AKfycby6LhlxzQjwd4nYxTkRFvvPJlO3vrF-TSPeYD7ir4Tm7KgE83b4MNkb5lHX2Yc8pgyDsg/exec"
     }
   }
 };
