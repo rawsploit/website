@@ -42,5 +42,13 @@ window.CLIENTS = {
     api: "",
     /* demo: Accounting-Books runs as a self-contained preview (data stays in the browser tab) */
     modules: { books: "demo/accounting-books.html" }
+  },
+  /* first real test deployment (Kalavara Demo folder, sample data only) */
+  test: {
+    name: "Kalavara Test Foods",
+    logo: "",
+    theme: "teal",
+    api: "https://script.google.com/macros/s/AKfycbzKTnow9_xb_wGqdjVl7x2S6UQ7ndaW2NNJ9cpsonrNses7gAZY9stDMasQ2v9Bxhk3tg/exec",
+    modules: {}
   }
 };
