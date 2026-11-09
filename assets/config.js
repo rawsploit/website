@@ -56,7 +56,8 @@ window.CLIENTS = {
       fieldsales: "https://script.google.com/macros/s/AKfycbyiZgpx6jdpAppmw0STYaEhwJf2mr69EXwuh7URVANZC2w5ZEy_m_Ev1JglZCxnTTdN/exec",
       collections: "https://script.google.com/macros/s/AKfycbwOtwEuZOkQ6lKlXWNqBvdVyLGkgy5C4yWl2nFTjUwAaxE2lfOPIojjr4whWU1O2DE2/exec",
       cashrecon: "https://script.google.com/macros/s/AKfycbypKaY-2cYxbtrbSbPF3VJUUlBxSbhuEXiIBbhD7_v9ubsj96QeMlzscafUC4FWIpHS/exec",
-      nexus: "https://script.google.com/macros/s/AKfycbyJRBtkjS3SwjUiWz6sWtfw-_goNHIQspKYqWUeleYBgXCTGSF5WX3rNIgZwmQvOtqm/exec"
+      nexus: "https://script.google.com/macros/s/AKfycbyJRBtkjS3SwjUiWz6sWtfw-_goNHIQspKYqWUeleYBgXCTGSF5WX3rNIgZwmQvOtqm/exec",
+      pnl: "https://script.google.com/macros/s/AKfycbydoe6sA2PURFXGSfeFzg3LkXkOkIDFcQWtltwKPCRRVuRNxvom-ZOVR98c5NOxFrMv/exec"
     }
   }
 };
