@@ -54,7 +54,8 @@ window.CLIENTS = {
       stockbook: "https://script.google.com/macros/s/AKfycby6LhlxzQjwd4nYxTkRFvvPJlO3vrF-TSPeYD7ir4Tm7KgE83b4MNkb5lHX2Yc8pgyDsg/exec",
       stocktake: "https://script.google.com/macros/s/AKfycbwKMdKaaKSiYWWYMdaGvJ5GQH0A-CVH0QqYrv9YH_vqLcc_P_ryqfzJXsmaNp2cl3tJUg/exec",
       fieldsales: "https://script.google.com/macros/s/AKfycbyiZgpx6jdpAppmw0STYaEhwJf2mr69EXwuh7URVANZC2w5ZEy_m_Ev1JglZCxnTTdN/exec",
-      collections: "https://script.google.com/macros/s/AKfycbwOtwEuZOkQ6lKlXWNqBvdVyLGkgy5C4yWl2nFTjUwAaxE2lfOPIojjr4whWU1O2DE2/exec"
+      collections: "https://script.google.com/macros/s/AKfycbwOtwEuZOkQ6lKlXWNqBvdVyLGkgy5C4yWl2nFTjUwAaxE2lfOPIojjr4whWU1O2DE2/exec",
+      cashrecon: "https://script.google.com/macros/s/AKfycbypKaY-2cYxbtrbSbPF3VJUUlBxSbhuEXiIBbhD7_v9ubsj96QeMlzscafUC4FWIpHS/exec"
     }
   }
 };
