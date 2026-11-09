@@ -58,7 +58,8 @@ window.CLIENTS = {
       cashrecon: "https://script.google.com/macros/s/AKfycbypKaY-2cYxbtrbSbPF3VJUUlBxSbhuEXiIBbhD7_v9ubsj96QeMlzscafUC4FWIpHS/exec",
       nexus: "https://script.google.com/macros/s/AKfycbyJRBtkjS3SwjUiWz6sWtfw-_goNHIQspKYqWUeleYBgXCTGSF5WX3rNIgZwmQvOtqm/exec",
       pnl: "https://script.google.com/macros/s/AKfycbydoe6sA2PURFXGSfeFzg3LkXkOkIDFcQWtltwKPCRRVuRNxvom-ZOVR98c5NOxFrMv/exec",
-      payroll: "https://script.google.com/macros/s/AKfycbxzS_g5170zFWNYzuCrPEXrwyZMUeQ_nzqxPWXV_GTtgrFC4VbtGwPwEFTsubimzWh0dg/exec"
+      payroll: "https://script.google.com/macros/s/AKfycbxzS_g5170zFWNYzuCrPEXrwyZMUeQ_nzqxPWXV_GTtgrFC4VbtGwPwEFTsubimzWh0dg/exec",
+      mis: "https://script.google.com/macros/s/AKfycbwMsAHrw-DEBFaks2J3rqmDCIbtKURLey09nKyJyHyi07EYh4wYb0zZ3kHdiGJt3-CAGQ/exec"
     }
   }
 };
