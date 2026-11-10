@@ -16,6 +16,61 @@
 <script src="assets/config.js"></script>
 <script src="assets/site.js"></script>
 <script src="assets/install.js"></script>
+<style>
+  .drawer[hidden], .drawer-bg[hidden], .cart-bar[hidden] { display:none !important; }
+  .cat-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; }
+  .view-switch { display:flex; gap:8px; }
+  .packs li { align-items:center; gap:10px; }
+  .packs .pk { flex:1; min-width:0; }
+  .packs .pk small { display:block; color:var(--muted); font-size:13px; }
+  .qstep { display:inline-flex; align-items:center; border:1.5px solid var(--rule-strong); border-radius:999px; overflow:hidden; background:#fff; }
+  .qstep button { border:0; background:transparent; width:30px; height:30px; font:700 17px var(--body); color:var(--ink); cursor:pointer; }
+  .qstep button:hover { background:var(--tint-2); }
+  .qstep input { width:42px; border:0; text-align:center; font:600 15px var(--body); color:var(--text); -moz-appearance:textfield; }
+  .qstep input::-webkit-outer-spin-button, .qstep input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .add-btn { font:600 14px var(--body); padding:6px 14px; border-radius:999px; border:1.5px solid var(--ink); background:#fff; color:var(--ink); cursor:pointer; }
+  .add-btn:hover { background:var(--tint-2); }
+  .cart-bar { position:fixed; left:0; right:0; bottom:0; background:var(--ink); color:#fff; z-index:20; box-shadow:0 -4px 18px rgba(0,0,0,.12); }
+  .cart-bar .wrap { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:12px; padding-bottom:12px; }
+  .cart-bar b { font-family:var(--head); font-size:18px; }
+  .cart-bar span, .cart-bar button { white-space:nowrap; }
+  @media (max-width:520px){ .cart-bar b { font-size:16px; } }
+  .cart-bar button { background:#fff; color:var(--ink); border:0; }
+  body.has-cart main { padding-bottom:96px !important; }
+  .drawer-bg { position:fixed; inset:0; background:rgba(15,20,40,.38); z-index:30; }
+  .drawer { position:fixed; top:0; right:0; bottom:0; width:min(440px,100%); background:var(--sheet); z-index:31; display:flex; flex-direction:column; box-shadow:-8px 0 30px rgba(0,0,0,.18); }
+  .drawer-head { display:flex; justify-content:space-between; align-items:center; padding:18px 20px; border-bottom:1px solid var(--rule); }
+  .drawer-body { flex:1; overflow:auto; padding:8px 20px 16px; }
+  .drawer-foot { border-top:1px solid var(--rule); padding:16px 20px 20px; }
+  .x-btn { border:0; background:transparent; font-size:26px; line-height:1; color:var(--muted); cursor:pointer; padding:4px 8px; }
+  .cart-line { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--rule); }
+  .cart-line .nm { flex:1; min-width:0; }
+  .cart-line .nm b { display:block; color:var(--text); font-weight:600; }
+  .cart-line .nm span { color:var(--muted); font-size:14px; }
+  .cart-line .amt { font-family:var(--head); color:var(--ink); min-width:76px; text-align:right; font-variant-numeric:tabular-nums; }
+  .rm { border:0; background:transparent; color:var(--danger); font:600 13.5px var(--body); cursor:pointer; padding:2px 0; }
+  .total-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+  .total-row b { font-family:var(--head); font-size:22px; color:var(--ink); }
+  .drawer textarea { width:100%; font:400 15px var(--body); padding:10px 12px; border:1.5px solid var(--rule-strong); border-radius:var(--radius-s); resize:vertical; min-height:64px; margin:6px 0 12px; }
+  .drawer textarea:focus { border-color:var(--ink); outline:none; box-shadow:0 0 0 3px var(--tint-3); }
+  .msg { padding:10px 12px; border-radius:var(--radius-s); font-size:15px; margin-bottom:12px; }
+  .msg.ok { background:var(--stamp-bg); color:var(--stamp); }
+  .msg.err { background:#FDECEA; color:var(--danger); }
+  .orders { display:grid; gap:14px; }
+  .order { background:var(--sheet); border:1px solid var(--rule-strong); border-radius:var(--radius-l); padding:16px 18px; }
+  .order-top { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline; }
+  .order-top h3 { font-size:17px; }
+  .order .when { color:var(--muted); font-size:14px; }
+  .pill { display:inline-block; font:600 13px var(--body); padding:3px 10px; border-radius:999px; }
+  .pill.New { background:var(--tint-2); color:var(--ink); }
+  .pill.Accepted { background:#FFF3D6; color:#8A5300; }
+  .pill.Dispatched { background:var(--stamp-bg); color:var(--stamp); }
+  .pill.Cancelled { background:#EEEEEE; color:#555; }
+  .order table { width:100%; border-collapse:collapse; margin-top:10px; font-size:15px; }
+  .order td { padding:6px 0; border-top:1px solid var(--rule); }
+  .order td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .order .note { color:var(--muted); font-size:14px; margin-top:8px; }
+</style>
 </head>
 <body>
 
@@ -33,14 +88,52 @@
 </header>
 
 <main class="wrap" style="padding-top:32px;padding-bottom:48px">
-  <h1 style="font-size:34px">Products and prices</h1>
-  <div class="cat-tools">
-    <input id="q" type="search" placeholder="Search products" aria-label="Search products">
-    <div id="chips" role="group" aria-label="Category" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+  <div class="cat-head">
+    <h1 style="font-size:34px" id="pageTitle">Products and prices</h1>
+    <div class="view-switch" role="group" aria-label="View">
+      <button class="chip" type="button" data-view="shop" aria-pressed="true">Products</button>
+      <button class="chip" type="button" data-view="orders" aria-pressed="false">My orders</button>
+    </div>
   </div>
-  <p id="state" style="color:var(--muted)">Loading products…</p>
-  <div class="products" id="grid"></div>
+
+  <section id="shopView">
+    <div class="cat-tools">
+      <input id="q" type="search" placeholder="Search products" aria-label="Search products">
+      <div id="chips" role="group" aria-label="Category" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+    <p id="state" style="color:var(--muted)">Loading products…</p>
+    <div class="products" id="grid"></div>
+  </section>
+
+  <section id="ordersView" hidden>
+    <p id="ordersState" style="color:var(--muted);margin-top:18px">Loading your orders…</p>
+    <div class="orders" id="ordersList" style="margin-top:18px"></div>
+  </section>
 </main>
+
+<div class="cart-bar" id="cartBar" hidden>
+  <div class="wrap">
+    <span><b id="cartCount">0 items</b> &nbsp;·&nbsp; <span id="cartTotal">₹ 0</span></span>
+    <button class="btn btn-small" type="button" id="openCart">View list</button>
+  </div>
+</div>
+
+<div class="drawer-bg" id="drawerBg" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-labelledby="drawerTitle" role="dialog" aria-modal="true">
+  <div class="drawer-head">
+    <h2 id="drawerTitle" style="font-size:22px">Your order list</h2>
+    <button class="x-btn" type="button" id="closeCart" aria-label="Close">×</button>
+  </div>
+  <div class="drawer-body" id="cartLines"></div>
+  <div class="drawer-foot">
+    <div id="cartMsg"></div>
+    <div class="total-row"><span>Total (at list prices)</span><b id="drawerTotal">₹ 0</b></div>
+    <label for="note" style="font-weight:600;font-size:15px">Note for us (optional)</label>
+    <textarea id="note" maxlength="500" placeholder="Delivery day, address changes, anything else"></textarea>
+    <button class="btn btn-ink" type="button" id="sendOrder" style="width:100%">Send order</button>
+    <p style="color:var(--muted);font-size:13.5px;margin-top:10px">We'll confirm stock and delivery. You can see the status under My orders.</p>
+  </div>
+</aside>
 
 <footer class="foot"><div class="wrap"><span data-credit></span></div></footer>
 
@@ -54,39 +147,97 @@
   $("signOut").onclick = function () { Suite.clearSession(); location.replace(Suite.link("index.html")); };
 
   var DEMO = [
-    { name: "Chilli Powder",    category: "Spices",  packs: [["100 g", 32], ["200 g", 60], ["500 g", 140]] },
-    { name: "Turmeric Powder",  category: "Spices",  packs: [["100 g", 28], ["250 g", 65]] },
-    { name: "Coriander Powder", category: "Spices",  packs: [["200 g", 48], ["500 g", 110]] },
-    { name: "Lime Pickle",      category: "Pickles", packs: [["300 g bottle", 95], ["1 kg pouch", 260]] },
-    { name: "Mixed Vegetable Pickle", category: "Pickles", packs: [["300 g bottle", 99]] },
-    { name: "Coconut Oil",      category: "Oils",    packs: [["500 ml", 135], ["1 L", 255]] },
-    { name: "Tea Powder",       category: "Beverages", packs: [["250 g", 120], ["1 kg", 450]] },
-    { name: "Coffee Powder",    category: "Beverages", packs: [["200 g", 160]] }
+    { name: "Floor Cleaner",     category: "Cleaning", packs: [["1 L", 120], ["5 L", 520]] },
+    { name: "Dish Wash Liquid",  category: "Cleaning", packs: [["500 ml", 85], ["2 L", 299]] },
+    { name: "Toilet Cleaner",    category: "Cleaning", packs: [["500 ml", 95]] },
+    { name: "Hand Wash",         category: "Personal care", packs: [["200 ml", 60], ["750 ml refill", 150]] },
+    { name: "Glass Cleaner",     category: "Cleaning", packs: [["500 ml", 110]] },
+    { name: "Laundry Detergent", category: "Laundry", packs: [["1 kg", 140], ["5 kg", 640]] }
   ];
 
-  var products = [], cat = "All";
-  var rupee = function (n) { return "₹ " + Number(n).toLocaleString("en-IN"); };
+  var MAX_QTY = 100000;
+  var products = [], cat = "All", cart = {};
+  var CART_KEY = "cart:" + Suite.clientId() + ":" + s.user;
+  var rupee = function (n) { return "₹ " + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 }); };
+  var keyOf = function (name, pack) { return name + "\u0001" + pack; };
 
+  /* ---------- cart (kept on this device until sent) ---------- */
+  function loadCart() {
+    try { cart = JSON.parse(localStorage.getItem(CART_KEY) || "{}") || {}; } catch (e) { cart = {}; }
+  }
+  function saveCart() {
+    try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {}
+  }
+  function priceOf(name, pack) {
+    for (var i = 0; i < products.length; i++) if (products[i].name === name)
+      for (var j = 0; j < products[i].packs.length; j++) if (products[i].packs[j][0] === pack) return products[i].packs[j][1];
+    return null;
+  }
+  /* drop anything no longer in the list (product removed or renamed) */
+  function pruneCart() {
+    Object.keys(cart).forEach(function (k) {
+      var c = cart[k];
+      if (!c || priceOf(c.product, c.pack) === null || !(c.qty > 0)) delete cart[k];
+    });
+    saveCart();
+  }
+  function setQty(name, pack, qty) {
+    qty = Math.max(0, Math.min(MAX_QTY, Math.floor(Number(qty) || 0)));
+    var k = keyOf(name, pack);
+    if (qty) cart[k] = { product: name, pack: pack, qty: qty }; else delete cart[k];
+    saveCart();
+    renderBar();
+  }
+  function cartLines() {
+    return Object.keys(cart).map(function (k) {
+      var c = cart[k], price = priceOf(c.product, c.pack) || 0;
+      return { key: k, product: c.product, pack: c.pack, qty: c.qty, price: price, amount: price * c.qty };
+    });
+  }
+  function renderBar() {
+    var lines = cartLines();
+    var count = lines.reduce(function (n, l) { return n + l.qty; }, 0);
+    var total = lines.reduce(function (n, l) { return n + l.amount; }, 0);
+    $("cartBar").hidden = !lines.length || !$("ordersView").hidden;
+    document.body.classList.toggle("has-cart", !!lines.length);
+    $("cartCount").textContent = count + (count === 1 ? " item" : " items") + " in " + lines.length + (lines.length === 1 ? " line" : " lines");
+    $("cartTotal").textContent = rupee(total);
+    $("drawerTotal").textContent = rupee(total);
+  }
+
+  function stepper(name, pack, qty) {
+    var data = ' data-name="' + esc(name) + '" data-pack="' + esc(pack) + '"';
+    if (!qty) return '<button class="add-btn" type="button" data-act="add"' + data + ' aria-label="Add ' + esc(name + " " + pack) + '">Add</button>';
+    return '<span class="qstep"><button type="button" data-act="dec"' + data + ' aria-label="One less">−</button>' +
+      '<input type="number" inputmode="numeric" min="0" max="' + MAX_QTY + '" value="' + qty + '"' + data + ' aria-label="Quantity of ' + esc(name + " " + pack) + '">' +
+      '<button type="button" data-act="inc"' + data + ' aria-label="One more">+</button></span>';
+  }
+
+  /* ---------- products ---------- */
   function render() {
     var q = $("q").value.trim().toLowerCase();
     var list = products.filter(function (p) {
       return (cat === "All" || p.category === cat) && (!q || p.name.toLowerCase().indexOf(q) !== -1);
     });
-    $("state").textContent = list.length ? "" : "No products match that search. Clear it to see everything.";
+    $("state").textContent = products.length ? (list.length ? "" : "No products match that search. Clear it to see everything.")
+      : "No products are listed yet. Please check back soon.";
     $("grid").innerHTML = list.map(function (p) {
       var pic = p.image ? '<img src="' + esc(p.image) + '" alt="">' : esc(p.name.charAt(0));
       return '<article class="product"><div class="pic">' + pic + '</div><div class="info"><span class="cat">' + esc(p.category) +
         "</span><h3>" + esc(p.name) + '</h3><ul class="packs">' +
-        p.packs.map(function (k) { return "<li><span>" + esc(k[0]) + "</span><b>" + rupee(k[1]) + "</b></li>"; }).join("") +
+        p.packs.map(function (k) {
+          var c = cart[keyOf(p.name, k[0])];
+          return '<li><span class="pk">' + esc(k[0]) + '<small>' + rupee(k[1]) + '</small></span>' + stepper(p.name, k[0], c ? c.qty : 0) + "</li>";
+        }).join("") +
         "</ul></div></article>";
     }).join("");
   }
   function chips() {
     var cats = ["All"].concat(products.map(function (p) { return p.category; })
       .filter(function (c, i, a) { return a.indexOf(c) === i; }));
-    $("chips").innerHTML = cats.map(function (c) {
+    $("chips").innerHTML = cats.length > 2 ? cats.map(function (c) {
       return '<button class="chip" type="button" data-cat="' + esc(c) + '" aria-pressed="' + (c === cat) + '">' + esc(c) + "</button>";
-    }).join("");
+    }).join("") : "";
   }
   $("chips").addEventListener("click", function (e) {
     var b = e.target.closest("[data-cat]"); if (!b) return;
@@ -94,13 +245,130 @@
   });
   $("q").addEventListener("input", render);
 
+  /* steppers in the grid and in the drawer share one handler */
+  function onStep(e, after) {
+    var b = e.target.closest("[data-act]"); if (!b) return;
+    var name = b.dataset.name, pack = b.dataset.pack, c = cart[keyOf(name, pack)], q = c ? c.qty : 0;
+    if (b.dataset.act === "add" || b.dataset.act === "inc") q++;
+    else if (b.dataset.act === "dec") q--;
+    else if (b.dataset.act === "rm") q = 0;
+    setQty(name, pack, q);
+    after();
+  }
+  function onType(e, after) {
+    var i = e.target; if (i.tagName !== "INPUT" || !i.dataset.name) return;
+    setQty(i.dataset.name, i.dataset.pack, i.value);
+    after();
+  }
+  $("grid").addEventListener("click", function (e) { onStep(e, render); });
+  $("grid").addEventListener("change", function (e) { onType(e, render); });
+
+  /* ---------- drawer ---------- */
+  function renderDrawer() {
+    var lines = cartLines();
+    $("cartLines").innerHTML = lines.length ? lines.map(function (l) {
+      var data = ' data-name="' + esc(l.product) + '" data-pack="' + esc(l.pack) + '"';
+      return '<div class="cart-line"><div class="nm"><b>' + esc(l.product) + '</b><span>' + esc(l.pack) + " · " + rupee(l.price) + ' each</span><br>' +
+        '<button class="rm" type="button" data-act="rm"' + data + '>Remove</button></div>' +
+        stepper(l.product, l.pack, l.qty) + '<span class="amt">' + rupee(l.amount) + "</span></div>";
+    }).join("") : '<p style="color:var(--muted);padding:18px 0">Your list is empty. Tap Add next to a product to put it here.</p>';
+    $("sendOrder").disabled = !lines.length;
+  }
+  function openDrawer() { $("cartMsg").innerHTML = ""; renderDrawer(); $("drawer").hidden = false; $("drawerBg").hidden = false; $("closeCart").focus(); }
+  function closeDrawer() { $("drawer").hidden = true; $("drawerBg").hidden = true; render(); }
+  $("openCart").onclick = openDrawer;
+  $("closeCart").onclick = closeDrawer;
+  $("drawerBg").onclick = closeDrawer;
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("drawer").hidden) closeDrawer(); });
+  $("cartLines").addEventListener("click", function (e) { onStep(e, renderDrawer); });
+  $("cartLines").addEventListener("change", function (e) { onType(e, renderDrawer); });
+
+  $("sendOrder").onclick = function () {
+    var lines = cartLines();
+    if (!lines.length) return;
+    var btn = $("sendOrder");
+    btn.disabled = true; btn.textContent = "Sending…";
+    $("cartMsg").innerHTML = "";
+    var items = lines.map(function (l) { return { product: l.product, pack: l.pack, qty: l.qty }; });
+    var note = $("note").value.trim();
+    var send = Suite.isDemo() ? demoPlace(items, note) : Suite.api("placeOrder", { token: s.token, items: items, note: note });
+    send.then(function (res) {
+      if (!res.ok) throw new Error(res.message || "The order didn't go through.");
+      cart = {}; saveCart(); $("note").value = "";
+      renderDrawer(); renderBar();
+      $("cartMsg").innerHTML = '<div class="msg ok">Sent. Your order number is <b>' + esc(res.order_id) + '</b>. We\'ll confirm it soon.</div>';
+      ordersLoaded = false;
+    }).catch(function (err) {
+      $("cartMsg").innerHTML = '<div class="msg err">' + esc(err.message || "The order didn't go through.") + " Your list is still here. Try again.</div>";
+    }).then(function () { btn.textContent = "Send order"; btn.disabled = !cartLines().length; });
+  };
+
+  /* ---------- my orders ---------- */
+  var ordersLoaded = false;
+  function fmtWhen(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + ", " + d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  }
+  var STATUS_TEXT = { New: "Sent", Accepted: "Accepted", Dispatched: "Dispatched", Cancelled: "Cancelled" };
+  function loadOrders() {
+    $("ordersState").textContent = "Loading your orders…";
+    $("ordersList").innerHTML = "";
+    var load = Suite.isDemo() ? Promise.resolve({ ok: true, orders: demoOrders() }) : Suite.api("myOrders", { token: s.token });
+    load.then(function (res) {
+      if (!res.ok) throw new Error(res.message || "Couldn't load your orders.");
+      ordersLoaded = true;
+      var list = res.orders || [];
+      $("ordersState").textContent = list.length ? "Your last " + list.length + (list.length === 1 ? " order" : " orders") + "." : "You haven't sent an order yet.";
+      $("ordersList").innerHTML = list.map(function (o) {
+        return '<article class="order"><div class="order-top"><h3>' + esc(o.order_id) + '</h3><span class="pill ' + esc(o.status) + '">' +
+          esc(STATUS_TEXT[o.status] || o.status) + '</span></div><div class="when">Sent ' + esc(fmtWhen(o.created)) +
+          (o.status_at && o.status !== "New" ? " · " + esc(STATUS_TEXT[o.status] || o.status) + " " + esc(fmtWhen(o.status_at)) : "") + "</div>" +
+          "<table>" + o.lines.map(function (l) {
+            return "<tr><td>" + esc(l.product) + " · " + esc(l.pack) + '</td><td class="n">× ' + l.qty + '</td><td class="n">' + rupee(l.amount) + "</td></tr>";
+          }).join("") + '<tr><td><b>Total</b></td><td></td><td class="n"><b>' + rupee(o.total) + "</b></td></tr></table>" +
+          (o.note ? '<div class="note">Note: ' + esc(o.note) + "</div>" : "") +
+          (o.status === "New" ? '<div class="note">Changes? Call us and mention the order number.</div>' : "") +
+          "</article>";
+      }).join("");
+    }).catch(function (err) {
+      $("ordersState").textContent = (err.message || "Couldn't load your orders.") + " Refresh the page to try again.";
+    });
+  }
+
+  document.querySelector(".view-switch").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-view]"); if (!b) return;
+    var orders = b.dataset.view === "orders";
+    document.querySelectorAll(".view-switch [data-view]").forEach(function (x) { x.setAttribute("aria-pressed", x === b); });
+    $("shopView").hidden = orders; $("ordersView").hidden = !orders;
+    $("pageTitle").textContent = orders ? "My orders" : "Products and prices";
+    renderBar();
+    if (orders) loadOrders();
+  });
+
+  /* ---------- demo company (no server) ---------- */
+  var DEMO_KEY = "demoOrders:" + s.user;
+  function demoOrders() { try { return JSON.parse(localStorage.getItem(DEMO_KEY) || "[]"); } catch (e) { return []; } }
+  function demoPlace(items, note) {
+    var list = demoOrders(), now = new Date();
+    var id = "ORD-" + String(now.getFullYear()).slice(2) + ("0" + (now.getMonth() + 1)).slice(-2) + ("0" + now.getDate()).slice(-2) + "-" + ("00" + (list.length + 1)).slice(-3);
+    var lines = items.map(function (it) { var p = priceOf(it.product, it.pack) || 0; return { product: it.product, pack: it.pack, qty: it.qty, price: p, amount: p * it.qty }; });
+    var total = lines.reduce(function (n, l) { return n + l.amount; }, 0);
+    list.unshift({ order_id: id, created: now.toISOString(), status: "New", status_at: "", note: note, lines: lines, total: total });
+    try { localStorage.setItem(DEMO_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) {}
+    return Promise.resolve({ ok: true, order_id: id, total: total });
+  }
+
+  /* ---------- start ---------- */
+  loadCart();
   var load = Suite.isDemo()
     ? Promise.resolve({ ok: true, products: DEMO })
     : Suite.api("catalog", { token: s.token });
   load.then(function (res) {
     if (!res.ok) throw new Error(res.message || "Couldn't load products.");
     products = res.products || [];
-    chips(); render();
+    pruneCart();
+    chips(); render(); renderBar();
   }).catch(function (err) {
     $("state").textContent = (err.message || "Couldn't load products.") + " Refresh the page to try again.";
   });
