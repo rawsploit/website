@@ -11,6 +11,7 @@
   var REPORTS = [["bills", "Customer bills"], ["items", "Item sales"], ["receipts", "Sales and receipts"], ["dsr", "Daily sales summary (DSR)"],
                  ["returns", "Sales returns"], ["collections", "Collections"], ["skips", "Skipped shops"]];
   var routesCache = null;
+  function viewOnly() { var s = Suite.getSession(); return !!(s && s.role === "viewer"); }
 
   function call(action, payload) {
     if (Suite.isDemo()) return Promise.resolve(demo(action, payload || {}));
@@ -78,7 +79,7 @@
           (cancelled ? ' <span class="pill-x">Cancelled</span>' : "") + "</td><td>" + esc(b.shop_name) + "</td><td>" + esc(b.route_id) + "</td><td>" + esc(b.user_name) + "</td><td>" + esc(b.pay_mode) +
           '</td><td class="num">' + money(b.total) + '</td><td class="num">' + money(b.paid) + '</td><td class="row-btns">' +
           '<a class="btn btn-line btn-small" target="_blank" rel="noopener" href="' + esc(Suite.link("invoice.html", { no: b.bill_no })) + '">' + (b.kind === "BILL" ? "Invoice" : "View") + "</a>" +
-          (cancelled ? "" : ' <button class="btn btn-line btn-small" type="button" data-cancel="' + esc(b.bill_no) + '">Cancel</button>') + "</td></tr>";
+          (cancelled || viewOnly() ? "" : ' <button class="btn btn-line btn-small" type="button" data-cancel="' + esc(b.bill_no) + '">Cancel</button>') + "</td></tr>";
       }).join("") + "</tbody></table></div>";
   }
   function bindBillTable(body, reload) {
@@ -123,9 +124,9 @@
       routesCache = r.routes || routesCache;
       var shops = r.shops || [];
       body.innerHTML = '<div class="row-head" style="flex-wrap:wrap;gap:10px"><div><h3>Shops</h3><p class="muted" style="margin:4px 0 0">' + shops.length +
-        ' shops. Sales staff see the shops on their route in Billing.</p></div><div class="row-btns"><button class="btn btn-ink btn-small" id="shAdd" type="button">Add a shop</button>' +
+        ' shops. Sales staff see the shops on their route in Billing.</p></div>' + (viewOnly() ? "" : '<div class="row-btns"><button class="btn btn-ink btn-small" id="shAdd" type="button">Add a shop</button>' +
         '<label class="btn btn-line btn-small" style="cursor:pointer">Upload a list (CSV)<input type="file" id="shFile" accept=".csv,text/csv" hidden></label>' +
-        '<button class="btn btn-line btn-small" id="shTpl" type="button">Download template</button></div></div>' +
+        '<button class="btn btn-line btn-small" id="shTpl" type="button">Download template</button></div>') + "</div>" +
         '<div id="shMsg"></div><div id="shForm"></div>' +
         '<label class="field" style="max-width:320px;margin-top:12px"><span>Filter</span><input id="shQ" placeholder="Shop name or route"></label>' +
         '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ID</th><th>Shop</th><th>Route</th><th>Phone (WhatsApp)</th><th>GSTIN</th><th>Type</th><th>Credit</th><th>Active</th><th></th></tr></thead><tbody id="shRows"></tbody></table></div>';
@@ -134,21 +135,21 @@
         body.querySelector("#shRows").innerHTML = shops.filter(function (s) { return !q || (s.name + " " + s.route_id).toLowerCase().indexOf(q) !== -1; }).map(function (s, i) {
           return "<tr" + (s.active ? "" : ' class="is-cancelled"') + "><td>" + esc(s.shop_id) + "</td><td>" + esc(s.name) + "<br><small class=\"muted\">" + esc(s.address) + "</small></td><td>" + esc(s.route_id) +
             "</td><td>" + esc(s.phone) + "</td><td>" + esc(s.gstin) + "</td><td>" + esc(s.type) + "</td><td>" + (s.credit ? "Yes" : "No") + "</td><td>" + (s.active ? "Yes" : "No") +
-            '</td><td><button class="btn btn-line btn-small" type="button" data-edit="' + esc(s.shop_id) + '">Edit</button></td></tr>';
+            "</td><td>" + (viewOnly() ? "" : '<button class="btn btn-line btn-small" type="button" data-edit="' + esc(s.shop_id) + '">Edit</button>') + "</td></tr>";
         }).join("") || '<tr><td colspan="9" class="muted">No shops yet. Add them one by one, or upload a list.</td></tr>';
       };
       paint();
       body.querySelector("#shQ").oninput = paint;
-      body.querySelector("#shAdd").onclick = function () { shopForm(body, null, function () { tabShops(body); }); };
+      if (!viewOnly()) body.querySelector("#shAdd").onclick = function () { shopForm(body, null, function () { tabShops(body); }); };
       body.querySelector("#shRows").onclick = function (e) {
         var b = e.target.closest("[data-edit]"); if (!b) return;
         shopForm(body, shops.filter(function (s) { return s.shop_id === b.dataset.edit; })[0], function () { tabShops(body); });
       };
-      body.querySelector("#shTpl").onclick = function () {
+      if (!viewOnly()) body.querySelector("#shTpl").onclick = function () {
         download("shops-template.csv", [["name", "route_id", "address", "phone", "gstin", "type", "credit", "active"],
           ["Example Stores", (routesCache[0] || {}).route_id || "R1", "Main Road", "9800000000", "", "A", "yes", "yes"]]);
       };
-      body.querySelector("#shFile").onchange = function () {
+      if (!viewOnly()) body.querySelector("#shFile").onchange = function () {
         var file = this.files && this.files[0]; if (!file) return;
         var reader = new FileReader();
         reader.onload = function () {

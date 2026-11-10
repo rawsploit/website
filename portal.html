@@ -44,7 +44,7 @@
     <div class="main-bar">
       <button class="btn btn-line btn-small menu-btn" id="menuBtn" type="button" aria-controls="side" aria-expanded="false">Menu</button>
       <h2 id="viewTitle">Home</h2>
-      <span></span>
+      <button class="btn btn-line btn-small" id="homeBtn" type="button" data-go="home" hidden>‹ Home</button>
     </div>
     <div id="view"></div>
   </section>
@@ -65,13 +65,22 @@
 
   $("who").textContent = s.name + " · " + Suite.teamName(s.role);
 
+  /* A module (inside its frame) can ask to open a built-in page, e.g. Field Sales → Billing.
+     Only Google's module frames are listened to, and only known pages can be opened. */
+  window.addEventListener("message", function (e) {
+    var d = e.data || {};
+    if (!d || d.kalavara !== "open" || typeof d.page !== "string") return;
+    if (!/^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(e.origin)) return;
+    if (VAN_PAGES.some(function (p) { return p.id === d.page; })) go(d.page);
+  });
+
   /* built-in pages (not separate modules) */
   var CAN_CATALOG = s.role === "admin" || s.role === "marketing";
   var PAGES = [
     { id: "catalog",   name: "Product catalog",   marketing: true, desc: "Photos, descriptions and groups customers see. Packs and prices come from Company setup." },
     { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." },
     { id: "billing",   name: "Billing",    van: true, team: "sales",    after: "fieldsales",  roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
-    { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
+    { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts", "viewer"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
   ];
   var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1; });
 
@@ -79,9 +88,14 @@
   function navHtml() {
     var html = '<button type="button" data-go="home">Home</button>';
     var shown = {}, placed = {};
-    var groups = s.role === "admin" ? window.TEAMS.filter(function (t) { return t.id !== "admin"; }) : [{ id: s.role, name: Suite.teamName(s.role) }];
+    var groups = s.role === "admin" || s.role === "viewer"
+      ? window.TEAMS.filter(function (t) { return t.id !== "admin" && t.id !== "viewer"; })
+      : [{ id: s.role, name: Suite.teamName(s.role) }];
+    if (s.role === "viewer") groups = groups.concat([{ id: "admin", name: "Management" }]);
     groups.forEach(function (g) {
-      var list = mods.filter(function (m) { return m.teams.indexOf(g.id) !== -1 && !shown[m.id]; });
+      var list = mods.filter(function (m) {
+        return !shown[m.id] && (m.teams.indexOf(g.id) !== -1 || (s.role === "viewer" && g.id === "admin" && !m.teams.length));
+      });
       list.forEach(function (m) { shown[m.id] = true; });
       // built-in van sales pages join their team's list, right after the module they belong with
       VAN_PAGES.forEach(function (p) {
@@ -148,7 +162,8 @@
       "</p><p>An admin connects it in People and setup. Until then, nothing here can change your data.</p></div></div>";
   }
 
-  function go(id) {
+  var current = null;
+  function go(id, fromHistory) {
     var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
     var allowed = id === "home" || id === "password" || ((id === "people" || id === "company") && s.role === "admin") ||
       ((id === "catalog" || id === "customers") && CAN_CATALOG) ||
@@ -169,8 +184,20 @@
     });
     $("side").classList.remove("open");
     $("menuBtn").setAttribute("aria-expanded", "false");
-    if (history.replaceState) history.replaceState(null, "", Suite.link("portal.html", id === "home" ? null : { m: id }));
+    $("homeBtn").hidden = id === "home";
+    // each screen is a step in the browser history, so the phone's Back button returns to the previous one
+    var url = Suite.link("portal.html", id === "home" ? null : { m: id });
+    if (history.pushState && !fromHistory) {
+      if (current === null || current === id) history.replaceState({ m: id }, "", url);
+      else history.pushState({ m: id }, "", url);
+    }
+    current = id;
+    window.scrollTo(0, 0);
   }
+  window.addEventListener("popstate", function (e) {
+    var id = (e.state && e.state.m) || new URLSearchParams(location.search).get("m") || "home";
+    go(id, true);
+  });
 
   document.addEventListener("click", function (e) {
     var b = e.target.closest("[data-go]");

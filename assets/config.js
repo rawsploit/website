@@ -15,6 +15,7 @@ window.TEAMS = [
   { id: "accounts", name: "Accounts",         blurb: "Reconciliations, collections and P&L" },
   { id: "hr",       name: "HR",               blurb: "Attendance, leave and payroll" },
   { id: "marketing", name: "Marketing",       blurb: "Product catalog and customer sign-ins" },
+  { id: "viewer",   name: "Viewer",           blurb: "Opens reports and dashboards, changes nothing" },
   { id: "admin",    name: "Admin / Manager",  blurb: "Everything, plus people and setup" }
 ];
 

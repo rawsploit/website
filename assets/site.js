@@ -60,7 +60,8 @@
     sales:    { password: "sales",    role: "sales",    name: "Joseph (Sales)" },
     accounts: { password: "accounts", role: "accounts", name: "Meera (Accounts)" },
     hr:       { password: "hr",       role: "hr",       name: "Hari (HR)" },
-    marketing: { password: "marketing", role: "marketing", name: "Maya (Marketing)" }
+    marketing: { password: "marketing", role: "marketing", name: "Maya (Marketing)" },
+    viewer:   { password: "viewer",   role: "viewer",   name: "Owner (Viewer)" }
   };
   var DEMO_CUSTOMERS = { "C1001": { password: "shop", name: "City Supermarket" } };
 
@@ -91,8 +92,11 @@
   }
 
   /* ---------- roles ---------- */
+  /* Modules that have a look-only mode for the Viewer team. */
+  var VIEW_ONLY_MODULES = ["collections", "nexus", "cashrecon", "books", "pnl", "payroll", "mis"];
   function modulesFor(role) {
     return window.MODULES.filter(function (m) {
+      if (role === "viewer") return VIEW_ONLY_MODULES.indexOf(m.id) !== -1;
       return role === "admin" || m.teams.indexOf(role) !== -1;
     });
   }
