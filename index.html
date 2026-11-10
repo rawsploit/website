@@ -93,6 +93,8 @@
       ? [{ name: "All modules", desc: "Every tool across factory, sales and accounts" }]
           .concat(window.MODULES.filter(function (m) { return !m.teams.length; }))
           .concat([{ name: "People and setup", desc: "Sign-ins, teams and company settings" }])
+      : t.id === "marketing"
+      ? [{ name: "Product catalog", desc: "Photos, descriptions and groups customers see" }, { name: "Customer sign-ins", desc: "Add customers and reset their passwords" }]
       : window.MODULES.filter(function (m) { return m.teams.indexOf(t.id) !== -1; });
     return '<div class="team"><h3>' + Suite.esc(t.name) + '</h3><p class="blurb">' + Suite.esc(t.blurb) + '</p><ul>' +
       mods.map(function (m) { return '<li><b>' + Suite.esc(m.name) + '</b><span>' + Suite.esc(m.desc) + '</span></li>'; }).join("") +

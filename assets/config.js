@@ -13,6 +13,8 @@ window.TEAMS = [
   { id: "factory",  name: "Factory",          blurb: "Production, stores and stock counts" },
   { id: "sales",    name: "Sales",            blurb: "Field sales, vans and collections" },
   { id: "accounts", name: "Accounts",         blurb: "Reconciliations, collections and P&L" },
+  { id: "hr",       name: "HR",               blurb: "Attendance, leave and payroll" },
+  { id: "marketing", name: "Marketing",       blurb: "Product catalog and customer sign-ins" },
   { id: "admin",    name: "Admin / Manager",  blurb: "Everything, plus people and setup" }
 ];
 
@@ -27,7 +29,7 @@ window.MODULES = [
   { id: "cashrecon",   name: "Cash Recon",       teams: ["accounts"], desc: "Deposit slips against cash collected and the day book." },
   { id: "books",       name: "Accounting-Books", teams: ["accounts"], desc: "Ledgers, GST bills, receipts and payments, with Tally-style keys. Feeds every other module." },
   { id: "pnl",         name: "Profit & Loss",    teams: ["accounts"], desc: "Management P&L built from stock and sales." },
-  { id: "payroll",     name: "Payroll",          teams: [],           desc: "Attendance and monthly salaries for field staff." },
+  { id: "payroll",     name: "Payroll",          teams: ["hr"],         desc: "Attendance and monthly salaries for field staff." },
   { id: "mis",         name: "MIS Dashboard",    teams: [],           desc: "Receivables, collections, P&L and sales by salesperson, for management." }
 ];
 

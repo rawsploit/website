@@ -58,7 +58,9 @@
     admin:    { password: "admin",    role: "admin",    name: "Anita (Manager)" },
     factory:  { password: "factory",  role: "factory",  name: "Ravi (Stores)" },
     sales:    { password: "sales",    role: "sales",    name: "Joseph (Sales)" },
-    accounts: { password: "accounts", role: "accounts", name: "Meera (Accounts)" }
+    accounts: { password: "accounts", role: "accounts", name: "Meera (Accounts)" },
+    hr:       { password: "hr",       role: "hr",       name: "Hari (HR)" },
+    marketing: { password: "marketing", role: "marketing", name: "Maya (Marketing)" }
   };
   var DEMO_CUSTOMERS = { "C1001": { password: "shop", name: "City Supermarket" } };
 

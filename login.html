@@ -73,7 +73,7 @@
     var hint = $("demoHint");
     hint.hidden = !Suite.isDemo();
     hint.innerHTML = kind === "staff"
-      ? "This is the demo company. Try <code>admin</code>, <code>factory</code>, <code>sales</code> or <code>accounts</code>, with the same word as the password."
+      ? "This is the demo company. Try <code>admin</code>, <code>factory</code>, <code>sales</code>, <code>accounts</code>, <code>hr</code> or <code>marketing</code>, with the same word as the password."
       : "This is the demo company. Try customer code <code>C1001</code> with password <code>shop</code>.";
   }
   $("asStaff").onclick = function () { kind = "staff"; render(); $("username").focus(); };

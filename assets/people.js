@@ -26,7 +26,7 @@
     });
   }
   function demoCall(action, p) {
-    if (action === "listUsers") return { ok: true, users: demo.users, roles: ["admin", "factory", "sales", "accounts"] };
+    if (action === "listUsers") return { ok: true, users: demo.users, roles: ["admin", "factory", "sales", "accounts", "hr", "marketing"] };
     if (action === "listCustomers") return { ok: true, customers: demo.customers };
     if (action === "saveUser") {
       var u = Object.assign({ status: "active", locked: false, lastLogin: "" }, p.user); delete u.password;
@@ -211,5 +211,11 @@
     };
   }
 
-  window.People = { renderPeople: renderPeople, renderPassword: renderPassword };
+  /* Marketing's own page: just the customer sign-ins. */
+  function renderCustomers(root) {
+    root.innerHTML = '<div class="view">' + demoNote() + '<div id="peopleBody"></div></div>';
+    customers(root.querySelector("#peopleBody"));
+  }
+
+  window.People = { renderPeople: renderPeople, renderPassword: renderPassword, renderCustomers: renderCustomers };
 })();

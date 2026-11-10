@@ -17,10 +17,11 @@
 <script src="assets/site.js"></script>
 <script src="assets/install.js"></script>
 <style>
-  .drawer[hidden], .drawer-bg[hidden], .cart-bar[hidden] { display:none !important; }
+  .drawer[hidden], .drawer-bg[hidden], .cart-bar[hidden], .view-switch[hidden] { display:none !important; }
   .cat-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; }
   .view-switch { display:flex; gap:8px; }
   .packs li { align-items:center; gap:10px; }
+  .product .desc { color:var(--muted); font-size:14px; margin:4px 0 0; }
   .packs .pk { flex:1; min-width:0; }
   .packs .pk small { display:block; color:var(--muted); font-size:13px; }
   .qstep { display:inline-flex; align-items:center; border:1.5px solid var(--rule-strong); border-radius:999px; overflow:hidden; background:#fff; }
@@ -140,11 +141,23 @@
 <script>
 (function () {
   var s = Suite.getSession();
-  if (!s || s.kind !== "customer") { location.replace(Suite.link("login.html", { as: "customer" })); return; }
+  /* Marketing and admins can look at the page as customers see it (no ordering). */
+  var PREVIEW = !!(s && s.kind === "staff" && (s.role === "admin" || s.role === "marketing") && Suite.params.get("preview") === "1");
+  if (!s || (s.kind !== "customer" && !PREVIEW)) { location.replace(Suite.link("login.html", { as: "customer" })); return; }
   var $ = function (id) { return document.getElementById(id); };
   var esc = Suite.esc;
   $("who").textContent = s.name;
   $("signOut").onclick = function () { Suite.clearSession(); location.replace(Suite.link("index.html")); };
+  if (PREVIEW) {
+    $("who").textContent = "Customer view (preview)";
+    $("signOut").textContent = "Back to the catalog editor";
+    $("signOut").onclick = function () { location.href = Suite.link("portal.html", { m: "catalog" }); };
+    document.querySelector(".view-switch").hidden = true;
+    var note = document.createElement("p");
+    note.className = "demo-hint"; note.style.margin = "14px 0 0";
+    note.textContent = "This is how customers see your products. Ordering is switched off in this preview.";
+    document.querySelector(".cat-head").after(note);
+  }
 
   var DEMO = [
     { name: "Floor Cleaner",     category: "Cleaning", packs: [["1 L", 120], ["5 L", 520]] },
@@ -157,7 +170,7 @@
 
   var MAX_QTY = 100000;
   var products = [], cat = "All", cart = {};
-  var CART_KEY = "cart:" + Suite.clientId() + ":" + s.user;
+  var CART_KEY = (PREVIEW ? "preview:" : "cart:") + Suite.clientId() + ":" + s.user;
   var rupee = function (n) { return "₹ " + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 }); };
   var keyOf = function (name, pack) { return name + "\u0001" + pack; };
 
@@ -198,7 +211,7 @@
     var lines = cartLines();
     var count = lines.reduce(function (n, l) { return n + l.qty; }, 0);
     var total = lines.reduce(function (n, l) { return n + l.amount; }, 0);
-    $("cartBar").hidden = !lines.length || !$("ordersView").hidden;
+    $("cartBar").hidden = PREVIEW || !lines.length || !$("ordersView").hidden;
     document.body.classList.toggle("has-cart", !!lines.length);
     $("cartCount").textContent = count + (count === 1 ? " item" : " items") + " in " + lines.length + (lines.length === 1 ? " line" : " lines");
     $("cartTotal").textContent = rupee(total);
@@ -206,6 +219,7 @@
   }
 
   function stepper(name, pack, qty) {
+    if (PREVIEW) return "";
     var data = ' data-name="' + esc(name) + '" data-pack="' + esc(pack) + '"';
     if (!qty) return '<button class="add-btn" type="button" data-act="add"' + data + ' aria-label="Add ' + esc(name + " " + pack) + '">Add</button>';
     return '<span class="qstep"><button type="button" data-act="dec"' + data + ' aria-label="One less">−</button>' +
@@ -224,7 +238,7 @@
     $("grid").innerHTML = list.map(function (p) {
       var pic = p.image ? '<img src="' + esc(p.image) + '" alt="">' : esc(p.name.charAt(0));
       return '<article class="product"><div class="pic">' + pic + '</div><div class="info"><span class="cat">' + esc(p.category) +
-        "</span><h3>" + esc(p.name) + '</h3><ul class="packs">' +
+        "</span><h3>" + esc(p.name) + "</h3>" + (p.description ? '<p class="desc">' + esc(p.description) + "</p>" : "") + '<ul class="packs">' +
         p.packs.map(function (k) {
           var c = cart[keyOf(p.name, k[0])];
           return '<li><span class="pk">' + esc(k[0]) + '<small>' + rupee(k[1]) + '</small></span>' + stepper(p.name, k[0], c ? c.qty : 0) + "</li>";
