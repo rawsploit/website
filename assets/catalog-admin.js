@@ -55,7 +55,7 @@
       '<p class="muted" style="margin:4px 0 0">' + shown + " of " + list.length + " products shown. Packs and prices come from Company setup; change them there.</p></div>" +
       '<a class="btn btn-line btn-small" target="_blank" rel="noopener" href="' + esc(Suite.link("catalog.html", { preview: "1" })) + '">Preview as a customer</a></div>';
     var warn = res.handPicked
-      ? '<p class="demo-hint" style="margin:0 0 16px">The core\'s <b>Catalog</b> tab has rows, so customers see that hand-filled list instead of this one. Clear that tab to use this page.</p>' : "";
+      ? '<p class="demo-hint" style="margin:0 0 16px">Packs and prices customers see come from the core\'s hand-filled <b>Catalog</b> tab. Photos, groups, descriptions, positions and hiding set here still apply.</p>' : "";
     var empty = !list.length ? '<p class="muted">No finished goods yet. Add FG products in Company setup and they appear here.</p>' : "";
 
     root.innerHTML = '<div class="view">' + (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 18px">Demo company: you can try this screen, but nothing is saved.</p>' : "") +
