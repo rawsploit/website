@@ -38,7 +38,7 @@
     <div class="wrap">
       <div>
         <h1>Every movement in the factory, written in one book.</h1>
-        <p class="lead">Stock, field sales, collections and accounts for growing manufacturers and distributors, built by someone who has run them.</p>
+        <p class="lead">Stock, field sales, collections and accounts for growing manufacturers and distributors, built around how they actually work.</p>
         <div class="hero-actions">
           <a class="btn btn-ink" data-page="login.html" data-kind="staff">Staff sign in</a>
           <a class="btn btn-line" data-page="login.html" data-kind="customer">Customer sign in</a>
@@ -88,7 +88,7 @@
 (function () {
   /* Teams and their modules */
   var grid = document.getElementById("teamsGrid");
-  grid.innerHTML = window.TEAMS.map(function (t) {
+  var cards = window.TEAMS.map(function (t) {
     var mods = t.id === "admin"
       ? [{ name: "All modules", desc: "Every tool across factory, sales and accounts" }]
           .concat(window.MODULES.filter(function (m) { return !m.teams.length; }))
@@ -99,7 +99,11 @@
     return '<div class="team"><h3>' + Suite.esc(t.name) + '</h3><p class="blurb">' + Suite.esc(t.blurb) + '</p><ul>' +
       mods.map(function (m) { return '<li><b>' + Suite.esc(m.name) + '</b><span>' + Suite.esc(m.desc) + '</span></li>'; }).join("") +
       '</ul></div>';
-  }).join("");
+  });
+  /* three stacked columns, so a long team doesn't leave gaps beside the short ones */
+  var cols = [[], [], []];
+  cards.forEach(function (html, i) { cols[i % 3].push(html); });
+  grid.innerHTML = cols.map(function (c) { return '<div class="team-col">' + c.join("") + "</div>"; }).join("");
 
   /* Today's book: the day's entries write themselves in, once */
   var rows = [
