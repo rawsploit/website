@@ -365,3 +365,6 @@ a { color: var(--ink); }
 .tbl tr.is-cancelled td.row-btns, .tbl tr.is-cancelled td .pill-x { text-decoration: none; }
 .row-btns { white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .pill-x { display: inline-block; font: 600 12px var(--body); padding: 2px 8px; border-radius: 999px; background: #FDECEA; color: var(--danger); }
+
+/* the hidden attribute always wins over a class that sets display */
+[hidden]{display:none!important}
