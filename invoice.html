@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tax invoice | {site}</title>
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+<style>
+  body { background: #E9ECF3; }
+  .inv-actions { max-width: 210mm; margin: 18px auto 10px; display: flex; gap: 10px; justify-content: flex-end; padding: 0 10px; }
+  .inv { background: #fff; color: #111; width: 210mm; min-height: 297mm; margin: 0 auto 30px; padding: 14mm 13mm; box-shadow: 0 2px 14px rgba(0,0,0,.12); font: 12.5px/1.4 "Source Sans 3", "Segoe UI", Arial, sans-serif; position: relative; }
+  .inv h1 { font: 800 22px var(--head); color: #111; margin: 0; letter-spacing: .2px; }
+  .inv .top { display: flex; justify-content: space-between; gap: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; }
+  .inv .doc { text-align: right; }
+  .inv .doc .ttl { font: 800 17px var(--head); letter-spacing: 1px; }
+  .inv .doc .copy { font-size: 11px; color: #555; }
+  .inv .muted { color: #555; }
+  .inv .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #999; margin-top: 12px; }
+  .inv .parties > div { padding: 8px 10px; }
+  .inv .parties > div + div { border-left: 1px solid #999; }
+  .inv .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: #555; font-weight: 700; margin-bottom: 3px; }
+  .inv table.items { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .inv table.items th, .inv table.items td { border: 1px solid #999; padding: 5px 6px; vertical-align: top; }
+  .inv table.items th { background: #F1F3F7; font-size: 11px; text-align: center; }
+  .inv td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .inv td.c { text-align: center; }
+  .inv tfoot td { font-weight: 700; background: #FAFBFC; }
+  .inv .bottom { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; margin-top: 12px; }
+  .inv .box { border: 1px solid #999; padding: 8px 10px; }
+  .inv .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .inv .totals .grand { border-top: 2px solid #111; margin-top: 4px; padding-top: 6px; font: 800 15px var(--head); }
+  .inv .words { margin-top: 10px; font-weight: 600; }
+  .inv .sign { margin-top: 26px; font-size: 11.5px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .inv .sign .who { text-align: center; min-width: 200px; border-top: 1px solid #111; padding-top: 4px; }
+  .inv .foot { position: absolute; left: 13mm; right: 13mm; bottom: 9mm; text-align: center; font-size: 10.5px; color: #777; }
+  .inv .stamp { position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg); font: 900 74px var(--head); color: rgba(180,35,24,.16); border: 6px solid rgba(180,35,24,.16); padding: 6px 24px; border-radius: 10px; pointer-events: none; }
+  .err { max-width: 560px; margin: 60px auto; background: #fff; padding: 24px; border-radius: 12px; }
+  @media screen and (max-width: 820px) { .inv { width: auto; min-height: 0; padding: 18px; margin: 0 8px 20px; } .inv .parties, .inv .bottom { grid-template-columns: 1fr; } .inv .parties > div + div { border-left: 0; border-top: 1px solid #999; } .inv .foot { position: static; margin-top: 20px; } }
+  @media print {
+    body { background: #fff; }
+    .inv-actions { display: none; }
+    .inv { box-shadow: none; margin: 0; width: auto; min-height: 0; padding: 0; }
+    .inv .foot { position: static; margin-top: 18px; }
+    @page { size: A4; margin: 12mm; }
+  }
+</style>
+</head>
+<body>
+<div class="inv-actions"><button class="btn btn-line" type="button" onclick="window.close()">Close</button><button class="btn btn-ink" type="button" id="printBtn" disabled>Print / Save as PDF</button></div>
+<div id="out"><p style="text-align:center;margin-top:60px">Loading the invoice…</p></div>
+<script>
+(function () {
+  "use strict";
+  var esc = Suite.esc;
+  var s = Suite.getSession();
+  var no = Suite.params.get("no") || "";
+  if (!s || s.kind !== "staff") { location.replace(Suite.link("login.html")); return; }
+
+  function n2(v) { return Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function niceDate(ymd) { var p = String(ymd).split("-"); return p.length === 3 ? p[2] + "-" + p[1] + "-" + p[0] : ymd; }
+
+  /* Rupees in words, Indian style (lakh, crore). */
+  var ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  var TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  function two(n) { return n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? " " + ONES[n % 10] : ""); }
+  function three(n) { return (n >= 100 ? ONES[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " : "") : "") + (n % 100 ? two(n % 100) : ""); }
+  function words(amount) {
+    var r = Math.floor(Math.abs(amount)), p = Math.round((Math.abs(amount) - r) * 100), out = [];
+    var crore = Math.floor(r / 10000000); r %= 10000000;
+    var lakh = Math.floor(r / 100000); r %= 100000;
+    var thou = Math.floor(r / 1000); r %= 1000;
+    if (crore) out.push(three(crore) + " Crore");
+    if (lakh) out.push(two(lakh) + " Lakh");
+    if (thou) out.push(two(thou) + " Thousand");
+    if (r) out.push(three(r));
+    var txt = "Rupees " + (out.length ? out.join(" ") : "Zero");
+    if (p) txt += " and " + two(p) + " Paise";
+    return txt + " Only";
+  }
+
+  function render(d) {
+    var b = d.bill, c = d.company, shop = d.shop || {};
+    var inter = b.igst > 0;
+    var title = b.kind === "RETURN" ? "CREDIT NOTE" : b.kind === "COLLECTION" ? "RECEIPT" : "TAX INVOICE";
+    document.title = title.charAt(0) + title.slice(1).toLowerCase() + " " + b.bill_no;
+    var stateCode = function (g) { var m = /^(\d{2})/.exec(g || ""); return m ? m[1] : ""; };
+    var rows = d.lines.map(function (l, i) {
+      var unit = l.qty ? l.taxable / l.qty : 0;
+      return "<tr><td class=\"c\">" + (i + 1) + "</td><td>" + esc(l.product) + (l.pack ? " – " + esc(l.pack) : "") + "</td><td class=\"c\">" + esc(l.hsn) +
+        "</td><td class=\"n\">" + l.qty + (l.free_qty ? "<br><small>+" + l.free_qty + " free</small>" : "") + "</td><td class=\"n\">" + n2(unit) + "</td><td class=\"n\">" + n2(l.taxable) +
+        "</td><td class=\"c\">" + l.gst + "%</td>" + (inter ? "<td class=\"n\">" + n2(l.igst) + "</td>" : "<td class=\"n\">" + n2(l.cgst) + "</td><td class=\"n\">" + n2(l.sgst) + "</td>") +
+        "<td class=\"n\">" + n2(l.total) + "</td></tr>";
+    }).join("");
+    var totQty = d.lines.reduce(function (a, l) { return a + l.qty; }, 0);
+    var html = '<div class="inv">' + (b.status === "Cancelled" ? '<div class="stamp">CANCELLED</div>' : "") +
+      '<div class="top"><div><h1>' + esc(c.name) + "</h1>" +
+      [c.address, [c.state, c.pincode].filter(Boolean).join(" – "), c.phone ? "Phone " + c.phone : "", c.email].filter(Boolean).map(function (x) { return "<div>" + esc(x) + "</div>"; }).join("") +
+      (c.gstin ? "<div><b>GSTIN: " + esc(c.gstin) + "</b></div>" : "") + "</div>" +
+      '<div class="doc"><div class="ttl">' + title + '</div><div class="copy">Original for recipient</div>' +
+      "<div style=\"margin-top:8px\"><b>No:</b> " + esc(b.bill_no) + "</div><div><b>Date:</b> " + esc(niceDate(b.bill_date)) + "</div>" +
+      (c.gstin ? "<div><b>State code:</b> " + esc(stateCode(c.gstin)) + (c.state ? " " + esc(c.state) : "") + "</div>" : "") +
+      (b.ref_bill ? "<div><b>Against bill:</b> " + esc(b.ref_bill) + "</div>" : "") + "</div></div>" +
+      '<div class="parties"><div><div class="lbl">Bill to</div><b>' + esc(shop.name || b.shop_name) + "</b>" +
+      (shop.address ? "<div>" + esc(shop.address) + "</div>" : "") + (shop.phone ? "<div>Phone " + esc(shop.phone) + "</div>" : "") +
+      ((shop.gstin || b.shop_gstin) ? "<div><b>GSTIN: " + esc(shop.gstin || b.shop_gstin) + "</b> · State code " + esc(stateCode(shop.gstin || b.shop_gstin)) + "</div>" : '<div class="muted">Unregistered (no GSTIN)</div>') +
+      '</div><div><div class="lbl">Details</div><div>Customer code: ' + esc(b.shop_id) + "</div><div>Route: " + esc(b.route_id) + "</div><div>Sold by: " + esc(b.user_name) +
+      "</div><div>Payment: " + esc(b.pay_mode) + "</div>" + (b.note ? "<div>Note: " + esc(b.note) + "</div>" : "") + "</div></div>";
+
+    if (b.kind !== "COLLECTION") {
+      html += '<table class="items"><thead><tr><th style="width:28px">#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Taxable</th><th>GST</th>' +
+        (inter ? "<th>IGST</th>" : "<th>CGST</th><th>SGST</th>") + "<th>Amount</th></tr></thead><tbody>" + rows + "</tbody>" +
+        '<tfoot><tr><td></td><td>Total</td><td></td><td class="n">' + totQty + '</td><td></td><td class="n">' + n2(b.taxable) + "</td><td></td>" +
+        (inter ? '<td class="n">' + n2(b.igst) + "</td>" : '<td class="n">' + n2(b.cgst) + '</td><td class="n">' + n2(b.sgst) + "</td>") +
+        '<td class="n">' + n2(b.taxable + b.cgst + b.sgst + b.igst) + "</td></tr></tfoot></table>";
+    }
+    html += '<div class="bottom"><div class="box"><div class="lbl">Payment details</div>' +
+      (c.upi ? "<div>UPI ID: <b>" + esc(c.upi) + "</b></div>" : "") +
+      (c.bank ? "<div>Bank: " + esc(c.bank) + "</div>" : "") + (c.account ? "<div>Account no: " + esc(c.account) + "</div>" : "") + (c.ifsc ? "<div>IFSC: " + esc(c.ifsc) + "</div>" : "") +
+      (!c.upi && !c.bank ? '<div class="muted">Add UPI and bank details in Company setup to show them here.</div>' : "") +
+      (b.kind === "BILL" ? "<div style=\"margin-top:6px\">Paid: " + n2(b.paid) + (b.total - b.paid > 0.005 ? " · Balance due: <b>" + n2(b.total - b.paid) + "</b>" : "") + "</div>" : "") +
+      '</div><div class="box totals">' +
+      (b.kind !== "COLLECTION" ? "<div><span>Taxable value</span><span>" + n2(b.taxable) + "</span></div>" +
+        (inter ? "<div><span>IGST</span><span>" + n2(b.igst) + "</span></div>" : "<div><span>CGST</span><span>" + n2(b.cgst) + "</span></div><div><span>SGST</span><span>" + n2(b.sgst) + "</span></div>") +
+        "<div><span>Round off</span><span>" + n2(b.round_off) + "</span></div>" : "") +
+      '<div class="grand"><span>' + (b.kind === "RETURN" ? "Credit total" : b.kind === "COLLECTION" ? "Amount received" : "Invoice total") + "</span><span>₹ " + n2(b.total) + "</span></div></div></div>" +
+      '<div class="words">' + esc(words(b.total)) + "</div>" +
+      (b.status === "Cancelled" ? '<p style="color:#B42318;margin-top:8px"><b>Cancelled</b> by ' + esc(b.cancelled_by) + ": " + esc(b.cancel_reason) + "</p>" : "") +
+      '<div class="sign"><div class="muted">Certified that the particulars given above are true and correct.<br>E. &amp; O.E.</div><div class="who">For ' + esc(c.name) + "<br><br>Authorised signatory</div></div>" +
+      '<div class="foot">' + esc(c.name) + " · Computer-generated document · Designed by rawsploit@gmail.com</div></div>";
+    document.getElementById("out").innerHTML = html;
+    var pb = document.getElementById("printBtn");
+    pb.disabled = false; pb.onclick = function () { window.print(); };
+  }
+
+  function fail(msg) {
+    document.getElementById("out").innerHTML = '<div class="err"><h2>Couldn\'t open this invoice</h2><p>' + esc(msg) + "</p></div>";
+  }
+
+  if (Suite.isDemo()) {
+    var lines = [
+      { product: "Floor Cleaner", pack: "1 L", hsn: "34022090", qty: 6, free_qty: 0, gst: 18, taxable: 610.17, cgst: 54.92, sgst: 54.92, igst: 0, total: 720.01 },
+      { product: "Dish Wash Liquid", pack: "500 ml", hsn: "34022090", qty: 10, free_qty: 1, gst: 18, taxable: 720.34, cgst: 64.83, sgst: 64.83, igst: 0, total: 850 }];
+    render({ bill: { bill_no: no || "R1/JOSE/26/00012", kind: "BILL", bill_date: new Date().toISOString().slice(0, 10), shop_id: "S0001", shop_name: "City Supermarket",
+                     route_id: "R1", user_name: "Joseph (Sales)", pay_mode: "Cash", taxable: 1330.51, cgst: 119.75, sgst: 119.75, igst: 0, round_off: -0.01, total: 1570, paid: 1570, status: "Active" },
+             lines: lines, shop: { name: "City Supermarket", address: "Market Road", phone: "9800000001", gstin: "32AAAAA1111A1Z1" },
+             company: { name: Suite.client().name, address: "Industrial Estate, Kochi", state: "Kerala", pincode: "682000", gstin: "32ABCDE1234F1Z5", phone: "0484 000000", upi: "demo@upi", bank: "Demo Bank", account: "000123456789", ifsc: "DEMO0001234" } });
+    return;
+  }
+  if (!no) { fail("No bill number was given."); return; }
+  Suite.api("salesBill", { token: s.token, bill_no: no }).then(function (res) {
+    if (!res.ok) throw new Error(res.message || "Couldn't load the bill.");
+    render(res);
+  }).catch(function (e) { fail(e.message); });
+})();
+</script>
+</body>
+</html>

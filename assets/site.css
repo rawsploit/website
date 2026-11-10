@@ -350,3 +350,18 @@ a { color: var(--ink); }
 .ca-check { display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 20px; cursor: pointer; }
 .ca-check input { width: 18px; height: 18px; accent-color: var(--ink); }
 .ca-msg { font-size: 14px; align-self: center; }
+
+/* ---------- Sales Desk ---------- */
+.sd-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 14px; margin-bottom: 8px; }
+.sd-tools .field { margin-bottom: 12px; min-width: 150px; }
+.sd-tools .btn { margin-bottom: 12px; }
+.sd-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 18px; }
+.sd-tiles div { background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: 12px; padding: 12px 14px; }
+.sd-tiles b { display: block; font-family: var(--head); font-size: 20px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sd-tiles span { font-size: 13.5px; color: var(--muted); }
+.tbl-wrap { overflow-x: auto; }
+.tbl td.num, .tbl th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl tr.is-cancelled td { color: var(--muted); text-decoration: line-through; }
+.tbl tr.is-cancelled td.row-btns, .tbl tr.is-cancelled td .pill-x { text-decoration: none; }
+.row-btns { white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.pill-x { display: inline-block; font: 600 12px var(--body); padding: 2px 8px; border-radius: 999px; background: #FDECEA; color: var(--danger); }

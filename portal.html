@@ -19,6 +19,7 @@
 <script src="assets/people.js"></script>
 <script src="assets/company.js"></script>
 <script src="assets/catalog-admin.js"></script>
+<script src="assets/sales-desk.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -67,8 +68,11 @@
   var CAN_CATALOG = s.role === "admin" || s.role === "marketing";
   var PAGES = [
     { id: "catalog",   name: "Product catalog",   marketing: true, desc: "Photos, descriptions and groups customers see. Packs and prices come from Company setup." },
-    { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." }
+    { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." },
+    { id: "billing",   name: "Billing",    van: true, roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
+    { id: "salesdesk", name: "Sales Desk", van: true, roles: ["admin", "accounts"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
   ];
+  var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1; });
 
   /* ---- sidebar ---- */
   function navHtml() {
@@ -83,6 +87,11 @@
         return '<button type="button" data-go="' + m.id + '">' + esc(m.name) + "</button>";
       }).join("");
     });
+    if (VAN_PAGES.length) {
+      html += "<h4>Van sales</h4>" + VAN_PAGES.map(function (p) {
+        return '<button type="button" data-go="' + p.id + '">' + esc(p.name) + "</button>";
+      }).join("");
+    }
     if (CAN_CATALOG) {
       html += "<h4>Marketing</h4>" + PAGES.filter(function (p) { return p.marketing && (p.id !== "customers" || s.role !== "admin"); }).map(function (p) {
         return '<button type="button" data-go="' + p.id + '">' + esc(p.name) + "</button>";
@@ -107,7 +116,10 @@
       return '<button class="mod" type="button" data-go="' + m.id + '"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) +
         '</p><span class="status ' + (live ? "live" : "soon") + '">' + (live ? "Connected" : "Not connected yet") + "</span></button>";
     }).join("");
-    if (s.role === "marketing") cards += PAGES.map(function (p) {
+    cards = VAN_PAGES.map(function (p) {
+      return '<button class="mod" type="button" data-go="' + p.id + '"><h3>' + esc(p.name) + "</h3><p>" + esc(p.desc) + '</p><span class="status live">Ready</span></button>';
+    }).join("") + cards;
+    if (s.role === "marketing") cards += PAGES.filter(function (p) { return p.marketing; }).map(function (p) {
       return '<button class="mod" type="button" data-go="' + p.id + '"><h3>' + esc(p.name) + "</h3><p>" + esc(p.desc) + '</p><span class="status live">Ready</span></button>';
     }).join("");
     return '<div class="view"><p style="color:var(--muted)">Signed in as ' + esc(s.name) +
@@ -127,10 +139,13 @@
   function go(id) {
     var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
     var allowed = id === "home" || id === "password" || ((id === "people" || id === "company") && s.role === "admin") ||
-      ((id === "catalog" || id === "customers") && CAN_CATALOG) || mods.indexOf(m) !== -1;
+      ((id === "catalog" || id === "customers") && CAN_CATALOG) ||
+      VAN_PAGES.some(function (p) { return p.id === id; }) || mods.indexOf(m) !== -1;
     if (!allowed) id = "home";
     var page = PAGES.filter(function (p) { return p.id === id; })[0];
-    if (id === "catalog") CatalogAdmin.render($("view"));
+    if (page && page.href) { location.href = Suite.link(page.href); return; }
+    if (id === "salesdesk") SalesDesk.render($("view"), Suite.params.get("tab"));
+    else if (id === "catalog") CatalogAdmin.render($("view"));
     else if (id === "customers") People.renderCustomers($("view"));
     else if (id === "people") People.renderPeople($("view"));
     else if (id === "company") Company.render($("view"));

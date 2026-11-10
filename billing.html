@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Billing | {site}</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1F2A6B">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kalavara">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+<style>
+  body { background: var(--paper); }
+  [hidden] { display: none !important; }
+  .bl-top { position: sticky; top: 0; z-index: 10; background: var(--ink); color: #fff; padding: 10px 14px calc(10px); display: flex; align-items: center; gap: 10px; }
+  .bl-top h1 { font-size: 17px; color: #fff; margin: 0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bl-top small { display: block; font: 500 12.5px var(--body); opacity: .85; }
+  .bl-top .back { background: transparent; border: 0; color: #fff; font-size: 22px; padding: 2px 8px; cursor: pointer; }
+  .sync { font: 600 12.5px var(--body); border-radius: 999px; padding: 4px 10px; background: rgba(255,255,255,.16); color: #fff; border: 0; cursor: pointer; white-space: nowrap; }
+  .sync.wait { background: #FFF3D6; color: #8A5300; }
+  .sync.off { background: #FDECEA; color: var(--danger); }
+  .sync.ok { background: #E5F2EA; color: var(--stamp); }
+  .bl-main { max-width: 640px; margin: 0 auto; padding: 14px 14px 110px; }
+  .card { background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--radius-l); padding: 14px; margin-bottom: 12px; }
+  .card h2 { font-size: 18px; margin: 0 0 6px; }
+  .muted { color: var(--muted); }
+  .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .sum div { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 8px 10px; }
+  .sum b { display: block; font-family: var(--head); font-size: 17px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sum span { font-size: 12.5px; color: var(--muted); }
+  .search { width: 100%; font: 400 16px var(--body); padding: 11px 13px; border: 1.5px solid var(--rule-strong); border-radius: 10px; margin-bottom: 10px; background: #fff; }
+  .shop { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 12px; margin-bottom: 8px; cursor: pointer; font: inherit; color: inherit; }
+  .shop:active { background: var(--tint-1); }
+  .shop .nm { flex: 1; min-width: 0; }
+  .shop .nm b { display: block; font-weight: 600; }
+  .shop .nm span { font-size: 13.5px; color: var(--muted); }
+  .tag { font: 600 12.5px var(--body); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+  .tag.billed { background: var(--stamp-bg); color: var(--stamp); }
+  .tag.skipped { background: #EEEEEE; color: #555; }
+  .tag.wait { background: #FFF3D6; color: #8A5300; }
+  .tag.err { background: #FDECEA; color: var(--danger); }
+  .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .acts button { padding: 16px 10px; font: 600 16px var(--body); border-radius: 12px; border: 1.5px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+  .acts button.main { background: var(--ink); color: #fff; grid-column: 1 / -1; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .item .nm { flex: 1; min-width: 0; }
+  .item .nm b { display: block; font-weight: 600; font-size: 15.5px; }
+  .item .nm span { font-size: 13.5px; color: var(--muted); }
+  .qstep { display: inline-flex; align-items: center; border: 1.5px solid var(--rule-strong); border-radius: 999px; overflow: hidden; background: #fff; }
+  .qstep button { border: 0; background: transparent; width: 36px; height: 36px; font: 700 19px var(--body); color: var(--ink); cursor: pointer; }
+  .qstep input { width: 46px; border: 0; text-align: center; font: 600 16px var(--body); -moz-appearance: textfield; background: transparent; }
+  .qstep input::-webkit-outer-spin-button, .qstep input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .free { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .free input { width: 52px; font: 500 14px var(--body); padding: 3px 6px; border: 1px solid var(--rule-strong); border-radius: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+  .chips button { font: 600 15px var(--body); padding: 9px 14px; border-radius: 999px; border: 1.5px solid var(--rule-strong); background: #fff; color: var(--text); cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .field input, .field select, .field textarea { font-size: 16px; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--sheet); border-top: 1px solid var(--rule-strong); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); z-index: 10; }
+  .bar .in { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .bar .tot { flex: 1; }
+  .bar .tot b { font-family: var(--head); font-size: 22px; color: var(--ink); display: block; }
+  .bar .tot span { font-size: 13px; color: var(--muted); }
+  .bar .btn { padding: 13px 22px; font-size: 16px; }
+  .msg { padding: 10px 12px; border-radius: 10px; font-size: 15px; margin-bottom: 12px; }
+  .msg.ok { background: var(--stamp-bg); color: var(--stamp); }
+  .msg.err { background: #FDECEA; color: var(--danger); }
+  .msg.warn { background: #FFF3D6; color: #8A5300; }
+  .receipt { background: #fff; border: 1px dashed var(--rule-strong); border-radius: 8px; padding: 14px; font: 13.5px/1.45 "Courier New", monospace; white-space: pre-wrap; color: #111; margin: 0 auto 12px; max-width: 360px; overflow-x: auto; }
+  .stack { display: grid; gap: 10px; }
+  .stack .btn { width: 100%; padding: 14px; font-size: 16px; }
+  .list-line { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  .list-line:last-child { border-bottom: 0; }
+  .list-line b { font-variant-numeric: tabular-nums; }
+  .link-btn { background: none; border: 0; color: var(--ink); font: 600 15px var(--body); padding: 6px 0; cursor: pointer; text-decoration: underline; }
+  .danger-btn { background: none; border: 0; color: var(--danger); font: 600 14px var(--body); padding: 6px 0; cursor: pointer; }
+  @media print {
+    body * { visibility: hidden !important; }
+    #printArea, #printArea * { visibility: visible !important; }
+    #printArea { position: absolute; left: 0; top: 0; width: 58mm; border: 0; padding: 0; margin: 0; font-size: 10.5px; }
+    @page { size: 58mm auto; margin: 2mm; }
+  }
+</style>
+</head>
+<body>
+<header class="bl-top">
+  <button class="back" id="backBtn" type="button" aria-label="Back" hidden>‹</button>
+  <h1 id="title">Billing<small id="subtitle"></small></h1>
+  <button class="sync" id="syncBtn" type="button">…</button>
+</header>
+<main class="bl-main" id="main"></main>
+<div class="bar" id="bar" hidden><div class="in" id="barIn"></div></div>
+<pre id="printArea" class="receipt" hidden></pre>
+<script src="assets/billing.js"></script>
+</body>
+</html>
