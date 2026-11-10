@@ -246,7 +246,8 @@
       '<div class="sum"><div><b>' + t.bills + '</b><span>Bills</span></div><div><b>' + money(t.sales) + '</b><span>Sales</span></div><div><b>' + money(t.cash) + "</b><span>Cash in hand</span></div></div>" +
       '<input class="search" id="q" type="search" placeholder="Search shop" aria-label="Search shop">' +
       '<div id="shops"></div>' +
-      '<p class="muted" style="text-align:center;margin-top:16px">' + shops.length + " shops on " + esc(st.day.route) + '. <button class="link-btn" id="changeRoute" type="button">Change route</button></p>';
+      '<p class="muted" style="text-align:center;margin-top:16px">' + shops.length + " shops on " + esc(st.day.route) + '. <button class="link-btn" id="changeRoute" type="button">Change route</button></p>' +
+      fieldSalesLink();
     paintFlash($("flash"));
     function paint() {
       var q = $("q").value.trim().toLowerCase();
@@ -531,6 +532,12 @@
     $("done").onclick = home;
   }
 
+  /* Start Day / End Day live in Field Sales (needs signal). */
+  function fieldSalesLink() {
+    if (!(Suite.client().modules || {}).fieldsales && !Suite.isDemo()) return "";
+    return '<a class="btn btn-line" style="display:block;text-align:center;margin:12px 0" href="' + esc(Suite.link("portal.html", { m: "fieldsales" })) + '">Start Day / End Day (Field Sales)</a>';
+  }
+
   /* ---------- day summary ---------- */
   function dayTotals() {
     var t = { bills: 0, sales: 0, returns: 0, cash: 0, upi: 0, cheque: 0, credit: 0, collections: 0, collected: 0, skips: 0 };
@@ -558,6 +565,7 @@
         .map(function (r) { return '<div class="list-line"><span>' + r[0] + "</span><b>" + r[1] + "</b></div>"; }).join("") + "</div>" +
       (older.length ? '<div class="msg warn">' + older.length + " entr" + (older.length === 1 ? "y" : "ies") + " from earlier days still waiting to be sent.</div>" : "") +
       '<div class="card"><h2 style="font-size:16px">Entries</h2>' + (es.length ? es.map(entryLine).join("") : '<p class="muted">Nothing yet today.</p>') + "</div>" +
+      fieldSalesLink() +
       '<div class="stack"><button class="btn btn-ink" id="sendNow" type="button">Send now</button>' +
       '<button class="btn btn-line" id="fresh" type="button">Download fresh shop and price list</button>' +
       '<button class="danger-btn" id="out" type="button">Sign out of billing on this phone</button></div>';

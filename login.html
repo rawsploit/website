@@ -79,10 +79,20 @@
   $("asStaff").onclick = function () { kind = "staff"; render(); $("username").focus(); };
   $("asCustomer").onclick = function () { kind = "customer"; render(); $("username").focus(); };
 
+  /* Sales staff who bill from this phone: the app opens straight into Billing,
+     even with no signal (Billing keeps working and sends bills later). */
+  var standalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+  var biller = null;
+  try { biller = (JSON.parse(localStorage.getItem("billing:" + Suite.clientId()) || "null") || {}).who; } catch (e) {}
+  if (biller && !Suite.params.get("next") && (!navigator.onLine || (standalone && kind === "staff" && !Suite.getSession()))) {
+    location.replace(Suite.link("billing.html")); return;
+  }
+
   /* Already signed in? Go straight in. */
   var s = Suite.getSession();
   function after(s) {
     if (s.kind === "customer") return Suite.link("catalog.html");
+    if (s.role === "sales" && standalone && !Suite.params.get("next")) return Suite.link("billing.html");
     var next = new URLSearchParams(Suite.params.get("next") || "");
     var extra = {};
     if (/^[a-z0-9-]{2,30}$/.test(next.get("m") || "")) extra.m = next.get("m");

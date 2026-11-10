@@ -69,26 +69,34 @@
   var PAGES = [
     { id: "catalog",   name: "Product catalog",   marketing: true, desc: "Photos, descriptions and groups customers see. Packs and prices come from Company setup." },
     { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." },
-    { id: "billing",   name: "Billing",    van: true, roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
-    { id: "salesdesk", name: "Sales Desk", van: true, roles: ["admin", "accounts"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
+    { id: "billing",   name: "Billing",    van: true, team: "sales",    after: "fieldsales",  roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
+    { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
   ];
   var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1; });
 
   /* ---- sidebar ---- */
   function navHtml() {
     var html = '<button type="button" data-go="home">Home</button>';
-    var shown = {};
+    var shown = {}, placed = {};
     var groups = s.role === "admin" ? window.TEAMS.filter(function (t) { return t.id !== "admin"; }) : [{ id: s.role, name: Suite.teamName(s.role) }];
     groups.forEach(function (g) {
       var list = mods.filter(function (m) { return m.teams.indexOf(g.id) !== -1 && !shown[m.id]; });
       list.forEach(function (m) { shown[m.id] = true; });
+      // built-in van sales pages join their team's list, right after the module they belong with
+      VAN_PAGES.forEach(function (p) {
+        if (p.team !== g.id || placed[p.id]) return;
+        var at = list.map(function (m) { return m.id; }).indexOf(p.after);
+        list.splice(at === -1 ? list.length : at + 1, 0, p);
+        placed[p.id] = true;
+      });
       if (!list.length) return;
       html += "<h4>" + esc(g.name) + "</h4>" + list.map(function (m) {
         return '<button type="button" data-go="' + m.id + '">' + esc(m.name) + "</button>";
       }).join("");
     });
-    if (VAN_PAGES.length) {
-      html += "<h4>Van sales</h4>" + VAN_PAGES.map(function (p) {
+    var rest = VAN_PAGES.filter(function (p) { return !placed[p.id]; });
+    if (rest.length) {
+      html += "<h4>Sales</h4>" + rest.map(function (p) {
         return '<button type="button" data-go="' + p.id + '">' + esc(p.name) + "</button>";
       }).join("");
     }
@@ -111,14 +119,17 @@
   function moduleUrl(id) { return (client.modules || {})[id] || ""; }
 
   function showHome() {
-    var cards = mods.map(function (m) {
+    var order = mods.slice();
+    VAN_PAGES.forEach(function (p) {
+      var at = order.map(function (m) { return m.id; }).indexOf(p.after);
+      order.splice(at === -1 ? order.length : at + 1, 0, p);
+    });
+    var cards = order.map(function (m) {
+      if (m.van) return '<button class="mod" type="button" data-go="' + m.id + '"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) + '</p><span class="status live">Ready</span></button>';
       var live = !!moduleUrl(m.id);
       return '<button class="mod" type="button" data-go="' + m.id + '"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) +
         '</p><span class="status ' + (live ? "live" : "soon") + '">' + (live ? "Connected" : "Not connected yet") + "</span></button>";
     }).join("");
-    cards = VAN_PAGES.map(function (p) {
-      return '<button class="mod" type="button" data-go="' + p.id + '"><h3>' + esc(p.name) + "</h3><p>" + esc(p.desc) + '</p><span class="status live">Ready</span></button>';
-    }).join("") + cards;
     if (s.role === "marketing") cards += PAGES.filter(function (p) { return p.marketing; }).map(function (p) {
       return '<button class="mod" type="button" data-go="' + p.id + '"><h3>' + esc(p.name) + "</h3><p>" + esc(p.desc) + '</p><span class="status live">Ready</span></button>';
     }).join("");
