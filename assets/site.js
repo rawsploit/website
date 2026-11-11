@@ -131,10 +131,28 @@
     });
   }
 
+  /* Kalavara's own contact buttons (WhatsApp, call, email), put together in the browser only */
+  function contactInfo() {
+    var C = window.CONTACT || {};
+    var digits = (C.phone || []).join("");
+    return { digits: digits, shown: C.phone ? "+" + C.phone.join(" ") : "",
+             email: C.mail ? C.mail[0] + String.fromCharCode(64) + C.mail.slice(1).join(".") : "" };
+  }
+  function contactHtml(withEmail) {
+    var c = contactInfo(), h = "";
+    if (c.digits) h += '<a class="btn btn-ink btn-small" target="_blank" rel="noopener" href="https://wa.me/' + c.digits +
+      "?text=" + encodeURIComponent("Hello, I'd like to know more about Kalavara.") + '">WhatsApp us</a>' +
+      '<a class="btn btn-line btn-small" href="tel:+' + c.digits + '">Call ' + esc(c.shown) + "</a>";
+    h = '<span class="contact-btns">' + h + "</span>";
+    if (withEmail !== false && c.email) h += '<span>Email: <a href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a></span>";
+    return h;
+  }
+
   window.Suite = {
     params: params, clientId: clientId, client: client, isDemo: isDemo, link: link,
     getSession: getSession, clearSession: clearSession, signIn: signIn, api: api,
-    modulesFor: modulesFor, teamName: teamName, brand: brand, esc: esc
+    modulesFor: modulesFor, teamName: teamName, brand: brand, esc: esc,
+    contactInfo: contactInfo, contactHtml: contactHtml
   };
   document.addEventListener("DOMContentLoaded", brand);
 })();

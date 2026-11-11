@@ -169,7 +169,9 @@
     if (s.role === "marketing") cards += PAGES.filter(function (p) { return p.marketing; }).map(function (p) {
       return '<button class="mod" type="button" data-go="' + p.id + '"><h3>' + esc(p.name) + "</h3><p>" + esc(p.desc) + '</p><span class="status live">Ready</span></button>';
     }).join("");
-    return '<div class="view"><p style="color:var(--muted)">Signed in as ' + esc(s.name) +
+    var ask = DEMO ? '<div class="demo-ask"><div><strong>This is a demo company with sample data.</strong> Like what you see? We\'ll set it up for your company.</div>' +
+      '<div class="contact-direct">' + Suite.contactHtml(false) + "</div></div>" : "";
+    return '<div class="view">' + ask + '<p style="color:var(--muted)">Signed in as ' + esc(s.name) +
       '. Pick a tool to start.</p><div class="home-grid">' + cards + "</div></div>";
   }
   function showModule(m) {
@@ -183,6 +185,7 @@
       return '<div class="view"><div class="empty demo-info"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) + "</p>" +
         '<h4>What it does</h4><ul>' + DEMO_INFO[m.id].map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
         '<p class="demo-note"><strong>Customised for you.</strong> We set this up with your own products, routes, staff and reports, so it works the way your company works.</p>' +
+        '<h4>Want it for your company?</h4><div class="contact-direct">' + Suite.contactHtml() + "</div><br>" +
         '<button class="btn btn-line" type="button" data-go="home">‹ Back to Home</button></div></div>';
     }
     return '<div class="view"><div class="empty"><h3>' + esc(m.name) + ' isn\'t connected yet</h3><p>' + esc(m.desc) +

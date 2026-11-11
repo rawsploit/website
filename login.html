@@ -75,6 +75,7 @@
     hint.innerHTML = kind === "staff"
       ? "This is the demo company. Try <code>admin</code>, <code>factory</code>, <code>sales</code>, <code>accounts</code>, <code>hr</code>, <code>marketing</code> or <code>viewer</code>, with the same word as the password."
       : "This is the demo company. Try customer code <code>C1001</code> with password <code>shop</code>.";
+    if (Suite.isDemo()) hint.innerHTML += '<div class="contact-direct demo-login-ask"><span>Want it for your company?</span>' + Suite.contactHtml(false) + "</div>";
   }
   $("asStaff").onclick = function () { kind = "staff"; render(); $("username").focus(); };
   $("asCustomer").onclick = function () { kind = "customer"; render(); $("username").focus(); };

@@ -118,17 +118,8 @@
   (function () {
     var C = window.CONTACT || {}, f = document.getElementById("contactForm");
     var $ = function (id) { return document.getElementById(id); };
-    // put the pieces together only here, in the browser
-    C.email = C.mail ? C.mail[0] + String.fromCharCode(64) + C.mail.slice(1).join(".") : "";
-    var digits = (C.phone || []).join(""), shown = C.phone ? "+" + C.phone.join(" ") : "";
-    var direct = [];
-    if (digits) {
-      direct.push('<a class="btn btn-ink btn-small" target="_blank" rel="noopener" href="https://wa.me/' + digits +
-        "?text=" + encodeURIComponent("Hello, I'd like to know more about Kalavara.") + '">WhatsApp us</a>');
-      direct.push('<a class="btn btn-line btn-small" href="tel:+' + digits + '">Call ' + Suite.esc(shown) + "</a>");
-    }
-    $("contactDirect").innerHTML = '<span class="contact-btns">' + direct.join("") + "</span>" +
-      (C.email ? '<span>Email: <a href="mailto:' + Suite.esc(C.email) + '">' + Suite.esc(C.email) + "</a></span>" : "");
+    C.email = Suite.contactInfo().email;
+    $("contactDirect").innerHTML = Suite.contactHtml();
     f.addEventListener("submit", function (e) {
       e.preventDefault();
       var d = { name: $("cName").value.trim(), company: $("cCompany").value.trim(), phone: $("cPhone").value.trim(),
