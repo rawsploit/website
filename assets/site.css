@@ -368,3 +368,9 @@ a { color: var(--ink); }
 
 /* the hidden attribute always wins over a class that sets display */
 [hidden]{display:none!important}
+/* demo company: what each app does */
+.demo-info { text-align: left; max-width: 640px; }
+.demo-info h4 { margin: 14px 0 6px; color: var(--ink); }
+.demo-info ul { margin: 0 0 16px 20px; padding: 0; line-height: 1.7; }
+.demo-note { background: var(--paper); border-radius: 10px; padding: 12px 14px; color: var(--ink) !important; }
+.status.custom { color: var(--ink); background: var(--paper); border: 1px solid var(--ink-soft); }

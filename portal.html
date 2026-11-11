@@ -132,6 +132,26 @@
 
   /* ---- views ---- */
   function moduleUrl(id) { return (client.modules || {})[id] || ""; }
+  var DEMO = Suite.isDemo();
+  /* demo company: what each app does, shown in place of the app */
+  var DEMO_INFO = {
+    stockbook: ["Goods received, production and packing, entered day by day", "Load vans in the morning and take returns back in the evening",
+      "Move stock between plants and stores", "Alerts when an item runs low, and a list of what customers have ordered", "Daily stock report in Excel"],
+    stocktake: ["Count stock on a phone, or from a photo of the count sheet", "Compares the count with the book stock in StockBook",
+      "Shows shortage and excess, item by item", "Checks van returns at the factory"],
+    fieldsales: ["Start Day and End Day, with a photo of the vehicle's KM reading", "Shop visits during the day",
+      "Daily sales report, or a photo of the handwritten report, read automatically", "Attendance and leave", "Expenses with bill photos, approved by the manager and accounts"],
+    collections: ["List of overdue shops for each salesperson", "How many days each amount is pending",
+      "Notes from every follow-up call", "What each salesperson should collect today"],
+    nexus: ["Checks every bill from the field against the accounts", "Shows bills missing from the accounts, or entered with a different amount",
+      "Route-wise and salesperson-wise", "Excel report of every difference"],
+    cashrecon: ["Bank deposit slips (photo) against cash collected", "Checked against the day book",
+      "Shows short deposits and late deposits", "UPI payments matched too"],
+    pnl: ["Monthly profit and loss, built from stock and sales", "Add expenses by hand, or bring them in from Tally or Accounting-Books",
+      "Plant-wise and route-wise"],
+    payroll: ["Attendance taken straight from Field Sales", "Leave records", "Monthly salary sheet for field staff", "Salary register in Excel"],
+    mis: ["One screen for the owner: sales, collections, money pending and profit", "Salesperson-wise and route-wise", "Only the owner and managers can open it"]
+  };
 
   function showHome() {
     var order = mods.slice();
@@ -142,8 +162,9 @@
     var cards = order.map(function (m) {
       if (m.van) return '<button class="mod" type="button" data-go="' + m.id + '"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) + '</p><span class="status live">Ready</span></button>';
       var live = !!moduleUrl(m.id);
+      var label = live ? "Connected" : DEMO ? "Customised for you" : "Not connected yet";
       return '<button class="mod" type="button" data-go="' + m.id + '"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) +
-        '</p><span class="status ' + (live ? "live" : "soon") + '">' + (live ? "Connected" : "Not connected yet") + "</span></button>";
+        '</p><span class="status ' + (live ? "live" : DEMO ? "custom" : "soon") + '">' + label + "</span></button>";
     }).join("");
     if (s.role === "marketing") cards += PAGES.filter(function (p) { return p.marketing; }).map(function (p) {
       return '<button class="mod" type="button" data-go="' + p.id + '"><h3>' + esc(p.name) + "</h3><p>" + esc(p.desc) + '</p><span class="status live">Ready</span></button>';
@@ -157,6 +178,12 @@
       var sep = url.indexOf("?") === -1 ? "?" : "&";
       var screen = (Suite.params.get("m") === m.id && /^[a-z]{2,20}$/.test(Suite.params.get("tab") || "")) ? "&tab=" + Suite.params.get("tab") : "";
       return '<iframe class="frame" title="' + esc(m.name) + '" src="' + esc(url + sep + "t=" + encodeURIComponent(s.token) + screen) + '"></iframe>';
+    }
+    if (DEMO && DEMO_INFO[m.id]) {
+      return '<div class="view"><div class="empty demo-info"><h3>' + esc(m.name) + "</h3><p>" + esc(m.desc) + "</p>" +
+        '<h4>What it does</h4><ul>' + DEMO_INFO[m.id].map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
+        '<p class="demo-note"><strong>Customised for you.</strong> We set this up with your own products, routes, staff and reports, so it works the way your company works.</p>' +
+        '<button class="btn btn-line" type="button" data-go="home">‹ Back to Home</button></div></div>';
     }
     return '<div class="view"><div class="empty"><h3>' + esc(m.name) + ' isn\'t connected yet</h3><p>' + esc(m.desc) +
       "</p><p>An admin connects it in People and setup. Until then, nothing here can change your data.</p></div></div>";
