@@ -124,7 +124,7 @@
     var active = P.plants.filter(function (p) { return p.active; });
     body.innerHTML = '<div class="panel" style="max-width:760px"><h3>2. Plants</h3>' +
       '<label class="field" style="max-width:260px"><span>How many plants do you have?</span><input id="plN" type="number" min="1" max="20" value="' + Math.max(active.length, 1) + '"></label>' +
-      '<table class="tbl" id="plTbl"><thead><tr><th>Plant name</th><th style="width:150px">Short code</th></tr></thead><tbody></tbody></table>' +
+      '<table class="tbl" id="plTbl"><thead><tr><th>Plant name</th><th style="width:150px">Short code</th><th style="width:90px"></th></tr></thead><tbody></tbody></table>' +
       '<p class="muted" style="margin-top:10px">The short code (2–4 letters, e.g. MNP) starts the ID of every place in that plant. Leave it blank and one is made from the name. It can\'t change later.</p>' +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="button" id="plSave">Save plants</button></div></div>' +
       '<div id="plPlaces"></div>';
@@ -138,9 +138,16 @@
       cur = cur.slice(0, n);
       tbody.innerHTML = cur.map(function (p, i) {
         return '<tr data-id="' + esc(p.plant_id) + '"><td><input class="cell nm" value="' + esc(p.name) + '" placeholder="e.g. ' + (i ? "Plant 2" : "Main Plant") + '"></td>' +
-          '<td><input class="cell cd" value="' + esc(p.code) + '" maxlength="4"' + (p.plant_id ? " readonly" : "") + ' placeholder="auto"></td></tr>';
+          '<td><input class="cell cd" value="' + esc(p.code) + '" maxlength="4"' + (p.plant_id ? " readonly" : "") + ' placeholder="auto"></td>' +
+          '<td><button class="btn btn-line btn-small" type="button" data-rm title="Remove this plant">Remove</button></td></tr>';
       }).join("");
     }
+    tbody.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-rm]"); if (!b) return;
+      if (tbody.querySelectorAll("tr").length <= 1) { body.querySelector(".form-error").textContent = "You need at least one plant."; return; }
+      b.closest("tr").remove(); body.querySelector("#plN").value = tbody.querySelectorAll("tr").length;
+      body.querySelector(".form-error").textContent = "Removed from the list. Click Save plants to confirm. (Its past stock and records stay.)";
+    });
     rows(Math.max(active.length, 1));
     body.querySelector("#plN").oninput = function () { var n = Math.min(Math.max(parseInt(this.value, 10) || 1, 1), 20); rows(n); };
     body.querySelector("#plSave").onclick = function () {
@@ -202,7 +209,7 @@
     var active = P.routes.filter(function (r) { return r.active; });
     body.innerHTML = '<div class="panel"><h3>3. Sales routes and vans</h3>' +
       '<label class="field" style="max-width:300px"><span>How many sales routes?</span><input id="rtN" type="number" min="0" max="60" value="' + active.length + '"></label>' +
-      '<table class="tbl" id="rtTbl"><thead><tr><th style="width:90px">Code</th><th>Route name</th><th>Van number</th><th>Salesperson</th><th>Loads from</th></tr></thead><tbody></tbody></table>' +
+      '<table class="tbl" id="rtTbl"><thead><tr><th style="width:90px">Code</th><th>Route name</th><th>Van number</th><th>Salesperson</th><th>Loads from</th><th style="width:90px"></th></tr></thead><tbody></tbody></table>' +
       '<p class="muted" style="margin-top:10px">Each route gets its own van in stock (VAN-R1, VAN-R2…). Route codes are what Collections and MIS group shops by.</p>' +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="button" id="rtSave">Save routes and continue</button></div></div>';
     var tbody = body.querySelector("#rtTbl tbody");
@@ -216,9 +223,15 @@
           '<td><input class="cell nm" value="' + esc(r.name) + '" placeholder="e.g. North Route"></td>' +
           '<td><input class="cell vn" value="' + esc(r.van) + '" placeholder="Vehicle number"></td>' +
           '<td><input class="cell sp" value="' + esc(r.salesperson) + '"></td>' +
-          '<td><select class="cell pl">' + plants.map(function (p) { return '<option value="' + esc(p.plant_id) + '"' + (p.plant_id === r.plant_id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></td></tr>";
+          '<td><select class="cell pl">' + plants.map(function (p) { return '<option value="' + esc(p.plant_id) + '"' + (p.plant_id === r.plant_id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></td>" +
+          '<td><button class="btn btn-line btn-small" type="button" data-rm title="Remove this route">Remove</button></td></tr>';
       }).join("");
     }
+    tbody.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-rm]"); if (!b) return;
+      b.closest("tr").remove(); body.querySelector("#rtN").value = tbody.querySelectorAll("tr").length;
+      body.querySelector(".form-error").textContent = "Removed from the list. Click Save routes to confirm. (Its past bills and van stock stay.)";
+    });
     function readRoute(tr) {
       return { route_id: tr.querySelector(".id").value.trim(), name: tr.querySelector(".nm").value.trim(), van: tr.querySelector(".vn").value.trim(),
         salesperson: tr.querySelector(".sp").value.trim(), plant_id: tr.querySelector(".pl").value };
@@ -330,15 +343,22 @@
       var plantName = {}; P.plants.forEach(function (p) { plantName[p.plant_id] = p.name; });
       var rows = P.products.filter(function (p) { return (cat === "All" || p.category === cat) && (!q || (p.name + " " + p.sku + " " + p.pack).toLowerCase().indexOf(q) >= 0); });
       body.querySelector("#pdCount").textContent = "(" + P.products.filter(function (p) { return p.active; }).length + " in use)";
-      body.querySelector("#pdList").innerHTML = rows.length ? '<table class="tbl"><thead><tr><th>SKU</th><th>Name</th><th>Cat.</th><th>Plant</th><th>Unit</th><th>Pack</th><th style="text-align:right">Price</th><th>HSN</th><th style="text-align:right">GST</th></tr></thead><tbody>' +
+      body.querySelector("#pdList").innerHTML = rows.length ? '<table class="tbl"><thead><tr><th>SKU</th><th>Name</th><th>Cat.</th><th>Plant</th><th>Unit</th><th>Pack</th><th style="text-align:right">Price</th><th>HSN</th><th style="text-align:right">GST</th><th></th></tr></thead><tbody>' +
         rows.slice(0, 300).map(function (p) {
           return '<tr' + (p.active ? "" : ' class="off"') + "><td>" + esc(p.sku) + "</td><td>" + esc(p.name) + (p.active ? "" : ' <span class="status soon">off</span>') + "</td><td>" + esc(p.category) + "</td><td>" +
             esc(plantName[p.plant_id] || "All plants") + "</td><td>" + esc(p.uom) + "</td><td>" + esc(p.pack) + '</td><td style="text-align:right">' + money(p.price) +
-            "</td><td>" + esc(p.hsn) + '</td><td style="text-align:right">' + esc(p.gst) + "%</td></tr>";
+            "</td><td>" + esc(p.hsn) + '</td><td style="text-align:right">' + esc(p.gst) + "%</td>" +
+            '<td><button class="btn btn-line btn-small" type="button" data-onoff="' + esc(p.sku) + '" data-to="' + (p.active ? "off" : "on") + '">' + (p.active ? "Switch off" : "Switch on") + "</button></td></tr>";
         }).join("") + "</tbody></table>" + (rows.length > 300 ? '<p class="muted">Showing the first 300. Use search to narrow down.</p>' : "")
         : '<p class="muted">No products yet. Download the template, fill it and upload it.</p>';
     }
     body.querySelector("#pdFind").oninput = list;
+    body.querySelector("#pdList").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-onoff]"); if (!b) return;
+      b.disabled = true; b.textContent = "…";
+      call("setProductActive", { sku: b.dataset.onoff, active: b.dataset.to === "on" }).then(keep).then(list)
+        .catch(function (e2) { b.disabled = false; b.textContent = b.dataset.to === "on" ? "Switch on" : "Switch off"; alert(e2.message); });
+    });
     body.querySelectorAll("#pdCats [data-cat]").forEach(function (b) {
       b.onclick = function () {
         cat = b.dataset.cat;
@@ -583,6 +603,10 @@
         p.distributors.forEach(function (x, i) { if (!x.name) errs.push({ row: i + 1, message: "Name is missing." }); });
         if (errs.length) return { ok: false, errors: errs };
         d.distributors = p.distributors.map(function (x, i) { return Object.assign({ dist_id: x.dist_id || "D" + ("00" + (i + 1)).slice(-3) }, x); });
+        return out();
+      }
+      if (action === "setProductActive") {
+        d.products.forEach(function (y) { if (y.sku === p.sku) y.active = !!p.active; });
         return out();
       }
       if (action === "saveProducts") {

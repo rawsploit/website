@@ -86,6 +86,8 @@
         if (!res || !res.ok) throw new Error((res && res.message) || "That username and password don't match.");
         var s = { client: clientId(), kind: kind, user: res.user, name: res.name, role: res.role,
                   token: res.token, expires: res.expires };
+        // a starting or reset password: they set their own before going in (the session is kept only after that)
+        if (res.mustChange) return { mustChange: true, session: s, oldPassword: password };
         setSession(s);
         return s;
       });
@@ -150,7 +152,7 @@
 
   window.Suite = {
     params: params, clientId: clientId, client: client, isDemo: isDemo, link: link,
-    getSession: getSession, clearSession: clearSession, signIn: signIn, api: api,
+    getSession: getSession, clearSession: clearSession, signIn: signIn, api: api, setSession: setSession,
     modulesFor: modulesFor, teamName: teamName, brand: brand, esc: esc,
     contactInfo: contactInfo, contactHtml: contactHtml
   };

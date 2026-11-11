@@ -51,6 +51,15 @@
       <button class="btn btn-ink" id="submit" type="submit" style="width:100%">Sign in</button>
     </form>
 
+    <form id="newPw" novalidate hidden>
+      <p style="margin:0 0 12px">Welcome! You signed in with a password someone gave you. Please choose your own now. Only you will know it.</p>
+      <label class="field"><span>New password</span><input id="np1" type="password" autocomplete="new-password" minlength="8"></label>
+      <label class="field"><span>Type it again</span><input id="np2" type="password" autocomplete="new-password"></label>
+      <p class="muted" style="margin:-4px 0 12px;font-size:14px">At least 8 characters. A short sentence or a mix of words and numbers is easy to remember and hard to guess.</p>
+      <p class="form-error" id="npError" role="alert"></p>
+      <button class="btn btn-ink" id="npSave" type="submit" style="width:100%">Save my password and continue</button>
+    </form>
+
     <div class="demo-hint" id="demoHint" hidden></div>
   </div>
 </main>
@@ -110,12 +119,35 @@
     var btn = $("submit");
     btn.disabled = true; btn.textContent = "Signing in…";
     Suite.signIn(kind, $("username").value, $("password").value)
-      .then(function (s) { location.replace(after(s)); })
+      .then(function (s) {
+        if (s && s.mustChange) return askNewPassword(s);
+        location.replace(after(s));
+      })
       .catch(function (err) {
         $("error").textContent = err.message || "Sign-in failed. Check your connection and try again.";
         btn.disabled = false; btn.textContent = "Sign in";
       });
   });
+
+  function askNewPassword(p) {
+    $("form").hidden = true; $("newPw").hidden = false;
+    document.querySelector(".switch").hidden = true;
+    $("title").textContent = "Choose your own password";
+    $("np1").focus();
+    $("newPw").onsubmit = function (e) {
+      e.preventDefault();
+      var a = $("np1").value, b = $("np2").value, err = $("npError");
+      if (a.length < 8) { err.textContent = "Use at least 8 characters."; return; }
+      if (a !== b) { err.textContent = "The two passwords don't match."; return; }
+      if (a === p.oldPassword) { err.textContent = "Choose a new password, different from the one you were given."; return; }
+      var btn = $("npSave"); btn.disabled = true; btn.textContent = "Saving…";
+      Suite.api("changePassword", { token: p.session.token, oldPassword: p.oldPassword, newPassword: a }).then(function (r) {
+        if (!r || !r.ok) throw new Error((r && r.message) || "Couldn't save the password.");
+        Suite.setSession(p.session);
+        location.replace(after(p.session));
+      }).catch(function (e2) { err.textContent = e2.message; btn.disabled = false; btn.textContent = "Save my password and continue"; });
+    };
+  }
 
   render();
 

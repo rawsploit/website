@@ -33,6 +33,9 @@
       demo.users = demo.users.filter(function (x) { return x.username !== u.username; }).concat([u]);
       return { ok: true };
     }
+    if (action === "resetPassword") return { ok: true, password: "Kala-1234-demo" };
+    if (action === "deleteUser") { demo.users = demo.users.filter(function (x) { return x.username !== p.username; }); return { ok: true }; }
+    if (action === "deleteCustomer") { demo.customers = demo.customers.filter(function (x) { return x.code !== p.code; }); return { ok: true }; }
     if (action === "saveCustomers") {
       var np = [], added = 0, upd = 0;
       p.customers.forEach(function (c) {
@@ -104,6 +107,36 @@
     }).catch(function (e) { body.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
   }
 
+
+  /* Forgotten password: makes a one-time password to pass on; they choose their own when they sign in with it. */
+  function resetButton(f, kind, id, name) {
+    var row = f.querySelector(".row-actions");
+    var b = document.createElement("button"); b.type = "button"; b.className = "btn btn-line"; b.textContent = "Reset password";
+    b.onclick = function () {
+      b.disabled = true; b.textContent = "Resetting…";
+      call("resetPassword", { kind: kind, id: id }).then(function (r) {
+        b.textContent = "Reset password"; b.disabled = false;
+        f.querySelector("#pwReset").innerHTML = '<div class="pw-box">One-time password for <b>' + esc(name) + '</b>: <code style="font-size:16px">' + esc(r.password) +
+          "</code><br>Share it with them privately (for example on WhatsApp). When they sign in with it, they will choose their own. It is shown only now.</div>";
+      }).catch(function (e) { b.disabled = false; b.textContent = "Reset password"; f.querySelector(".form-error").textContent = e.message; });
+    };
+    row.appendChild(b);
+  }
+
+  /* Two-step remove: the first click asks, the second removes. */
+  function removeButton(f, label, warn, run) {
+    var row = f.querySelector(".row-actions");
+    var b = document.createElement("button"); b.type = "button"; b.className = "btn btn-line btn-danger"; b.textContent = label;
+    b.style.marginLeft = "auto";
+    var note = document.createElement("p"); note.className = "muted"; note.style.margin = "10px 0 0"; note.hidden = true; note.textContent = warn;
+    b.onclick = function () {
+      if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Yes, remove"; note.hidden = false; return; }
+      b.disabled = true; b.textContent = "Removing…";
+      run().catch(function (e) { f.querySelector(".form-error").textContent = e.message; b.disabled = false; b.textContent = label; delete b.dataset.sure; });
+    };
+    row.appendChild(b); row.parentNode.insertBefore(note, row.nextSibling);
+  }
+
   function userForm(body, u) {
     var isNew = !u; u = u || { username: "", name: "", role: "factory", status: "active" };
     var box = body.querySelector("#userForm");
@@ -113,8 +146,9 @@
       '<label class="field"><span>Username</span><input name="username" value="' + esc(u.username) + '"' + (isNew ? "" : " readonly") + ' required></label>' +
       '<label class="field"><span>Team</span><select name="role">' + teamOptions(u.role) + "</select></label>" +
       '<label class="field"><span>Sign-in</span><select name="status"><option value="active"' + (u.status === "active" ? " selected" : "") + '>On</option><option value="off"' + (u.status !== "active" ? " selected" : "") + ">Off</option></select></label>" +
-      '<label class="field"><span>' + (isNew ? "Starting password" : "New password (leave blank to keep)") + '</span><input name="password" type="password" autocomplete="new-password"></label>' +
-      "</div>" + (u.locked ? '<p class="muted">This sign-in is locked after too many wrong passwords. Setting a new password unlocks it.</p>' : "") +
+      (isNew ? '<label class="field"><span>Starting password</span><input name="password" type="password" autocomplete="new-password"></label>' : '<input name="password" type="hidden" value="">') +
+      "</div>" + (isNew ? '<p class="muted">Give them this password. When they first sign in, they will be asked to choose their own.</p>' : "") +
+      '<div id="pwReset"></div>' + (u.locked ? '<p class="muted">This sign-in is locked after too many wrong passwords. Setting a new password unlocks it.</p>' : "") +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">' + (isNew ? "Add person" : "Save changes") +
       '</button><button class="btn btn-line" type="button" data-cancel>Cancel</button></div></form>';
     var f = box.querySelector("form");
@@ -128,6 +162,14 @@
       call("saveUser", { user: d }).then(function () { staff(body); })
         .catch(function (e2) { f.querySelector(".form-error").textContent = e2.message; f.querySelector("[type=submit]").disabled = false; });
     };
+    var me = Suite.getSession();
+    if (!isNew && (!me || me.user !== u.username)) resetButton(f, "staff", u.username, u.name);
+    if (!isNew && (!me || me.user !== u.username)) {
+      removeButton(f, "Remove person", "Use this when someone leaves. Their sign-in is removed and they are signed out straight away. Bills, entries and reports keep their name. " +
+        "If they might come back, set Sign-in to Off instead.", function () {
+        return call("deleteUser", { username: u.username }).then(function () { staff(body); });
+      });
+    }
     f.name.focus();
   }
 
@@ -234,8 +276,9 @@
       '<label class="field"><span>Customer code</span><input name="code" value="' + esc(c.code) + '"' + (isNew ? "" : " readonly") + ' required></label>' +
       '<label class="field"><span>Phone</span><input name="phone" type="tel" value="' + esc(c.phone) + '"></label>' +
       '<label class="field"><span>Sign-in</span><select name="status"><option value="active"' + (c.status === "active" ? " selected" : "") + '>On</option><option value="off"' + (c.status !== "active" ? " selected" : "") + ">Off</option></select></label>" +
-      '<label class="field"><span>' + (isNew ? "Starting password" : "New password (leave blank to keep)") + '</span><input name="password" type="password" autocomplete="new-password"></label>' +
-      '</div><p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">' + (isNew ? "Add customer" : "Save changes") +
+      (isNew ? '<label class="field"><span>Starting password</span><input name="password" type="password" autocomplete="new-password"></label>' : '<input name="password" type="hidden" value="">') +
+      "</div>" + (isNew ? '<p class="muted">Give them this password. When they first sign in, they will be asked to choose their own.</p>' : "") +
+      '<div id="pwReset"></div><p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">' + (isNew ? "Add customer" : "Save changes") +
       '</button><button class="btn btn-line" type="button" data-cancel>Cancel</button></div></form>';
     var f = box.querySelector("form");
     f.querySelector("[data-cancel]").onclick = function () { box.innerHTML = ""; };
@@ -248,6 +291,12 @@
       call("saveCustomer", { customer: d }).then(function () { customers(body); })
         .catch(function (e2) { f.querySelector(".form-error").textContent = e2.message; f.querySelector("[type=submit]").disabled = false; });
     };
+    if (!isNew) resetButton(f, "customer", c.code, c.name);
+    if (!isNew) {
+      removeButton(f, "Remove customer", "Their sign-in is removed and they are signed out straight away. Their past orders stay.", function () {
+        return call("deleteCustomer", { code: c.code }).then(function () { customers(body); });
+      });
+    }
     f.name.focus();
   }
 

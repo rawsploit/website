@@ -395,3 +395,7 @@ a { color: var(--ink); }
 .demo-ask { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: var(--paper); border: 1px solid var(--ink-soft); border-radius: var(--radius-l); padding: 14px 16px; margin-bottom: 18px; }
 .demo-info .contact-direct a.btn-ink, .demo-ask a.btn-ink { color: #fff; }
 .demo-login-ask { margin-top: 12px; gap: 8px; } .demo-login-ask a.btn-ink { color: #fff; }
+/* people: one-time password box and remove button */
+.pw-box { background: var(--paper); border: 1px solid var(--ink-soft); border-radius: var(--radius-s); padding: 12px 14px; margin: 12px 0; line-height: 1.6; }
+.btn-danger { color: #A23A2A !important; border-color: #E2B4AB !important; }
+.btn-danger:hover { background: #FBEDEA !important; }

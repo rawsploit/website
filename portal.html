@@ -60,6 +60,14 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = Suite.esc;
+  // someone removed, switched off or moved to another team is signed out here
+  if (!Suite.isDemo()) {
+    Suite.api("me", { token: s.token }).then(function (r) {
+      if (r && r.ok === false && /session has ended|team has changed/i.test(r.message || "")) {
+        Suite.clearSession(); location.replace(Suite.link("login.html"));
+      }
+    }).catch(function () {});
+  }
   var mods = Suite.modulesFor(s.role);
   var client = Suite.client();
 
