@@ -527,6 +527,7 @@
     var text = receiptText(e);
     $("main").innerHTML = '<div id="flash"></div>' +
       (e.state === "sent" ? '<div class="msg ok">Sent to the office.</div>' : e.state === "err" ? '<div class="msg err">Not saved at the office: ' + esc(e.err || "") + "</div>" : '<div class="msg warn">Saved on the phone. It goes to the office automatically when there\'s signal.</div>') +
+      printTip() +
       '<pre class="receipt" id="rcpt"></pre>' +
       '<div class="stack"><button class="btn btn-ink" id="wa" type="button">Send on WhatsApp</button>' +
       '<button class="btn btn-line" id="pr" type="button">Print</button>' +
@@ -534,6 +535,8 @@
       (navigator.share ? '<button class="btn btn-line" id="sh" type="button">Share</button>' : "") +
       '<button class="btn btn-line" id="done" type="button">Done – back to shops</button></div>';
     $("rcpt").textContent = text;
+    // show the slip as it prints: one line per printed line, small enough to fit the phone
+    $("rcpt").style.cssText = "white-space:pre;overflow-x:auto;font-size:" + (W === 48 ? "min(11px, 2.6vw)" : "min(13px, 3.8vw)");
     paintFlash($("flash"));
     $("wa").onclick = function () {
       var n = waNumber(e.shop_phone || (shopById(e.shop_id) || {}).phone);
@@ -551,6 +554,18 @@
      rawbt  = through the free RawBT app (any Bluetooth printer, Android)
      system = the phone's own print dialog
      Bluetooth and RawBT send standard receipt-printer commands (ESC/POS). */
+  /* first-time help on the bill screen; disappears once a print has worked on this phone */
+  function printTip() {
+    if (pr.printed) return "";
+    var steps = pr.method === "rawbt"
+      ? ["Install the free <b>RawBT</b> app from the Play Store.", "Open RawBT once and pair your printer (PIN <b>0000</b>).", "Come back here and tap <b>Print</b>."]
+      : pr.method === "bt" && navigator.bluetooth
+      ? ["Switch the printer <b>on</b>.", "Turn on the phone's <b>Bluetooth</b> and <b>Location</b>.", "Tap <b>Print</b>, then pick your printer from the list (for example <b>Printer_F160</b>).", "Next time it prints straight away."]
+      : ["Tap <b>Print</b> and choose your printer in the phone's print screen."];
+    return '<div class="msg warn" id="prTip" style="text-align:left"><b>First time printing on this phone?</b><ol style="margin:6px 0 0 18px;padding:0">' +
+      steps.map(function (t) { return "<li>" + t + "</li>"; }).join("") + "</ol></div>";
+  }
+  function printedOk() { if (!pr.printed) { pr.printed = true; savePrinter(); var t = $("prTip"); if (t) t.remove(); } }
   function printerLine() {
     return (pr.width === 58 ? "58 mm" : "80 mm") + " · " +
       (pr.method === "bt" ? "Bluetooth" + (pr.name ? " (" + pr.name + ")" : "") : pr.method === "rawbt" ? "RawBT app" : "Phone print dialog");
@@ -621,18 +636,18 @@
     });
   }
   function printText(text, btn) {
-    if (pr.method === "rawbt") { rawbtPrint(text); return; }
-    if (pr.method !== "bt" || !navigator.bluetooth) { systemPrint(text); return; }
+    if (pr.method === "rawbt") { rawbtPrint(text); printedOk(); return; }
+    if (pr.method !== "bt" || !navigator.bluetooth) { systemPrint(text); printedOk(); return; }
     var label = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Printing…"; }
     btConnect(false).then(function (ch) { return btWrite(ch, escpos(text)); })
-      .then(function () { if (btn) btn.textContent = "Printed ✓"; setTimeout(function () { if (btn) { btn.textContent = label; btn.disabled = false; } }, 1500); })
+      .then(function () { printedOk(); if (btn) btn.textContent = "Printed ✓"; setTimeout(function () { if (btn) { btn.textContent = label; btn.disabled = false; } }, 1500); })
       .catch(function (err) {
         bt.ch = null;
         if (btn) { btn.textContent = label; btn.disabled = false; }
         if (err && err.name === "NotFoundError") return;           // closed the printer list
-        flash("Couldn't print: " + ((err && err.message) || "printer not reachable") + ". Check the printer is on and close by, then try again. " +
-          "If it keeps failing, choose \u201cRawBT app\u201d in Printer settings.", "err");
+        flash("Couldn't print. Check: 1) the printer is on and close by, 2) the phone's Bluetooth and Location are on, 3) the printer isn't connected to another phone. Then tap Print again. " +
+          "Still not working? Open Printer settings and choose \u201cRawBT app\u201d.", "err");
         paintFlash($("flash"));
       });
   }
@@ -643,7 +658,9 @@
       return '<label class="list-line" style="display:flex;gap:10px;align-items:flex-start;justify-content:flex-start;text-align:left;cursor:pointer"><input type="radio" name="' + name + '" value="' + val + '"' + (on ? " checked" : "") +
         ' style="margin-top:4px"><span><b>' + label + "</b>" + (note ? '<br><small class="muted">' + note + "</small>" : "") + "</span></label>";
     }
-    $("main").innerHTML = '<div id="flash"></div><div class="card"><h2 style="font-size:16px">Paper width</h2>' +
+    $("main").innerHTML = '<div id="flash"></div>' +
+      '<div class="msg ok" style="text-align:left">Set this once on each phone. Then every bill has a <b>Print</b> button that prints straight away. Use <b>Print a test slip</b> to check.</div>' +
+      '<div class="card"><h2 style="font-size:16px">Paper width</h2>' +
       opt("w", 80, "80 mm (3 inch)", "Most van printers", pr.width !== 58) + opt("w", 58, "58 mm (2 inch)", "Small pocket printers", pr.width === 58) + "</div>" +
       '<div class="card"><h2 style="font-size:16px">How to print</h2>' +
       (hasBt ? opt("m", "bt", "Bluetooth printer, direct", "No extra app. The first time, pick your printer from the list (for example Printer_F160)." +
