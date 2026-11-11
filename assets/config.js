@@ -38,12 +38,13 @@ window.MODULES = [
    `api` = the client's core backend URL (blank = demo mode).
    `modules` = web-app URL for each module that is connected. */
 /* Contact section on the home page.
-   email    = where enquiries go (also used when leadsUrl isn't set)
-   whatsapp = number with country code, digits only, e.g. "919876543210" (blank hides the button)
-   leadsUrl = the Kalavara Leads web app URL (saves each enquiry to a sheet and emails you) */
+   The email and phone are kept in pieces and only put together in the browser,
+   so spam robots reading the page source don't find them.
+   leadsUrl = the Kalavara Leads web app URL (saves each enquiry to a sheet and emails you);
+   blank = the form opens the visitor's email app instead. */
 window.CONTACT = {
-  email: "rawsploit@gmail.com",
-  whatsapp: "",
+  mail: ["rawsploit", "gmail", "com"],
+  phone: ["91", "85905", "71252"],
   leadsUrl: ""
 };
 

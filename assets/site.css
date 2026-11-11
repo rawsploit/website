@@ -389,3 +389,6 @@ a { color: var(--ink); }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .contact-done { font-weight: 600; color: var(--ink); margin: 0; }
 @media (max-width: 760px) { .contact-wrap { grid-template-columns: 1fr; gap: 20px; } .bar-link { display: none; } }
+.contact-direct { display: flex; flex-direction: column; gap: 12px; }
+.contact-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.contact-direct a.btn-ink { color: #fff; }
