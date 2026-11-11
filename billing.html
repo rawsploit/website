@@ -82,10 +82,10 @@
   @media print {
     body * { visibility: hidden !important; }
     #printArea, #printArea * { visibility: visible !important; }
-    #printArea { position: absolute; left: 0; top: 0; width: 58mm; border: 0; padding: 0; margin: 0; font-size: 10.5px; }
-    @page { size: 58mm auto; margin: 2mm; }
+    #printArea { position: absolute; left: 0; top: 0; border: 0; padding: 0; margin: 0; }
   }
 </style>
+<style id="pageSize">@media print { @page { size: 80mm auto; margin: 2mm; } }</style>
 </head>
 <body>
 <header class="bl-top">

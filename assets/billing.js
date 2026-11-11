@@ -437,13 +437,23 @@
   }
 
   /* ---------- receipt: print, WhatsApp, share ---------- */
-  var W = 32;   // characters across a 58 mm receipt
+  /* ---------- printer (kept per phone, not per company) ---------- */
+  var PKEY = "billing:printer";
+  var pr = (function () { try { return JSON.parse(localStorage.getItem(PKEY) || "null"); } catch (e) { return null; } })() ||
+    { width: 80, method: navigator.bluetooth ? "bt" : "system" };
+  function savePrinter() { try { localStorage.setItem(PKEY, JSON.stringify(pr)); } catch (e) {} }
+  var W = pr.width === 58 ? 32 : 48;   // characters across the receipt: 58 mm = 32, 80 mm = 48
+  function cols() {                    // item / qty / rate / amount column widths
+    return W === 32 ? [14, 5, 6, 7] : [22, 6, 9, 11];
+  }
   function padR(s, n) { s = String(s); return s.length >= n ? s.slice(0, n) : s + new Array(n - s.length + 1).join(" "); }
   function padL(s, n) { s = String(s); return s.length >= n ? s.slice(0, n) : new Array(n - s.length + 1).join(" ") + s; }
   function centre(s) { s = String(s).slice(0, W); var p = Math.floor((W - s.length) / 2); return new Array(p + 1).join(" ") + s; }
   function num(n) { return Number(n || 0).toFixed(2); }
   function rule(ch) { return new Array(W + 1).join(ch || "-"); }
 
+  /* prices include GST: the shop sees qty x price on each line (the tax split's paise go to round off) */
+  function lineAmt(l) { return st.boot && st.boot.inclusive !== false ? r2(l.qty * l.rate) : l.total; }
   function receiptText(e) {
     var c = st.boot.company, out = [];
     out.push(centre(c.name || ""));
@@ -458,24 +468,25 @@
     if (e.shop_gstin) out.push(padR("GSTIN: " + e.shop_gstin, W));
     out.push(rule());
     if (e.kind !== "COLLECTION") {
-      out.push(padR("Item", 14) + padL("Qty", 5) + padL("Rate", 6) + padL("Amt", 7));
+      var c4 = cols(), L = W - 12;
+      out.push(padR("Item", c4[0]) + padL("Qty", c4[1]) + padL("Rate", c4[2]) + padL("Amt", c4[3]));
       out.push(rule());
       e.lines.forEach(function (l) {
         var nm = l.product + " " + l.pack;
         out.push(nm.slice(0, W));
-        out.push(padR(l.free_qty ? "  +" + l.free_qty + " free" : "", 14) + padL(l.qty, 5) + padL(Number(l.rate).toFixed(0), 6) + padL(num(l.total), 7));
+        out.push(padR(l.free_qty ? "  +" + l.free_qty + " free" : "", c4[0]) + padL(l.qty, c4[1]) + padL(Number(l.rate).toFixed(W === 32 ? 0 : 2), c4[2]) + padL(num(lineAmt(l)), c4[3]));
       });
       out.push(rule());
-      out.push(padR("Taxable", 20) + padL(num(e.taxable), 12));
-      if (e.igst) out.push(padR("IGST", 20) + padL(num(e.igst), 12));
-      else { out.push(padR("CGST", 20) + padL(num(e.cgst), 12)); out.push(padR("SGST", 20) + padL(num(e.sgst), 12)); }
-      if (e.round_off) out.push(padR("Round off", 20) + padL(num(e.round_off), 12));
+      out.push(padR("Taxable", L) + padL(num(e.taxable), 12));
+      if (e.igst) out.push(padR("IGST", L) + padL(num(e.igst), 12));
+      else { out.push(padR("CGST", L) + padL(num(e.cgst), 12)); out.push(padR("SGST", L) + padL(num(e.sgst), 12)); }
+      if (e.round_off) out.push(padR("Round off", L) + padL(num(e.round_off), 12));
     }
     out.push(rule("="));
-    out.push(padR("TOTAL", 16) + padL("Rs " + num(e.total), 16));
+    out.push(padR("TOTAL", W - 16) + padL("Rs " + num(e.total), 16));
     if (e.kind === "BILL") {
-      out.push(padR("Paid (" + e.pay_mode + ")", 20) + padL(num(e.paid), 12));
-      if (e.total - e.paid > 0.005) out.push(padR("Balance (credit)", 20) + padL(num(e.total - e.paid), 12));
+      out.push(padR("Paid (" + e.pay_mode + ")", W - 12) + padL(num(e.paid), 12));
+      if (e.total - e.paid > 0.005) out.push(padR("Balance (credit)", W - 12) + padL(num(e.total - e.paid), 12));
     } else out.push(padR(e.pay_mode, W));
     if (e.note) out.push("Note: " + e.note);
     out.push(rule());
@@ -519,6 +530,7 @@
       '<pre class="receipt" id="rcpt"></pre>' +
       '<div class="stack"><button class="btn btn-ink" id="wa" type="button">Send on WhatsApp</button>' +
       '<button class="btn btn-line" id="pr" type="button">Print</button>' +
+      '<p class="muted" style="margin:-4px 0 4px;font-size:13px">' + esc(printerLine()) + ' · <a href="#" id="prSet">Printer settings</a></p>' +
       (navigator.share ? '<button class="btn btn-line" id="sh" type="button">Share</button>' : "") +
       '<button class="btn btn-line" id="done" type="button">Done – back to shops</button></div>';
     $("rcpt").textContent = text;
@@ -527,9 +539,138 @@
       var n = waNumber(e.shop_phone || (shopById(e.shop_id) || {}).phone);
       window.open("https://wa.me/" + n + "?text=" + encodeURIComponent(whatsappText(e)), "_blank");
     };
-    $("pr").onclick = function () { $("printArea").textContent = text; $("printArea").hidden = false; window.print(); setTimeout(function () { $("printArea").hidden = true; }, 500); };
+    $("pr").onclick = function () { printText(text, $("pr")); };
+    $("prSet").onclick = function (ev) { ev.preventDefault(); show(viewPrinter, null, true); };
     if ($("sh")) $("sh").onclick = function () { navigator.share({ title: e.bill_no, text: whatsappText(e) }).catch(function () {}); };
     $("done").onclick = home;
+  }
+
+  /* ---------- printing ----------
+     Three ways, chosen per phone in Printer settings:
+     bt     = straight to a Bluetooth printer from Chrome (no extra app)
+     rawbt  = through the free RawBT app (any Bluetooth printer, Android)
+     system = the phone's own print dialog
+     Bluetooth and RawBT send standard receipt-printer commands (ESC/POS). */
+  function printerLine() {
+    return (pr.width === 58 ? "58 mm" : "80 mm") + " · " +
+      (pr.method === "bt" ? "Bluetooth" + (pr.name ? " (" + pr.name + ")" : "") : pr.method === "rawbt" ? "RawBT app" : "Phone print dialog");
+  }
+  function escpos(text) {
+    var lines = text.split("\n"), bytes = [0x1B, 0x40];           // reset
+    function add(str) { for (var i = 0; i < str.length; i++) { var c = str.charCodeAt(i); bytes.push(c < 128 ? c : 63); } }
+    lines.forEach(function (ln, i) {
+      if (i === 0) { bytes.push(0x1B, 0x45, 1, 0x1D, 0x21, 0x01); add(ln); bytes.push(0x0A, 0x1D, 0x21, 0x00, 0x1B, 0x45, 0); return; }  // company name bold, tall
+      var big = /^\s*(BILL|SALES RETURN|RECEIPT)\s*$/.test(ln) || /^TOTAL/.test(ln);
+      if (big) bytes.push(0x1B, 0x45, 1);
+      add(ln); bytes.push(0x0A);
+      if (big) bytes.push(0x1B, 0x45, 0);
+    });
+    bytes.push(0x1B, 0x64, 4);                                    // feed 4 lines to tear off
+    return new Uint8Array(bytes);
+  }
+  function systemPrint(text) {
+    var a = $("printArea");
+    a.textContent = text; a.style.width = pr.width + "mm"; a.style.fontSize = pr.width === 58 ? "10.5px" : "12px";
+    document.getElementById("pageSize").textContent = "@media print { @page { size: " + pr.width + "mm auto; margin: 2mm; } }";
+    a.hidden = false; window.print(); setTimeout(function () { a.hidden = true; }, 500);
+  }
+  function rawbtPrint(text) {
+    var b = escpos(text), bin = "";
+    for (var i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+    location.href = "intent:base64," + btoa(bin) + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
+  }
+  /* Bluetooth printers expose a "serial" service; makers use different ids, so ask for the common ones
+     and write to the first characteristic that accepts data. */
+  var BT_SERVICES = [0xfff0, 0xff00, 0xffe0, 0x18f0, 0xae30, 0xfee7,
+    "49535343-fe7d-4ae5-8fa9-9fafd205e455", "e7810a71-73ae-499d-8c15-faa9aef0c3f2", "0000ff12-0000-1000-8000-00805f9b34fb"];
+  var bt = { device: null, ch: null };
+  function btFindChar(server) {
+    return server.getPrimaryServices().then(function (svcs) {
+      var i = 0;
+      function next() {
+        if (i >= svcs.length) throw new Error("This printer didn't offer a way to send data.");
+        return svcs[i++].getCharacteristics().then(function (chs) {
+          for (var k = 0; k < chs.length; k++) if (chs[k].properties.write || chs[k].properties.writeWithoutResponse) return chs[k];
+          return next();
+        }, next);
+      }
+      return next();
+    });
+  }
+  function btConnect(pick) {
+    if (bt.ch && bt.device && bt.device.gatt.connected) return Promise.resolve(bt.ch);
+    var getDev = bt.device && !pick ? Promise.resolve(bt.device) :
+      navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BT_SERVICES });
+    return getDev.then(function (d) {
+      bt.device = d; pr.name = d.name || "printer"; savePrinter();
+      return d.gatt.connect();
+    }).then(btFindChar).then(function (ch) { bt.ch = ch; return ch; });
+  }
+  function btWrite(ch, data) {
+    var size = 100, pos = 0, safe = !!ch.properties.write;
+    function step() {
+      if (pos >= data.length) return Promise.resolve();
+      var part = data.slice(pos, pos + size); pos += size;
+      var w = safe && ch.writeValueWithResponse ? ch.writeValueWithResponse(part) :
+        ch.writeValueWithoutResponse ? ch.writeValueWithoutResponse(part) : ch.writeValue(part);
+      return w.then(function () { return safe ? null : new Promise(function (r) { setTimeout(r, 25); }); }).then(step);
+    }
+    return step().catch(function (err) {
+      if (size > 20) { size = 20; pos = 0; return step(); }    // some printers only take small pieces
+      throw err;
+    });
+  }
+  function printText(text, btn) {
+    if (pr.method === "rawbt") { rawbtPrint(text); return; }
+    if (pr.method !== "bt" || !navigator.bluetooth) { systemPrint(text); return; }
+    var label = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Printing…"; }
+    btConnect(false).then(function (ch) { return btWrite(ch, escpos(text)); })
+      .then(function () { if (btn) btn.textContent = "Printed ✓"; setTimeout(function () { if (btn) { btn.textContent = label; btn.disabled = false; } }, 1500); })
+      .catch(function (err) {
+        bt.ch = null;
+        if (btn) { btn.textContent = label; btn.disabled = false; }
+        if (err && err.name === "NotFoundError") return;           // closed the printer list
+        flash("Couldn't print: " + ((err && err.message) || "printer not reachable") + ". Check the printer is on and close by, then try again. " +
+          "If it keeps failing, choose \u201cRawBT app\u201d in Printer settings.", "err");
+        paintFlash($("flash"));
+      });
+  }
+  function viewPrinter() {
+    header("Printer settings", printerLine());
+    var hasBt = !!navigator.bluetooth;
+    function opt(name, val, label, note, on) {
+      return '<label class="list-line" style="display:flex;gap:10px;align-items:flex-start;justify-content:flex-start;text-align:left;cursor:pointer"><input type="radio" name="' + name + '" value="' + val + '"' + (on ? " checked" : "") +
+        ' style="margin-top:4px"><span><b>' + label + "</b>" + (note ? '<br><small class="muted">' + note + "</small>" : "") + "</span></label>";
+    }
+    $("main").innerHTML = '<div id="flash"></div><div class="card"><h2 style="font-size:16px">Paper width</h2>' +
+      opt("w", 80, "80 mm (3 inch)", "Most van printers", pr.width !== 58) + opt("w", 58, "58 mm (2 inch)", "Small pocket printers", pr.width === 58) + "</div>" +
+      '<div class="card"><h2 style="font-size:16px">How to print</h2>' +
+      (hasBt ? opt("m", "bt", "Bluetooth printer, direct", "No extra app. The first time, pick your printer from the list (for example Printer_F160)." +
+        (pr.name ? " Last used: " + esc(pr.name) + "." : ""), pr.method === "bt") : "") +
+      opt("m", "rawbt", "RawBT app", "Works with almost any Bluetooth printer. Install \u201cRawBT\u201d from the Play Store and pair the printer in it once.", pr.method === "rawbt") +
+      opt("m", "system", "Phone print dialog", "Uses the phone's own printing.", pr.method === "system" || (!hasBt && pr.method === "bt")) + "</div>" +
+      '<div class="stack"><button class="btn btn-ink" id="pSave" type="button">Save</button>' +
+      '<button class="btn btn-line" id="pTest" type="button">Print a test slip</button>' +
+      (hasBt ? '<button class="btn btn-line" id="pPick" type="button">Choose a different Bluetooth printer</button>' : "") + "</div>";
+    paintFlash($("flash"));
+    function read() {
+      var w = document.querySelector('input[name="w"]:checked'), m = document.querySelector('input[name="m"]:checked');
+      pr.width = w && w.value === "58" ? 58 : 80; pr.method = m ? m.value : "system";
+      W = pr.width === 58 ? 32 : 48; savePrinter();
+    }
+    $("pSave").onclick = function () { read(); flash("Printer settings saved: " + printerLine() + ".", "ok"); back(); };
+    $("pTest").onclick = function () {
+      read();
+      var t = [centre((st.boot && st.boot.company && st.boot.company.name) || "Test print"), rule("="), centre("TEST SLIP"),
+        padR("Paper: " + pr.width + " mm", W), padR("Printer: " + printerLine(), W), rule(), "1234567890".repeat(5).slice(0, W), rule(), centre("Printing works")].join("\n");
+      printText(t, $("pTest"));
+    };
+    if ($("pPick")) $("pPick").onclick = function () {
+      read(); pr.method = "bt"; savePrinter();
+      btConnect(true).then(function () { flash("Printer connected: " + pr.name + ".", "ok"); show(viewPrinter); })
+        .catch(function (err) { if (!err || err.name !== "NotFoundError") { flash("Couldn't connect: " + ((err && err.message) || "") + ".", "err"); paintFlash($("flash")); } });
+    };
   }
 
   /* Start Day / End Day live in Field Sales (needs signal). */
@@ -568,11 +709,13 @@
       fieldSalesLink() +
       '<div class="stack"><button class="btn btn-ink" id="sendNow" type="button">Send now</button>' +
       '<button class="btn btn-line" id="fresh" type="button">Download fresh shop and price list</button>' +
+      '<button class="btn btn-line" id="printerSet" type="button">Printer settings (' + esc(printerLine()) + ')</button>' +
       '<button class="danger-btn" id="out" type="button">Sign out of billing on this phone</button></div>';
     paintFlash($("flash"));
     bindEntryLines();
     $("sendNow").onclick = function () { sync(true); };
     $("fresh").onclick = function () { stack = []; show(viewStart); };
+    $("printerSet").onclick = function () { show(viewPrinter, null, true); };
     $("out").onclick = function () {
       if (pending().length) { flash("Send your " + pending().length + " waiting entr" + (pending().length === 1 ? "y" : "ies") + " first. Signing out would lose them.", "err"); paintFlash($("flash")); return; }
       if (!confirm("Sign out of billing on this phone?")) return;
