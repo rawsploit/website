@@ -39,7 +39,7 @@ window.MODULES = [
    `modules` = web-app URL for each module that is connected. */
 window.CLIENTS = {
   demo: {
-    name: "Demo Foods Pvt. Ltd.",
+    name: "Demo Industries Pvt. Ltd.",
     logo: "",
     theme: "teal",            /* colour theme: "teal", "blue" or "maroon" */
     api: "",
