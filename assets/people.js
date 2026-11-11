@@ -33,6 +33,16 @@
       demo.users = demo.users.filter(function (x) { return x.username !== u.username; }).concat([u]);
       return { ok: true };
     }
+    if (action === "saveCustomers") {
+      var np = [], added = 0, upd = 0;
+      p.customers.forEach(function (c) {
+        var code = String(c.code).toUpperCase(), had = demo.customers.some(function (x) { return x.code === code; });
+        if (had) upd++; else { added++; if (!c.password) np.push({ code: code, name: c.name, password: "Kala-1234-demo" }); }
+        demo.customers = demo.customers.filter(function (x) { return x.code !== code; })
+          .concat([{ code: code, name: c.name, phone: c.phone || "", status: /^(no|off)$/i.test(c.active || "") ? "off" : "active", lastLogin: "" }]);
+      });
+      return { ok: true, added: added, updated: upd, newPasswords: np };
+    }
     if (action === "saveCustomer") {
       var c = Object.assign({ status: "active", lastLogin: "" }, p.customer); delete c.password; c.code = c.code.toUpperCase();
       demo.customers = demo.customers.filter(function (x) { return x.code !== c.code; }).concat([c]);
@@ -129,14 +139,91 @@
           "</td><td>" + (c.status === "active" ? '<span class="status live">Active</span>' : '<span class="status soon">Off</span>') + "</td><td>" + when(c.lastLogin) +
           '</td><td><button class="btn btn-line btn-small" type="button" data-edit="' + esc(c.code) + '">Edit</button></td></tr>';
       });
-      body.innerHTML = '<div class="row-head"><h3>Customer sign-ins</h3><button class="btn btn-ink btn-small" type="button" id="addCust">Add a customer</button></div>' +
-        '<p class="muted" style="margin-bottom:12px">Customers see your products and prices. They can\'t see anything else.</p>' +
+      body.innerHTML = '<div class="row-head"><h3>Customer sign-ins</h3><span class="row-actions" style="margin:0">' +
+        '<button class="btn btn-line btn-small" type="button" id="custTpl">Download template</button>' +
+        '<label class="btn btn-line btn-small" style="cursor:pointer">Upload a list<input type="file" id="custFile" accept=".xlsx,.xls,.csv" hidden></label>' +
+        '<button class="btn btn-ink btn-small" type="button" id="addCust">Add a customer</button></span></div>' +
+        '<p class="muted" style="margin-bottom:12px">Customers see your products and prices. They can\'t see anything else. ' +
+        "Many customers at once? Download the template, fill one row per customer and upload it. Leave the password empty and we'll make one for each new customer.</p>" +
+        '<div id="custUpload"></div>' +
         table(["Customer", "Phone", "State", "Last sign-in", ""], rows) + '<div id="custForm"></div>';
       body.querySelector("#addCust").onclick = function () { custForm(body, null); };
+      body.querySelector("#custTpl").onclick = function () {
+        Xlsx.download("customer-signins-template.xlsx", [{ name: "Customers", columns: ["code", "name", "phone", "active", "password"], types: ["text", "text", "text", "text", "text"],
+          rows: [["C1002", "Example Stores", "9000000000", "yes", ""]] }]);
+      };
+      body.querySelector("#custFile").onchange = function (ev) { var f = ev.target.files[0]; ev.target.value = ""; if (f) uploadCustomers(body, f); };
       body.querySelectorAll("[data-edit]").forEach(function (b) {
         b.onclick = function () { custForm(body, res.customers.filter(function (c) { return c.code === b.dataset.edit; })[0]); };
       });
     }).catch(function (e) { body.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
+  }
+
+  /* ---------- bulk upload of customer sign-ins ---------- */
+  var XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  var CUST_ALIASES = { code: ["code", "customer code", "customer_code", "id"], name: ["name", "customer", "shop", "shop name", "customer name"],
+    phone: ["phone", "mobile", "phone number"], active: ["active", "sign-in", "status"], password: ["password", "starting password"] };
+  function parseCsv(text) {
+    var rows = [], row = [], cur = "", q = false; text = text.replace(/^\uFEFF/, "");
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cur); cur = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cur); rows.push(row); row = []; cur = ""; }
+      else cur += ch;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  function readTable(file) {
+    var isCsv = /\.csv$/i.test(file.name);
+    var aoaP = isCsv ? file.text().then(parseCsv) : new Promise(function (res, rej) {
+      if (window.XLSX) return res();
+      var sc = document.createElement("script"); sc.src = XLSX_URL; sc.onload = res;
+      sc.onerror = function () { rej(new Error("Couldn't load the Excel reader. Check the internet connection, or upload a CSV file.")); };
+      document.head.appendChild(sc);
+    }).then(function () { return file.arrayBuffer(); }).then(function (buf) {
+      var wb = XLSX.read(buf, { type: "array" });
+      return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: "" });
+    });
+    return aoaP.then(function (aoa) {
+      while (aoa.length && aoa[0].every(function (c) { return String(c).trim() === ""; })) aoa.shift();
+      if (aoa.length < 2) throw new Error("The file has no rows under the header.");
+      var head = aoa[0].map(function (h) { return String(h).trim().toLowerCase(); }), map = {};
+      Object.keys(CUST_ALIASES).forEach(function (k) { var at = head.findIndex(function (h) { return CUST_ALIASES[k].indexOf(h) >= 0; }); if (at >= 0) map[k] = at; });
+      if (map.code === undefined || map.name === undefined) throw new Error("The file needs a \u201ccode\u201d and a \u201cname\u201d column. Download the template to see the layout.");
+      return aoa.slice(1).filter(function (r) { return r.some(function (c) { return String(c).trim() !== ""; }); }).map(function (r) {
+        var o = {}; Object.keys(map).forEach(function (k) { o[k] = String(r[map[k]] === undefined ? "" : r[map[k]]).trim(); }); return o;
+      });
+    });
+  }
+  function uploadCustomers(body, file) {
+    var box = body.querySelector("#custUpload");
+    box.innerHTML = '<p class="muted">Reading ' + esc(file.name) + "…</p>";
+    readTable(file).then(function (list) {
+      box.innerHTML = '<p class="muted">Saving ' + list.length + " customers…</p>";
+      return call("saveCustomers", { customers: list });
+    }).then(function (res) {
+      var msg = '<div class="panel"><h3>Upload done</h3><p>' + res.added + " new, " + res.updated + " updated.</p>";
+      if (res.newPasswords && res.newPasswords.length) {
+        msg += '<p><b>Starting passwords for the new customers.</b> They are shown only now, so download the list and share each one privately (for example on WhatsApp).</p>' +
+          table(["Customer code", "Name", "Starting password"], res.newPasswords.map(function (p) {
+            return "<tr><td>" + esc(p.code) + "</td><td>" + esc(p.name) + '</td><td><code>' + esc(p.password) + "</code></td></tr>";
+          })) + '<div class="row-actions"><button class="btn btn-ink btn-small" type="button" id="pwDl">Download passwords (Excel)</button></div>';
+      }
+      box.innerHTML = msg + "</div>";
+      var dl = box.querySelector("#pwDl");
+      if (dl) dl.onclick = function () {
+        Xlsx.download("customer-starting-passwords.xlsx", [{ name: "Passwords", columns: ["Customer code", "Name", "Starting password"], types: ["text", "text", "text"],
+          rows: res.newPasswords.map(function (p) { return [p.code, p.name, p.password]; }) }]);
+      };
+      return call("listCustomers").then(function (r2) {
+        // refresh the table under the result, keeping the result box
+        var keep = box.innerHTML; customers(body);
+        setTimeout(function () { var b2 = body.querySelector("#custUpload"); if (b2) { b2.innerHTML = keep; var d2 = b2.querySelector("#pwDl"); if (d2 && dl) d2.onclick = dl.onclick; } }, 400);
+      });
+    }).catch(function (e) { box.innerHTML = '<div class="panel"><p class="form-error">' + esc(e.message) + "</p></div>"; });
   }
 
   function custForm(body, c) {
