@@ -59,7 +59,7 @@ window.CLIENTS = {
   },
   /* first real test deployment (Kalavara Demo folder, sample data only) */
   test: {
-    name: "Kalavara Hygiene",
+    name: "HyGenie Pvt. Ltd.",
     logo: "",
     theme: "teal",
     api: "https://script.google.com/macros/s/AKfycbzKTnow9_xb_wGqdjVl7x2S6UQ7ndaW2NNJ9cpsonrNses7gAZY9stDMasQ2v9Bxhk3tg/exec",
