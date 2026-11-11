@@ -37,6 +37,16 @@ window.MODULES = [
 /* Clients. Each client gets a link like  index.html?c=demo
    `api` = the client's core backend URL (blank = demo mode).
    `modules` = web-app URL for each module that is connected. */
+/* Contact section on the home page.
+   email    = where enquiries go (also used when leadsUrl isn't set)
+   whatsapp = number with country code, digits only, e.g. "919876543210" (blank hides the button)
+   leadsUrl = the Kalavara Leads web app URL (saves each enquiry to a sheet and emails you) */
+window.CONTACT = {
+  email: "rawsploit@gmail.com",
+  whatsapp: "",
+  leadsUrl: ""
+};
+
 window.CLIENTS = {
   demo: {
     name: "Demo Industries Pvt. Ltd.",

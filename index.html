@@ -27,6 +27,7 @@
       <span class="brand-name" data-site-name>Kalavara</span>
     </a>
     <div class="bar-actions">
+      <a class="bar-link" href="#contact">Contact us</a>
       <a class="btn btn-line btn-small" data-page="login.html" data-kind="customer">Customer sign in</a>
       <a class="btn btn-ink btn-small" data-page="login.html" data-kind="staff">Staff sign in</a>
     </div>
@@ -43,7 +44,8 @@
           <a class="btn btn-ink" data-page="login.html" data-kind="staff">Staff sign in</a>
           <a class="btn btn-line" data-page="login.html" data-kind="customer">Customer sign in</a>
         </div>
-        <p class="hero-note">Staff sign in to their team's tools. Customers browse products and prices.</p>
+        <p class="hero-note">Staff sign in to their team's tools. Customers browse products and prices.
+          New here? <a href="#contact">Ask for a free demo</a>.</p>
       </div>
 
       <div class="book" aria-label="Example of a day's stock and cash movements">
@@ -75,6 +77,32 @@
       </div>
     </div>
   </section>
+  <section class="section contact" id="contact">
+    <div class="wrap contact-wrap">
+      <div>
+        <h2>Want to see it working for your company?</h2>
+        <p class="section-intro">Tell us a little about your business. We'll call you, show you a demo, and set it up with your own products, routes and staff.</p>
+        <ul class="contact-points">
+          <li>Free demo, no obligation</li>
+          <li>Works on any phone and computer</li>
+          <li>Your data stays in your own Google account</li>
+        </ul>
+        <p class="contact-direct" id="contactDirect"></p>
+      </div>
+      <form class="contact-form" id="contactForm" novalidate>
+        <label class="field"><span>Your name</span><input id="cName" name="name" autocomplete="name" maxlength="80" required></label>
+        <label class="field"><span>Company name</span><input id="cCompany" name="company" autocomplete="organization" maxlength="120" required></label>
+        <label class="field"><span>Phone number</span><input id="cPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" required></label>
+        <label class="field"><span>City</span><input id="cCity" name="city" autocomplete="address-level2" maxlength="60"></label>
+        <label class="field"><span>What does your company make or sell?</span><input id="cWhat" name="what" maxlength="120" placeholder="e.g. cleaning products, garments"></label>
+        <label class="field"><span>Anything else? (optional)</span><textarea id="cNote" name="note" rows="3" maxlength="600"></textarea></label>
+        <label class="hp" aria-hidden="true">Leave this empty<input id="cWebsite" name="website" tabindex="-1" autocomplete="off"></label>
+        <p class="form-error" id="cError" role="alert"></p>
+        <button class="btn btn-ink" type="submit" id="cSend">Send</button>
+        <p class="contact-done" id="cDone" hidden></p>
+      </form>
+    </div>
+  </section>
 </main>
 
 <footer class="foot">
@@ -86,6 +114,43 @@
 
 <script>
 (function () {
+  /* Contact form */
+  (function () {
+    var C = window.CONTACT || {}, f = document.getElementById("contactForm");
+    var $ = function (id) { return document.getElementById(id); };
+    var direct = [];
+    if (C.whatsapp) direct.push('<a class="btn btn-line btn-small" target="_blank" rel="noopener" href="https://wa.me/' + encodeURIComponent(C.whatsapp) +
+      "?text=" + encodeURIComponent("Hello, I'd like to know more about Kalavara.") + '">Message us on WhatsApp</a>');
+    if (C.email) direct.push('Or email <a href="mailto:' + Suite.esc(C.email) + '">' + Suite.esc(C.email) + "</a>");
+    $("contactDirect").innerHTML = direct.join(" ");
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var d = { name: $("cName").value.trim(), company: $("cCompany").value.trim(), phone: $("cPhone").value.trim(),
+        city: $("cCity").value.trim(), what: $("cWhat").value.trim(), note: $("cNote").value.trim(), website: $("cWebsite").value };
+      var err = !d.name ? "Please enter your name." : !d.company ? "Please enter your company name." :
+        (d.phone.replace(/\D/g, "").length < 10) ? "Please enter a phone number we can call (10 digits or more)." : "";
+      $("cError").textContent = err;
+      if (err) return;
+      if (d.website) return;               // filled in by a bot, not a person
+      var text = "New enquiry from mykalavara.com\n\nName: " + d.name + "\nCompany: " + d.company + "\nPhone: " + d.phone +
+        "\nCity: " + (d.city || "-") + "\nMakes / sells: " + (d.what || "-") + "\n\n" + (d.note || "");
+      function done(msg) { f.querySelectorAll(".field, #cSend").forEach(function (el) { el.hidden = true; }); $("cDone").textContent = msg; $("cDone").hidden = false; }
+      if (C.leadsUrl) {
+        $("cSend").disabled = true; $("cSend").textContent = "Sending…";
+        fetch(C.leadsUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(d) })
+          .then(function (r) { return r.json(); })
+          .then(function (r) { if (!r || !r.ok) throw new Error((r && r.error) || "not saved"); done("Thank you, " + d.name + ". We'll call you within one working day."); })
+          .catch(function () {
+            $("cSend").disabled = false; $("cSend").textContent = "Send";
+            $("cError").innerHTML = 'That didn\'t go through. Please try again, or email us at <a href="mailto:' + Suite.esc(C.email || "") + '">' + Suite.esc(C.email || "") + "</a>.";
+          });
+      } else {
+        location.href = "mailto:" + (C.email || "") + "?subject=" + encodeURIComponent("Kalavara enquiry: " + d.company) + "&body=" + encodeURIComponent(text);
+        done("Your email app should open with the details filled in. Press Send there and we'll call you within one working day.");
+      }
+    });
+  })();
+
   /* Teams and their modules */
   var grid = document.getElementById("teamsGrid");
   var cards = window.TEAMS.map(function (t) {
