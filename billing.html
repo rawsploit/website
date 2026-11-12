@@ -71,6 +71,9 @@
   .msg.ok { background: var(--stamp-bg); color: var(--stamp); }
   .msg.err { background: #FDECEA; color: var(--danger); }
   .msg.warn { background: #FFF3D6; color: #8A5300; }
+  .qr-box { background: #fff; border: 1px solid var(--rule); border-radius: 12px; padding: 14px; margin: 0 auto 12px; max-width: 360px; text-align: center; }
+  .qr-box svg { display: block; margin: 0 auto 8px; width: 220px; height: 220px; }
+  .qr-box p { margin: 0; line-height: 1.5; }
   .receipt { background: #fff; border: 1px dashed var(--rule-strong); border-radius: 8px; padding: 14px; font: 13.5px/1.45 "Courier New", monospace; white-space: pre-wrap; color: #111; margin: 0 auto 12px; max-width: 360px; overflow-x: auto; }
   .stack { display: grid; gap: 10px; }
   .stack .btn { width: 100%; padding: 14px; font-size: 16px; }
@@ -83,6 +86,9 @@
     body * { visibility: hidden !important; }
     #printArea, #printArea * { visibility: visible !important; }
     #printArea { position: absolute; left: 0; top: 0; border: 0; padding: 0; margin: 0; }
+    #printText { border: 0; padding: 0; margin: 0; background: none; }
+    #printQr { text-align: center; margin-top: 2mm; }
+    #printQr svg { width: 34mm; height: 34mm; }
   }
 </style>
 <style id="pageSize">@media print { @page { size: 80mm auto; margin: 2mm; } }</style>
@@ -95,7 +101,8 @@
 </header>
 <main class="bl-main" id="main"></main>
 <div class="bar" id="bar" hidden><div class="in" id="barIn"></div></div>
-<pre id="printArea" class="receipt" hidden></pre>
+<div id="printArea" hidden><pre id="printText" class="receipt"></pre><div id="printQr"></div></div>
+<script src="assets/qr.js"></script>
 <script src="assets/billing.js"></script>
 </body>
 </html>

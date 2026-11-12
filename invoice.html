@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/config.js"></script>
 <script src="assets/site.js"></script>
+<script src="assets/qr.js"></script>
 <style>
   body { background: #E9ECF3; }
   .inv-actions { max-width: 210mm; margin: 18px auto 10px; display: flex; gap: 10px; justify-content: flex-end; padding: 0 10px; }
@@ -46,6 +47,8 @@
     .inv .foot { position: static; margin-top: 18px; }
     @page { size: A4; margin: 12mm; }
   }
+  .inv-qr { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+  .inv-qr svg { flex: none; width: 28mm; height: 28mm; }
 </style>
 </head>
 <body>
@@ -59,6 +62,15 @@
   var no = Suite.params.get("no") || "";
   if (!s || s.kind !== "staff") { location.replace(Suite.link("login.html")); return; }
 
+  /* UPI QR for what is still due (or the total of a UPI bill); none on fully paid cash/cheque bills or cancelled ones */
+  function invoiceQr(b, c) {
+    if (b.kind !== "BILL" || String(b.status).toLowerCase() === "cancelled" || !c.upi || !c.upi_qr || c.upi_qr === "off" || !window.QR) return "";
+    var due = b.pay_mode === "UPI" ? (b.paid || b.total) : Math.round((b.total - b.paid) * 100) / 100;
+    if (!(due > 0.005)) return "";
+    var amt = c.upi_qr === "amount" ? due : 0;
+    return '<div class="inv-qr">' + QR.svg(QR.upiLink({ upi: c.upi, name: c.name, amount: amt, note: b.bill_no }), 110) +
+      "<div><b>Scan to pay" + (amt ? " " + n2(amt) : "") + "</b><br>with any UPI app" + (amt ? "<br><small>Note: " + esc(b.bill_no) + "</small>" : "") + "</div></div>";
+  }
   function n2(v) { return Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function niceDate(ymd) { var p = String(ymd).split("-"); return p.length === 3 ? p[2] + "-" + p[1] + "-" + p[0] : ymd; }
 
@@ -121,6 +133,7 @@
       (c.bank ? "<div>Bank: " + esc(c.bank) + "</div>" : "") + (c.account ? "<div>Account no: " + esc(c.account) + "</div>" : "") + (c.ifsc ? "<div>IFSC: " + esc(c.ifsc) + "</div>" : "") +
       (!c.upi && !c.bank ? '<div class="muted">Add UPI and bank details in Company setup to show them here.</div>' : "") +
       (b.kind === "BILL" ? "<div style=\"margin-top:6px\">Paid: " + n2(b.paid) + (b.total - b.paid > 0.005 ? " · Balance due: <b>" + n2(b.total - b.paid) + "</b>" : "") + "</div>" : "") +
+      invoiceQr(b, c) +
       '</div><div class="box totals">' +
       (b.kind !== "COLLECTION" ? "<div><span>Taxable value</span><span>" + n2(b.taxable) + "</span></div>" +
         (inter ? "<div><span>IGST</span><span>" + n2(b.igst) + "</span></div>" : "<div><span>CGST</span><span>" + n2(b.cgst) + "</span></div><div><span>SGST</span><span>" + n2(b.sgst) + "</span></div>") +
@@ -144,9 +157,9 @@
       { product: "Floor Cleaner", pack: "1 L", hsn: "34022090", qty: 6, free_qty: 0, gst: 18, taxable: 610.17, cgst: 54.92, sgst: 54.92, igst: 0, total: 720.01 },
       { product: "Dish Wash Liquid", pack: "500 ml", hsn: "34022090", qty: 10, free_qty: 1, gst: 18, taxable: 720.34, cgst: 64.83, sgst: 64.83, igst: 0, total: 850 }];
     render({ bill: { bill_no: no || "R1/JOSE/26/00012", kind: "BILL", bill_date: new Date().toISOString().slice(0, 10), shop_id: "S0001", shop_name: "City Supermarket",
-                     route_id: "R1", user_name: "Joseph (Sales)", pay_mode: "Cash", taxable: 1330.51, cgst: 119.75, sgst: 119.75, igst: 0, round_off: -0.01, total: 1570, paid: 1570, status: "Active" },
+                     route_id: "R1", user_name: "Joseph (Sales)", pay_mode: "Credit", taxable: 1330.51, cgst: 119.75, sgst: 119.75, igst: 0, round_off: -0.01, total: 1570, paid: 0, status: "Active" },
              lines: lines, shop: { name: "City Supermarket", address: "Market Road", phone: "9800000001", gstin: "32AAAAA1111A1Z1" },
-             company: { name: Suite.client().name, address: "Industrial Estate, Kochi", state: "Kerala", pincode: "682000", gstin: "32ABCDE1234F1Z5", phone: "0484 000000", upi: "demo@upi", bank: "Demo Bank", account: "000123456789", ifsc: "DEMO0001234" } });
+             company: { name: Suite.client().name, address: "Industrial Estate, Kochi", state: "Kerala", pincode: "682000", gstin: "32ABCDE1234F1Z5", phone: "0484 000000", upi: "demo@upi", upi_qr: "amount", bank: "Demo Bank", account: "000123456789", ifsc: "DEMO0001234" } });
     return;
   }
   if (!no) { fail("No bill number was given."); return; }

@@ -102,6 +102,9 @@
       '<h3 style="margin:10px 0 4px;font-size:17px">Payment details on invoices (optional)</h3><p class="muted" style="margin:0 0 12px">Printed on tax invoices and bills so shops know where to pay.</p>' +
       '<div class="form-grid">' +
       '<label class="field"><span>UPI ID</span><input name="upi" value="' + esc(c.upi || "") + '" placeholder="name@bank"></label>' +
+      '<label class="field"><span>UPI QR on bills</span><select name="upi_qr">' +
+        [["off", "Off"], ["amount", "QR with the bill amount (recommended)"], ["fixed", "Fixed QR (customer types the amount)"]].map(function (o) {
+          return '<option value="' + o[0] + '"' + ((c.upi_qr || "off") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
       '<label class="field"><span>Bank name</span><input name="bank" value="' + esc(c.bank || "") + '"></label>' +
       '<label class="field"><span>Account number</span><input name="account" value="' + esc(c.account || "") + '" inputmode="numeric"></label>' +
       '<label class="field"><span>IFSC</span><input name="ifsc" value="' + esc(c.ifsc || "") + '" maxlength="11"></label>' +
@@ -113,7 +116,7 @@
       var err = f.querySelector(".form-error");
       if (!f.name.value.trim()) { err.textContent = "Enter your company name."; return; }
       if (!f.state.value) { err.textContent = "Pick your state (it decides CGST + SGST or IGST on bills)."; return; }
-      var data = {}; ["name", "address", "state", "pincode", "gstin", "phone", "email", "logo", "upi", "bank", "account", "ifsc"].forEach(function (k) { data[k] = f[k].value.trim(); });
+      var data = {}; ["name", "address", "state", "pincode", "gstin", "phone", "email", "logo", "upi", "upi_qr", "bank", "account", "ifsc"].forEach(function (k) { data[k] = f[k].value.trim(); });
       call("saveCompanyProfile", { company: data }).then(function (r) { P.company = r.company; nextStep(root); })
         .catch(function (e2) { err.textContent = e2.message; });
     };

@@ -490,10 +490,23 @@
     } else out.push(padR(e.pay_mode, W));
     if (e.note) out.push("Note: " + e.note);
     out.push(rule());
-    if (e.kind === "BILL" && c.upi) out.push(centre("Pay by UPI: " + c.upi));
+    var uq = upiFor(e);
+    if (uq) { out.push(centre("Scan to pay" + (uq.amount ? " Rs " + num(uq.amount) : "") + " by UPI")); out.push(centre(c.upi)); }
+    else if (e.kind === "BILL" && c.upi) out.push(centre("Pay by UPI: " + c.upi));
     out.push(centre("Thank you"));
     out.push(centre("Sold by " + st.who.name));
     return out.join("\n");
+  }
+
+  /* UPI QR for a bill (Company setup: off / fixed / with bill amount). Shown when something is due or the bill is paid by UPI. */
+  function upiFor(e) {
+    var c = (st.boot && st.boot.company) || {};
+    if (e.kind !== "BILL" || !c.upi || !c.upi_qr || c.upi_qr === "off" || !window.QR) return null;
+    var due = e.pay_mode === "UPI" ? (e.paid || e.total) : r2(e.total - e.paid);
+    if (!(due > 0.005)) return null;
+    var withAmount = c.upi_qr === "amount";
+    return { amount: withAmount ? due : 0, due: due, upi: c.upi,
+      link: QR.upiLink({ upi: c.upi, name: c.name || "", amount: withAmount ? due : 0, note: e.bill_no }) };
   }
 
   function whatsappText(e) {
@@ -508,7 +521,9 @@
     }
     lines.push("*Total ₹" + num(e.total) + "*" + (e.kind === "BILL" ? " · Paid ₹" + num(e.paid) + " (" + e.pay_mode + ")" : " · " + e.pay_mode));
     if (e.kind === "BILL" && e.total - e.paid > 0.005) lines.push("Balance ₹" + num(e.total - e.paid));
-    if (e.kind === "BILL" && c.upi) lines.push("Pay by UPI: " + c.upi);
+    var uq = upiFor(e);
+    if (uq) lines.push("Pay by UPI: " + c.upi + " · ₹" + num(uq.due) + " · note " + e.bill_no);
+    else if (e.kind === "BILL" && c.upi) lines.push("Pay by UPI: " + c.upi);
     lines.push("", "Thank you! – " + st.who.name);
     return lines.join("\n");
   }
@@ -529,6 +544,8 @@
       (e.state === "sent" ? '<div class="msg ok">Sent to the office.</div>' : e.state === "err" ? '<div class="msg err">Not saved at the office: ' + esc(e.err || "") + "</div>" : '<div class="msg warn">Saved on the phone. It goes to the office automatically when there\'s signal.</div>') +
       printTip() +
       '<pre class="receipt" id="rcpt"></pre>' +
+      (upiFor(e) ? '<div class="qr-box">' + QR.svg(upiFor(e).link, 220) + '<p><b>Scan to pay' + (upiFor(e).amount ? " ₹" + num(upiFor(e).amount) : "") +
+        '</b> with any UPI app<br><small class="muted">' + esc(upiFor(e).upi) + (upiFor(e).amount ? " · note " + esc(e.bill_no) : "") + "</small></p></div>" : "") +
       '<div class="stack"><button class="btn btn-ink" id="wa" type="button">Send on WhatsApp</button>' +
       '<button class="btn btn-line" id="pr" type="button">Print</button>' +
       '<p class="muted" style="margin:-4px 0 4px;font-size:13px">' + esc(printerLine()) + ' · <a href="#" id="prSet">Printer settings</a></p>' +
@@ -542,7 +559,7 @@
       var n = waNumber(e.shop_phone || (shopById(e.shop_id) || {}).phone);
       window.open("https://wa.me/" + n + "?text=" + encodeURIComponent(whatsappText(e)), "_blank");
     };
-    $("pr").onclick = function () { printText(text, $("pr")); };
+    $("pr").onclick = function () { var uq = upiFor(e); printText(text, $("pr"), uq && uq.link); };
     $("prSet").onclick = function (ev) { ev.preventDefault(); show(viewPrinter, null, true); };
     if ($("sh")) $("sh").onclick = function () { navigator.share({ title: e.bill_no, text: whatsappText(e) }).catch(function () {}); };
     $("done").onclick = home;
@@ -570,8 +587,10 @@
     return (pr.width === 58 ? "58 mm" : "80 mm") + " · " +
       (pr.method === "bt" ? "Bluetooth" + (pr.name ? " (" + pr.name + ")" : "") : pr.method === "rawbt" ? "RawBT app" : "Phone print dialog");
   }
-  function escpos(text) {
+  function escpos(text, qrLink) {
     var lines = text.split("\n"), bytes = [0x1B, 0x40];           // reset
+    var qrAfter = -1;
+    if (qrLink) lines.forEach(function (ln, i) { if (/Scan to pay/.test(ln)) qrAfter = i + 1; });   // after the caption and UPI ID
     function add(str) { for (var i = 0; i < str.length; i++) { var c = str.charCodeAt(i); bytes.push(c < 128 ? c : 63); } }
     lines.forEach(function (ln, i) {
       if (i === 0) { bytes.push(0x1B, 0x45, 1, 0x1D, 0x21, 0x01); add(ln); bytes.push(0x0A, 0x1D, 0x21, 0x00, 0x1B, 0x45, 0); return; }  // company name bold, tall
@@ -579,18 +598,38 @@
       if (big) bytes.push(0x1B, 0x45, 1);
       add(ln); bytes.push(0x0A);
       if (big) bytes.push(0x1B, 0x45, 0);
+      if (qrLink && i === qrAfter) escposQr(bytes, qrLink);
     });
     bytes.push(0x1B, 0x64, 4);                                    // feed 4 lines to tear off
     return new Uint8Array(bytes);
   }
-  function systemPrint(text) {
+  /* QR code on the printer: the printer's own QR command (sharp, fast), or as a picture for printers without it */
+  function escposQr(bytes, link) {
+    bytes.push(0x1B, 0x61, 1);                                    // centre
+    if (pr.qr === "image") {
+      var img = QR.raster(link, pr.width === 58 ? 5 : 7), xL = img.rowBytes & 255, xH = img.rowBytes >> 8, yL = img.height & 255, yH = img.height >> 8;
+      bytes.push(0x1D, 0x76, 0x30, 0, xL, xH, yL, yH);
+      for (var i = 0; i < img.bytes.length; i++) bytes.push(img.bytes[i]);
+    } else {
+      var d = []; for (var j = 0; j < link.length; j++) d.push(link.charCodeAt(j) & 255);
+      var n = d.length + 3;
+      bytes.push(0x1D, 0x28, 0x6B, 4, 0, 0x31, 0x41, 0x32, 0);     // model 2
+      bytes.push(0x1D, 0x28, 0x6B, 3, 0, 0x31, 0x43, pr.width === 58 ? 5 : 7);   // module size
+      bytes.push(0x1D, 0x28, 0x6B, 3, 0, 0x31, 0x45, 0x31);        // error correction M
+      bytes.push(0x1D, 0x28, 0x6B, n & 255, n >> 8, 0x31, 0x50, 0x30); Array.prototype.push.apply(bytes, d);
+      bytes.push(0x1D, 0x28, 0x6B, 3, 0, 0x31, 0x51, 0x30);        // print it
+    }
+    bytes.push(0x0A, 0x1B, 0x61, 0);                              // back to left
+  }
+  function systemPrint(text, qrLink) {
     var a = $("printArea");
-    a.textContent = text; a.style.width = pr.width + "mm"; a.style.fontSize = pr.width === 58 ? "10.5px" : "12px";
+    $("printText").textContent = text; $("printQr").innerHTML = qrLink ? QR.svg(qrLink, 150) : "";
+    a.style.width = pr.width + "mm"; $("printText").style.fontSize = pr.width === 58 ? "10.5px" : "12px";
     document.getElementById("pageSize").textContent = "@media print { @page { size: " + pr.width + "mm auto; margin: 2mm; } }";
     a.hidden = false; window.print(); setTimeout(function () { a.hidden = true; }, 500);
   }
-  function rawbtPrint(text) {
-    var b = escpos(text), bin = "";
+  function rawbtPrint(text, qrLink) {
+    var b = escpos(text, qrLink), bin = "";
     for (var i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
     location.href = "intent:base64," + btoa(bin) + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
   }
@@ -635,12 +674,12 @@
       throw err;
     });
   }
-  function printText(text, btn) {
-    if (pr.method === "rawbt") { rawbtPrint(text); printedOk(); return; }
-    if (pr.method !== "bt" || !navigator.bluetooth) { systemPrint(text); printedOk(); return; }
+  function printText(text, btn, qrLink) {
+    if (pr.method === "rawbt") { rawbtPrint(text, qrLink); printedOk(); return; }
+    if (pr.method !== "bt" || !navigator.bluetooth) { systemPrint(text, qrLink); printedOk(); return; }
     var label = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Printing…"; }
-    btConnect(false).then(function (ch) { return btWrite(ch, escpos(text)); })
+    btConnect(false).then(function (ch) { return btWrite(ch, escpos(text, qrLink)); })
       .then(function () { printedOk(); if (btn) btn.textContent = "Printed ✓"; setTimeout(function () { if (btn) { btn.textContent = label; btn.disabled = false; } }, 1500); })
       .catch(function (err) {
         bt.ch = null;
@@ -667,6 +706,9 @@
         (pr.name ? " Last used: " + esc(pr.name) + "." : ""), pr.method === "bt") : "") +
       opt("m", "rawbt", "RawBT app", "Works with almost any Bluetooth printer. Install \u201cRawBT\u201d from the Play Store and pair the printer in it once.", pr.method === "rawbt") +
       opt("m", "system", "Phone print dialog", "Uses the phone's own printing.", pr.method === "system" || (!hasBt && pr.method === "bt")) + "</div>" +
+      '<div class="card"><h2 style="font-size:16px">UPI QR code on bills</h2>' +
+      opt("q", "native", "Printer draws the QR", "Sharpest and quickest. Most van printers can do this.", pr.qr !== "image") +
+      opt("q", "image", "Print the QR as a picture", "Choose this if the test slip shows no QR, or strange characters instead.", pr.qr === "image") + "</div>" +
       '<div class="stack"><button class="btn btn-ink" id="pSave" type="button">Save</button>' +
       '<button class="btn btn-line" id="pTest" type="button">Print a test slip</button>' +
       (hasBt ? '<button class="btn btn-line" id="pPick" type="button">Choose a different Bluetooth printer</button>' : "") + "</div>";
@@ -674,14 +716,17 @@
     function read() {
       var w = document.querySelector('input[name="w"]:checked'), m = document.querySelector('input[name="m"]:checked');
       pr.width = w && w.value === "58" ? 58 : 80; pr.method = m ? m.value : "system";
+      var q = document.querySelector('input[name="q"]:checked'); pr.qr = q && q.value === "image" ? "image" : "native";
       W = pr.width === 58 ? 32 : 48; savePrinter();
     }
     $("pSave").onclick = function () { read(); flash("Printer settings saved: " + printerLine() + ".", "ok"); back(); };
     $("pTest").onclick = function () {
       read();
       var t = [centre((st.boot && st.boot.company && st.boot.company.name) || "Test print"), rule("="), centre("TEST SLIP"),
-        padR("Paper: " + pr.width + " mm", W), padR("Printer: " + printerLine(), W), rule(), "1234567890".repeat(5).slice(0, W), rule(), centre("Printing works")].join("\n");
-      printText(t, $("pTest"));
+        padR("Paper: " + pr.width + " mm", W), padR("Printer: " + printerLine(), W), rule(), "1234567890".repeat(5).slice(0, W), rule(),
+        centre("Scan to pay - test QR"), centre("(scan only, don't pay)"), centre("Printing works")].join("\n");
+      var c0 = (st.boot && st.boot.company) || {};
+      printText(t, $("pTest"), QR.upiLink({ upi: c0.upi || "test@upi", name: (c0.name || "Test") + " TEST", note: "Test slip" }));
     };
     if ($("pPick")) $("pPick").onclick = function () {
       read(); pr.method = "bt"; savePrinter();
@@ -746,7 +791,7 @@
   function demo(action, p) {
     if (action === "salesBootstrap") {
       return { ok: true, inclusive: true, userCode: "DEMO", lastSeq: {}, serverDate: today(),
-        company: { name: Suite.client().name, address: "Industrial Estate, Kochi", gstin: "32ABCDE1234F1Z5", phone: "0484 000000", upi: "demo@upi" },
+        company: { name: Suite.client().name, address: "Industrial Estate, Kochi", gstin: "32ABCDE1234F1Z5", phone: "0484 000000", upi: "demo@upi", upi_qr: "amount" },
         routes: [{ route_id: "R1", name: "North route" }, { route_id: "R2", name: "South route" }],
         shops: [
           { shop_id: "S0001", name: "City Supermarket", route_id: "R1", address: "Market Road", phone: "9800000001", gstin: "32AAAAA1111A1Z1", credit: true },
