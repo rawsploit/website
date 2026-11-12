@@ -95,7 +95,7 @@
     call("listUsers").then(function (res) {
       var rows = res.users.map(function (u) {
         var state = u.status !== "active" ? '<span class="status soon">Off</span>' : u.locked ? '<span class="status soon">Locked</span>' : '<span class="status live">Active</span>';
-        return "<tr><td><b>" + esc(u.name) + "</b><br><span class=\"muted\">" + esc(u.username) + "</span></td><td>" + esc(Suite.teamName(u.role)) +
+        return "<tr><td><b>" + esc(u.name) + "</b><br><span class=\"muted\">" + esc(u.username) + (u.empCode ? " · " + esc(u.empCode) : "") + "</span></td><td>" + esc(Suite.teamName(u.role)) +
           "</td><td>" + state + "</td><td>" + when(u.lastLogin) + '</td><td><button class="btn btn-line btn-small" type="button" data-edit="' + esc(u.username) + '">Edit</button></td></tr>';
       });
       body.innerHTML = '<div class="row-head"><h3>Staff sign-ins</h3><button class="btn btn-ink btn-small" type="button" id="addUser">Add a person</button></div>' +
@@ -147,7 +147,10 @@
       '<label class="field"><span>Team</span><select name="role">' + teamOptions(u.role) + "</select></label>" +
       '<label class="field"><span>Sign-in</span><select name="status"><option value="active"' + (u.status === "active" ? " selected" : "") + '>On</option><option value="off"' + (u.status !== "active" ? " selected" : "") + ">Off</option></select></label>" +
       (isNew ? '<label class="field"><span>Starting password</span><input name="password" type="password" autocomplete="new-password"></label>' : '<input name="password" type="hidden" value="">') +
-      "</div>" + (isNew ? '<p class="muted">Give them this password. When they first sign in, they will be asked to choose their own.</p>' : "") +
+      '<label class="field"><span>Employee code (optional)</span><input name="empCode" value="' + esc(u.empCode || "") + '" maxlength="20" placeholder="e.g. HG-014"></label>' +
+      '<label class="field"><span>Email (optional)</span><input name="email" type="email" value="' + esc(u.email || "") + '" maxlength="120"></label>' +
+      '<label class="field"><span>Phone (optional)</span><input name="phone" type="tel" value="' + esc(u.phone || "") + '" maxlength="20"></label>' +
+      "</div>" + (isNew ? '<p class="muted">Give them this password. When they first sign in, they will be asked to choose their own. They will also appear in Payroll for HR to add their salary.</p>' : "") +
       '<div id="pwReset"></div>' + (u.locked ? '<p class="muted">This sign-in is locked after too many wrong passwords. Setting a new password unlocks it.</p>' : "") +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">' + (isNew ? "Add person" : "Save changes") +
       '</button><button class="btn btn-line" type="button" data-cancel>Cancel</button></div></form>';
@@ -155,7 +158,8 @@
     f.querySelector("[data-cancel]").onclick = function () { box.innerHTML = ""; };
     f.onsubmit = function (e) {
       e.preventDefault();
-      var d = { name: f.name.value.trim(), username: f.username.value.trim().toLowerCase(), role: f.role.value, status: f.status.value, password: f.password.value };
+      var d = { name: f.name.value.trim(), username: f.username.value.trim().toLowerCase(), role: f.role.value, status: f.status.value, password: f.password.value,
+                empCode: f.empCode.value.trim().toUpperCase(), email: f.email.value.trim(), phone: f.phone.value.trim() };
       var err = !d.name ? "Enter the person's name." : !d.username ? "Choose a username." : isNew && d.password.length < 8 ? "Give them a starting password of at least 8 characters." : "";
       if (err) { f.querySelector(".form-error").textContent = err; return; }
       f.querySelector("[type=submit]").disabled = true;
