@@ -139,7 +139,7 @@
   }
   function brandKeep(b) {
     try {
-      var raw = JSON.stringify({ logo: b.logo || "", accent: b.accent || "", pattern: b.pattern || "" });
+      var raw = JSON.stringify({ logo: b.logo || "", accent: b.accent || "", pattern: b.pattern || "", look: b.look || null });
       if (isDemo()) sessionStorage.setItem("suite.demoBrand", raw); else localStorage.setItem(BRAND_KEY + clientId(), raw);
     } catch (e) { /* storage full or blocked: the page still shows it now */ }
   }
@@ -154,19 +154,43 @@
     return { acc: hex, deep: mixHex(c, [0, 0, 0], 0.35), mid: mixHex(c, [255, 255, 255], 0.18), soft: mixHex(c, [255, 255, 255], 0.9),
              ink: lum > 0.62 ? "#1B1E2B" : "#FFFFFF" };
   }
+  /* the company theme: one colour (shaded), two colours, or the company's picture */
+  function brandLook(b) {
+    b = b || {};
+    var L = b.look || { style: "solid", accent: b.accent || "", pattern: b.pattern || "" };
+    var DIR = { down: "180deg", across: "90deg", diagonal: "135deg" };
+    var main = L.accent || L.accent2 || "";
+    var col = brandColours(main);
+    var side = "", wide = "", ink = col ? col.ink : "#FFFFFF";
+    if (L.style === "picture" && L.side) {
+      ink = L.ink === "dark" ? "#1B1E2B" : "#FFFFFF";
+      var veil = ink === "#FFFFFF" ? "rgba(0,0,0,.32)" : "rgba(255,255,255,.45)";
+      side = wide = "linear-gradient(" + veil + "," + veil + "), url(\"" + String(L.side).replace(/["\\()]/g, "") + "\") center / cover no-repeat " + (col ? col.deep : "#333");
+    } else if (L.style === "gradient" && L.accent && L.accent2) {
+      side = wide = "linear-gradient(" + (DIR[L.dir] || "180deg") + "," + L.accent + "," + L.accent2 + ")";
+      var a = brandColours(L.accent), z = brandColours(L.accent2);
+      ink = a.ink === "#FFFFFF" || z.ink === "#FFFFFF" ? "#FFFFFF" : "#1B1E2B";
+    } else if (col) {
+      side = "linear-gradient(180deg," + col.deep + " 0%," + col.acc + " 55%," + col.mid + " 100%)";
+      wide = "linear-gradient(160deg," + col.deep + " 0%," + col.acc + " 60%," + col.mid + " 100%)";
+    }
+    return { look: L, col: col, side: side, wide: wide, ink: ink, pattern: L.pattern || "" };
+  }
   function applyBrand(b) {
     b = b || {};
     var root = document.documentElement.style, body = document.body;
-    var col = brandColours(b.accent);
+    var t = brandLook(b);
     if (body) {
-      body.classList.toggle("branded", !!col);
-      body.classList.toggle("has-pattern", !!b.pattern);
+      body.classList.toggle("branded", !!t.side);
+      body.classList.toggle("has-accent", !!t.col);
+      body.classList.toggle("has-pattern", !!t.pattern);
     }
-    if (col) {
-      root.setProperty("--b-acc", col.acc); root.setProperty("--b-deep", col.deep); root.setProperty("--b-mid", col.mid);
-      root.setProperty("--b-soft", col.soft); root.setProperty("--b-ink", col.ink);
+    if (t.side) { root.setProperty("--b-side", t.side); root.setProperty("--b-wide", t.wide); root.setProperty("--b-ink", t.ink); }
+    if (t.col) {
+      root.setProperty("--b-acc", t.col.acc); root.setProperty("--b-deep", t.col.deep); root.setProperty("--b-mid", t.col.mid);
+      root.setProperty("--b-soft", t.col.soft); root.setProperty("--b-acc-ink", t.col.ink);
     }
-    root.setProperty("--b-pattern", b.pattern ? 'url("' + String(b.pattern).replace(/["\\()]/g, "") + '")' : "none");
+    root.setProperty("--b-pattern", t.pattern ? 'url("' + String(t.pattern).replace(/["\\()]/g, "") + '")' : "none");
     document.querySelectorAll("img[data-client-logo]").forEach(function (img) {
       if (b.logo) { img.src = b.logo; img.alt = client().name; img.hidden = false; } else { img.hidden = true; img.removeAttribute("src"); }
     });
@@ -183,7 +207,7 @@
   }
   /* Demo company: forget every picture, colour and word anyone added in this tab. */
   function resetDemo() {
-    ["suite.demoBrand", "suite.sfDemo", "suite.sfDemoState"].forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) {} });
+    ["suite.demoBrand", "suite.demoBrandKit", "suite.sfDemo", "suite.sfDemoState"].forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) {} });
     applyBrand({});
   }
 
@@ -212,7 +236,7 @@
 
   window.Suite = {
     params: params, clientId: clientId, client: client, isDemo: isDemo, link: link,
-    brandCached: brandCached, brandKeep: brandKeep, brandColours: brandColours, applyBrand: applyBrand, loadBrand: loadBrand, resetDemo: resetDemo,
+    brandCached: brandCached, brandKeep: brandKeep, brandColours: brandColours, brandLook: brandLook, applyBrand: applyBrand, loadBrand: loadBrand, resetDemo: resetDemo,
     getSession: getSession, clearSession: clearSession, signIn: signIn, api: api, setSession: setSession,
     modulesFor: modulesFor, teamName: teamName, brand: brand, esc: esc,
     contactInfo: contactInfo, contactHtml: contactHtml

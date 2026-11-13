@@ -65,7 +65,7 @@
     if (id === "routes") return P.routes.some(function (r) { return r.active; });
     if (id === "distributors") return P.distributors.length > 0;
     if (id === "products") return P.products.some(function (p) { return p.active; });
-    if (id === "brand") { var b = BRAND || Suite.brandCached(); return !!(b.logo || b.accent); }
+    if (id === "brand") { var b = (BRAND && BRAND.brand) || Suite.brandCached(); return !!(b.logo || b.accent || (b.look && b.look.side)); }
     return false;
   }
 
@@ -637,110 +637,270 @@
     return { call: call };
   })();
 
-  /* ---------------- 6. brand kit (admins only) ---------------- */
-  var SWATCHES = ["#0E5E63", "#1F6F43", "#2E7D32", "#1D4FA8", "#2A45A6", "#5B2C83", "#7A1F2E", "#B3261E", "#B86E00", "#3E4A59"];
+  /* ---------------- 6. brand kit (admins only) ----------------
+     Logo, and the theme: one for every module, or each module its own.
+     A theme is one colour, two colours (gradient) or the company's own picture, plus an optional pattern. */
+  var SWATCHES = ["#0E5E63", "#1F6F43", "#2E7D32", "#1D4FA8", "#2A45A6", "#5B2C83", "#7A1F2E", "#B3261E", "#B86E00", "#D4A017", "#3E4A59", "#111827"];
+  var SIDEBAR_TARGETS = ["company", "stockbook", "nexus"];      // these show their theme down a sidebar; the rest across a top band
+  var bkTarget = "company";
 
-  function brandCall(action, payload) {
-    if (Suite.isDemo()) {
-      var b = Suite.brandCached();
-      if (action === "saveBrand") b.accent = payload.accent || "";
-      else if (action === "uploadBrandImage") b[payload.slot] = payload.dataUrl;
-      else if (action === "removeBrandImage") b[payload.slot] = "";
-      Suite.brandKeep(b);
-      return Promise.resolve({ ok: true, brand: Suite.brandCached() });
+  function modName(key) {
+    if (key === "company") return "Company theme";
+    var m = (window.MODULES || []).filter(function (x) { return x.id === key; })[0];
+    return m ? m.name : key;
+  }
+  function blankLook() { return { style: "solid", accent: "", accent2: "", dir: "down", ink: "light", side: "", pattern: "" }; }
+
+  /* demo company: the whole kit lives in this browser tab */
+  function demoKit() {
+    var k = null;
+    try { k = JSON.parse(sessionStorage.getItem("suite.demoBrandKit") || "null"); } catch (e) {}
+    k = k || { perModule: false, company: blankLook(), mods: {}, logo: "" };
+    k.modules = ["stockbook", "stocktake", "fieldsales", "collections", "nexus", "cashrecon", "books", "pnl", "payroll", "mis"];
+    return k;
+  }
+  function demoView(k) {
+    try { sessionStorage.setItem("suite.demoBrandKit", JSON.stringify(k)); } catch (e) {}
+    var pub = { logo: k.logo, accent: k.company.accent, pattern: k.company.pattern, look: k.company };
+    Suite.brandKeep(pub);
+    return { ok: true, brand: pub, perModule: k.perModule, company: k.company, mods: k.mods, modules: k.modules };
+  }
+  function brandCall(action, p) {
+    if (!Suite.isDemo()) return call(action, p);
+    var k = demoKit(), t = p.target || "company";
+    if (action === "saveBrand") {
+      if (p.perModule !== undefined) k.perModule = !!p.perModule;
+      if (t !== "company" && p.useCompany) delete k.mods[t];
+      else if (p.look) {
+        var base = t === "company" ? k.company : (k.mods[t] || {});
+        var l = Object.assign(blankLook(), p.look, { side: base.side || "", pattern: base.pattern || "" });
+        if (t === "company") k.company = l; else k.mods[t] = l;
+      }
+    } else if (action === "uploadBrandImage" || action === "removeBrandImage") {
+      var url = action === "uploadBrandImage" ? p.dataUrl : "";
+      if (p.slot === "logo") k.logo = url;
+      else {
+        if (t !== "company" && !k.mods[t]) k.mods[t] = Object.assign(blankLook(), k.company, { side: "", pattern: "" });
+        var look = t === "company" ? k.company : k.mods[t];
+        look[p.slot] = url;
+        if (p.slot === "side") look.style = url ? "picture" : (look.accent2 ? "gradient" : "solid");
+      }
     }
-    return call(action, payload);
+    return Promise.resolve(demoView(k));
+  }
+
+  function previewHtml(target, L, logo) {
+    var t = Suite.brandLook({ look: L });
+    var bar = t.side || "linear-gradient(180deg,#0B4A4E,#0E5E63 55%,#3A8589)";
+    var ink = t.side ? t.ink : "#FFFFFF";
+    var acc = t.col ? t.col.acc : "#0E5E63";
+    var name = target === "company" ? "Your portal" : modName(target);
+    var pat = L.pattern ? ' style="background-image:linear-gradient(rgba(246,243,236,.86),rgba(246,243,236,.86)),url(\'' + esc(L.pattern) + '\');background-size:auto,120px"' : "";
+    var logoHtml = logo ? '<img src="' + esc(logo) + '" alt="">' : '<div class="bk-nologo">Your logo</div>';
+    var body = '<div class="bk-title" style="color:' + acc + '">' + esc(name) + '</div><div class="bk-cards"><i></i><i></i><i></i></div><div class="bk-table"></div>';
+    if (SIDEBAR_TARGETS.indexOf(target) > -1) {
+      return '<div class="bk-preview"><div class="bk-side" style="background:' + esc(bar) + ";color:" + ink + '">' + logoHtml +
+        "<b>" + esc(name) + '</b><small>Menu</small><span class="on">Dashboard</span><span>Entries</span><span>Reports</span><span>Settings</span></div>' +
+        '<div class="bk-main"' + pat + ">" + body + "</div></div>";
+    }
+    var across = t.side ? t.side.replace("180deg", "90deg") : bar;
+    if (L.style !== "picture" && L.style !== "gradient" && t.col) across = "linear-gradient(90deg," + t.col.deep + " 0%," + t.col.acc + " 55%," + t.col.mid + " 100%)";
+    return '<div class="bk-preview top"><div class="bk-band" style="background:' + esc(across) + ";color:" + ink + '">' + logoHtml + "<b>" + esc(name) + "</b><span>Sign out</span></div>" +
+      '<div class="bk-main"' + pat + ">" + body + "</div></div>";
+  }
+
+  function swatchRow(name, current) {
+    return '<div class="bk-swatches" data-swrow="' + name + '">' + SWATCHES.map(function (h) {
+      return '<button type="button" class="bk-sw' + (current === h ? " on" : "") + '" data-sw="' + h + '" style="background:' + h + '" aria-label="Colour ' + h + '"></button>';
+    }).join("") + '<label class="bk-own" title="Pick your own colour"><input type="color" data-own="' + name + '" value="' + esc(current || "#0E5E63") + '"> Own</label></div>';
   }
 
   function stepBrand(body, root) {
     if (!BRAND) {
       body.innerHTML = '<p class="muted">Loading your brand…</p>';
-      brandCall(Suite.isDemo() ? "saveBrand" : "brandKit", Suite.isDemo() ? { accent: Suite.brandCached().accent || "" } : {})
-        .then(function (r) { BRAND = r.brand || {}; stepBrand(body, root); })
-        .catch(function (e) { body.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
+      brandCall("brandKit", {}).then(function (r) {
+        if (Suite.isDemo()) r = demoView(demoKit());
+        BRAND = r; stepBrand(body, root);
+      }).catch(function (e) { body.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
       return;
     }
-    var b = BRAND, col = Suite.brandColours(b.accent) || Suite.brandColours("#0E5E63");
-    var preview =
-      '<div class="bk-preview" style="--p-acc:' + col.acc + ";--p-deep:" + col.deep + ";--p-mid:" + col.mid + ";--p-ink:" + col.ink + '">' +
-        '<div class="bk-side">' + (b.logo ? '<img src="' + esc(b.logo) + '" alt="">' : '<div class="bk-nologo">Your logo</div>') +
-          "<b>StockBook</b><small>Daily stock</small><span class=\"on\">Dashboard</span><span>Production</span><span>Stock report</span><span>Returns</span></div>" +
-        '<div class="bk-main' + (b.pattern ? " pat" : "") + '"' + (b.pattern ? ' style="--p-pat:url(\'' + esc(b.pattern) + '\')"' : "") + '>' +
-          '<div class="bk-title" style="color:' + col.acc + '">Daily dashboard</div><div class="bk-cards"><i></i><i></i><i></i></div><div class="bk-table"></div></div>' +
-      "</div>";
+    var K = BRAND;
+    var logo = (K.brand && K.brand.logo) || "";
+    if (!K.perModule) bkTarget = "company";
+    var own = bkTarget !== "company" && !!K.mods[bkTarget];
+    var L = Object.assign(blankLook(), bkTarget === "company" ? K.company : (K.mods[bkTarget] || K.company));
+    var tall = SIDEBAR_TARGETS.indexOf(bkTarget) > -1;
+    var editing = bkTarget === "company" || own;
+
+    var list = K.perModule ? '<div class="bk-list"><button type="button" class="bk-row' + (bkTarget === "company" ? " on" : "") + '" data-target="company">' +
+        swatchDot(K.company) + "<span><b>Company theme</b><small>Portal, sign-in, storefront and any module left alone</small></span></button>" +
+        K.modules.map(function (key) {
+          var m = K.mods[key];
+          return '<button type="button" class="bk-row' + (bkTarget === key ? " on" : "") + '" data-target="' + key + '">' + swatchDot(m || K.company) +
+            "<span><b>" + esc(modName(key)) + "</b><small>" + (m ? "Own theme" : "Company theme") + "</small></span></button>";
+        }).join("") + "</div>" : "";
+
+    var editor = "";
+    if (bkTarget !== "company") {
+      editor += '<label class="ca-check bk-usecompany"><input type="checkbox" id="bkUseCompany"' + (own ? "" : " checked") + "> Use the company theme for " + esc(modName(bkTarget)) + "</label>";
+    }
+    if (editing) {
+      editor +=
+        '<div class="bk-styles" role="radiogroup" aria-label="Theme style">' +
+          [["solid", "One colour"], ["gradient", "Two colours"], ["picture", "My own picture"]].map(function (o) {
+            return '<button type="button" role="radio" class="bk-style' + (L.style === o[0] ? " on" : "") + '" aria-checked="' + (L.style === o[0]) + '" data-style="' + o[0] + '">' + o[1] + "</button>";
+          }).join("") + "</div>" +
+        '<div data-for="solid gradient picture"><h4 class="bk-sub" data-label-acc>' + (L.style === "picture" ? "Button and heading colour" : L.style === "gradient" ? "First colour" : "Colour") + "</h4>" + swatchRow("accent", L.accent) + "</div>" +
+        '<div data-for="gradient"><h4 class="bk-sub">Second colour</h4>' + swatchRow("accent2", L.accent2) +
+          '<label class="field" style="max-width:260px"><span>Direction</span><select id="bkDir">' +
+          [["down", "Top to bottom"], ["across", "Left to right"], ["diagonal", "Diagonal"]].map(function (o) {
+            return '<option value="' + o[0] + '"' + (L.dir === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
+          }).join("") + "</select></label></div>" +
+        '<div data-for="picture"><h4 class="bk-sub">Your picture</h4><p class="muted">Anything you like: a photo, graffiti, a gradient made in Canva. ' +
+          (tall ? "A <b>tall picture, about 400 × 1200 pixels</b>, for the sidebar." : "A <b>wide picture, about 1600 × 300 pixels</b>, for the top band.") + " Under 2 MB.</p>" +
+          '<div class="row-actions"><label class="btn btn-line btn-small">' + (L.side ? "Change picture" : "Upload picture") + '<input type="file" id="bkSide" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+          (L.side ? '<button class="btn btn-line btn-small" type="button" data-rm="side">Remove</button>' : "") + "</div>" +
+          '<label class="field" style="max-width:260px;margin-top:10px"><span>Words on the picture</span><select id="bkInk">' +
+          '<option value="light"' + (L.ink !== "dark" ? " selected" : "") + ">Light words (for darker pictures)</option>" +
+          '<option value="dark"' + (L.ink === "dark" ? " selected" : "") + ">Dark words (for lighter pictures)</option></select></label></div>" +
+        '<div><h4 class="bk-sub">Background pattern (optional)</h4><p class="muted">A small, light, square tile, about <b>400 × 400 pixels</b>. It repeats faintly behind the pages.</p>' +
+          '<div class="row-actions"><label class="btn btn-line btn-small">' + (L.pattern ? "Change pattern" : "Upload pattern") + '<input type="file" id="bkPattern" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+          (L.pattern ? '<button class="btn btn-line btn-small" type="button" data-rm="pattern">Remove</button>' : "") + "</div></div>" +
+        '<div class="row-actions" style="margin-top:16px"><button class="btn btn-ink" type="button" id="bkSave" disabled>Save theme</button>' +
+          (bkTarget === "company" && (L.accent || L.side) ? '<button class="btn btn-line" type="button" id="bkStd">Back to the standard look</button>' : "") + "</div>";
+    } else {
+      editor += '<p class="muted">' + esc(modName(bkTarget)) + " uses the company theme. Untick the box to give it its own colour, two colours or picture.</p>";
+    }
+
     body.innerHTML = '<div class="panel bk"><h3>6. Brand</h3>' +
-      (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 16px">Demo company: try a logo, colour and pattern. They stay in this browser tab only. <button class="btn btn-line btn-small" type="button" id="bkReset" style="margin-left:8px">Reset demo</button></p>' : "") +
-      '<p class="muted" style="margin:0 0 18px">Your logo, colour and background pattern appear in the portal, on the sign-in page, on your storefront and in every module\'s sidebar. ' +
-      "Modules pick up a change the next time each person signs in.</p>" +
-      '<div class="bk-grid"><div>' + preview + '<p class="muted" style="font-size:13.5px;margin:8px 0 0">Preview of a module with your brand.</p></div><div>' +
+      (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 16px">Demo company: try a logo and themes. They stay in this browser tab only. <button class="btn btn-line btn-small" type="button" id="bkReset" style="margin-left:8px">Reset demo</button></p>' : "") +
+      '<p class="muted" style="margin:0 0 18px">Your logo and theme appear in the portal, on the sign-in page, on your storefront and in the modules. Modules pick up a change the next time each person signs in.</p>' +
 
-      '<div class="bk-item"><h4>Company logo</h4><p class="muted">PNG with a clear (transparent) background works best. About <b>400 × 200 pixels</b>, wider than tall. Under 1 MB.</p>' +
-        '<div class="row-actions"><label class="btn btn-line btn-small">' + (b.logo ? "Change logo" : "Upload logo") + '<input type="file" id="bkLogo" accept="image/png,image/jpeg,image/webp" hidden></label>' +
-        (b.logo ? '<button class="btn btn-line btn-small" type="button" data-rm="logo">Remove</button>' : "") + "</div></div>" +
+      '<div class="bk-item"><h4>Company logo</h4><p class="muted">PNG with a clear (transparent) background works best. About <b>400 × 200 pixels</b>, wider than tall. Under 2 MB.</p>' +
+        '<div class="row-actions">' + (logo ? '<img class="bk-logo-thumb" src="' + esc(logo) + '" alt="">' : "") +
+        '<label class="btn btn-line btn-small">' + (logo ? "Change logo" : "Upload logo") + '<input type="file" id="bkLogo" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+        (logo ? '<button class="btn btn-line btn-small" type="button" data-rm="logo">Remove</button>' : "") + "</div></div>" +
 
-      '<div class="bk-item"><h4>Sidebar colour</h4><p class="muted">One colour; the sidebar shades it from dark to light. Buttons and headings follow it.</p>' +
-        '<div class="bk-swatches">' + SWATCHES.map(function (h) {
-          return '<button type="button" class="bk-sw' + (b.accent === h ? " on" : "") + '" data-sw="' + h + '" style="background:' + h + '" aria-label="Colour ' + h + '"></button>';
-        }).join("") + '<label class="bk-own" title="Pick your own colour"><input type="color" id="bkColour" value="' + esc(b.accent || col.acc) + '"> Own colour</label></div>' +
-        '<div class="row-actions"><button class="btn btn-ink btn-small" type="button" id="bkSave" disabled>Save colour</button>' +
-        (b.accent ? '<button class="btn btn-line btn-small" type="button" id="bkStd">Use the standard colour</button>' : "") + "</div></div>" +
+      '<div class="bk-item"><h4>How should the modules look?</h4><div class="bk-modes">' +
+        '<label class="bk-mode' + (!K.perModule ? " on" : "") + '"><input type="radio" name="bkMode" value="one"' + (!K.perModule ? " checked" : "") + "><span><b>One theme for all modules</b><small>Every module looks the same.</small></span></label>" +
+        '<label class="bk-mode' + (K.perModule ? " on" : "") + '"><input type="radio" name="bkMode" value="each"' + (K.perModule ? " checked" : "") + "><span><b>Customise each module</b><small>Give modules their own colour or picture, so people can tell at a glance which one they are in.</small></span></label>" +
+      "</div></div>" +
 
-      '<div class="bk-item"><h4>Background pattern (optional)</h4><p class="muted">A small, light, square tile, about <b>400 × 400 pixels</b>. It repeats faintly behind the pages. Under 1 MB.</p>' +
-        '<div class="row-actions"><label class="btn btn-line btn-small">' + (b.pattern ? "Change pattern" : "Upload pattern") + '<input type="file" id="bkPattern" accept="image/png,image/jpeg,image/webp" hidden></label>' +
-        (b.pattern ? '<button class="btn btn-line btn-small" type="button" data-rm="pattern">Remove</button>' : "") + "</div></div>" +
+      '<div class="bk-grid' + (K.perModule ? " with-list" : "") + '">' + list +
+        '<div class="bk-edit"><h4 class="bk-edit-title">' + esc(modName(bkTarget)) + (bkTarget === "company" && !K.perModule ? " (all modules)" : "") + "</h4>" + editor + "</div>" +
+        '<div class="bk-prev">' + previewHtml(bkTarget, editing ? L : Object.assign(blankLook(), K.company), logo) + '<p class="muted" style="font-size:13.5px;margin:8px 0 0">Preview</p></div>' +
+      "</div>" +
+      '<p class="muted" id="bkMsg" role="status"></p><p class="form-error" id="bkErr" role="alert"></p></div>';
 
-      '<p class="muted" id="bkMsg" role="status"></p><p class="form-error" id="bkErr" role="alert"></p>' +
-      "</div></div></div>";
+    wireBrand(body, root, K, L);
+  }
 
+  function swatchDot(L) {
+    var t = Suite.brandLook({ look: L || {} });
+    return '<i class="bk-dot" style="background:' + esc(t.side || "#0E5E63") + '"></i>';
+  }
+
+  function wireBrand(body, root, K, L) {
     var msg = body.querySelector("#bkMsg"), err = body.querySelector("#bkErr");
-    var picked = b.accent || "";
+    var draft = Object.assign({}, L);
     function after(r, text) {
-      BRAND = r.brand || {};
-      Suite.brandKeep(BRAND); Suite.applyBrand(BRAND);
+      BRAND = r;
+      var pub = r.brand || {};
+      Suite.brandKeep(pub); Suite.applyBrand(pub);
       paint(root);
-      var m = document.querySelector("#bkMsg"); if (m) m.textContent = text;
+      var m = document.querySelector("#bkMsg"); if (m) m.textContent = text || "";
     }
     function fail(e) { msg.textContent = ""; err.textContent = (e && e.message) || "That didn't work. Try again."; }
-    function pick(hex) {
-      picked = hex.toUpperCase();
-      body.querySelectorAll(".bk-sw").forEach(function (x) { x.classList.toggle("on", x.dataset.sw === picked); });
-      var c = Suite.brandColours(picked), pv = body.querySelector(".bk-preview");
-      pv.style.setProperty("--p-acc", c.acc); pv.style.setProperty("--p-deep", c.deep); pv.style.setProperty("--p-mid", c.mid); pv.style.setProperty("--p-ink", c.ink);
-      body.querySelector(".bk-title").style.color = c.acc;
-      body.querySelector("#bkSave").disabled = picked === (b.accent || "");
+    function work(text) { err.textContent = ""; msg.textContent = text; }
+    function dirty() {
+      var save = body.querySelector("#bkSave"); if (save) save.disabled = false;
+      var prev = body.querySelector(".bk-prev");
+      prev.innerHTML = previewHtml(bkTarget, draft, (K.brand && K.brand.logo) || "") + '<p class="muted" style="font-size:13.5px;margin:8px 0 0">Preview (not saved yet)</p>';
     }
-    body.querySelectorAll("[data-sw]").forEach(function (x) { x.onclick = function () { pick(x.dataset.sw); }; });
-    body.querySelector("#bkColour").addEventListener("input", function () { pick(this.value); });
-    body.querySelector("#bkSave").onclick = function () {
-      err.textContent = ""; msg.textContent = "Saving…";
-      brandCall("saveBrand", { accent: picked }).then(function (r) { after(r, "Colour saved."); }).catch(fail);
+    function showFor() {
+      body.querySelectorAll("[data-for]").forEach(function (el) { el.hidden = el.dataset.for.split(" ").indexOf(draft.style) === -1; });
+      var lab = body.querySelector("[data-label-acc]");
+      if (lab) lab.textContent = draft.style === "picture" ? "Button and heading colour" : draft.style === "gradient" ? "First colour" : "Colour";
+    }
+    showFor();
+
+    body.querySelectorAll("input[name=bkMode]").forEach(function (r) {
+      r.onchange = function () {
+        work("Saving…");
+        brandCall("saveBrand", { perModule: r.value === "each" }).then(function (res) {
+          bkTarget = "company";
+          after(res, r.value === "each" ? "Now pick a module on the left to give it its own theme." : "One theme for all modules. Module themes are kept in case you switch back.");
+        }).catch(fail);
+      };
+    });
+    body.querySelectorAll("[data-target]").forEach(function (b) { b.onclick = function () { bkTarget = b.dataset.target; paint(root); }; });
+    var use = body.querySelector("#bkUseCompany");
+    if (use) use.onchange = function () {
+      work("Saving…");
+      var p = use.checked ? { target: bkTarget, useCompany: true } : { target: bkTarget, look: Object.assign({}, K.company, { side: "", pattern: "" }) };
+      brandCall("saveBrand", p).then(function (res) { after(res, use.checked ? modName(bkTarget) + " uses the company theme." : "Now choose " + modName(bkTarget) + "'s own theme."); }).catch(fail);
+    };
+    body.querySelectorAll("[data-style]").forEach(function (b) {
+      b.onclick = function () {
+        draft.style = b.dataset.style;
+        body.querySelectorAll("[data-style]").forEach(function (x) { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
+        if (draft.style === "gradient" && !draft.accent2) draft.accent2 = "#D4A017";
+        if (!draft.accent && draft.style !== "picture") draft.accent = "#0E5E63";
+        showFor(); dirty();
+      };
+    });
+    body.querySelectorAll("[data-swrow]").forEach(function (row) {
+      var field = row.dataset.swrow;
+      var setC = function (hex) {
+        draft[field] = hex.toUpperCase();
+        row.querySelectorAll(".bk-sw").forEach(function (x) { x.classList.toggle("on", x.dataset.sw === draft[field]); });
+        dirty();
+      };
+      row.querySelectorAll(".bk-sw").forEach(function (x) { x.onclick = function () { setC(x.dataset.sw); }; });
+      row.querySelector("[data-own]").addEventListener("input", function () { setC(this.value); });
+    });
+    var dir = body.querySelector("#bkDir"); if (dir) dir.onchange = function () { draft.dir = dir.value; dirty(); };
+    var ink = body.querySelector("#bkInk"); if (ink) ink.onchange = function () { draft.ink = ink.value; dirty(); };
+    var save = body.querySelector("#bkSave");
+    if (save) save.onclick = function () {
+      if (draft.style === "picture" && !draft.side) { err.textContent = "Upload a picture first, or choose one or two colours."; return; }
+      work("Saving…");
+      brandCall("saveBrand", { target: bkTarget, look: { style: draft.style, accent: draft.accent, accent2: draft.accent2, dir: draft.dir, ink: draft.ink } })
+        .then(function (res) { after(res, "Theme saved."); }).catch(fail);
     };
     var std = body.querySelector("#bkStd");
     if (std) std.onclick = function () {
-      err.textContent = ""; msg.textContent = "Saving…";
-      brandCall("saveBrand", { accent: "" }).then(function (r) { after(r, "Back to the standard colour."); }).catch(fail);
+      work("Saving…");
+      brandCall("saveBrand", { target: "company", look: { style: "solid", accent: "" } }).then(function (res) {
+        return L.side ? brandCall("removeBrandImage", { slot: "side", target: "company" }) : res;
+      }).then(function (res) { after(res, "Back to the standard look."); }).catch(fail);
     };
-    [["#bkLogo", "logo", 800], ["#bkPattern", "pattern", 600]].forEach(function (x) {
-      var input = body.querySelector(x[0]);
+    [["#bkLogo", "logo", 800], ["#bkSide", "side", 1800], ["#bkPattern", "pattern", 600]].forEach(function (x) {
+      var input = body.querySelector(x[0]); if (!input) return;
       input.onchange = function () {
         var f = input.files && input.files[0]; if (!f) return;
-        err.textContent = ""; msg.textContent = "Uploading…";
-        shrinkKeep(f, x[2]).then(function (dataUrl) { return brandCall("uploadBrandImage", { slot: x[1], dataUrl: dataUrl }); })
-          .then(function (r) { after(r, x[1] === "logo" ? "Logo saved." : "Pattern saved."); })
+        work("Uploading…");
+        // keep any colours picked but not saved yet
+        var first = x[1] === "side" && body.querySelector("#bkSave") && !body.querySelector("#bkSave").disabled
+          ? brandCall("saveBrand", { target: bkTarget, look: { style: "picture", accent: draft.accent, accent2: draft.accent2, dir: draft.dir, ink: draft.ink } })
+          : Promise.resolve();
+        first.then(function () { return shrinkKeep(f, x[2]); })
+          .then(function (dataUrl) { return brandCall("uploadBrandImage", { slot: x[1], target: bkTarget, dataUrl: dataUrl }); })
+          .then(function (res) { after(res, x[1] === "logo" ? "Logo saved." : x[1] === "side" ? "Picture saved." : "Pattern saved."); })
           .catch(function (e) { input.value = ""; fail(e); });
       };
     });
     body.querySelectorAll("[data-rm]").forEach(function (btn) {
       btn.onclick = function () {
-        err.textContent = ""; msg.textContent = "Removing…";
-        brandCall("removeBrandImage", { slot: btn.dataset.rm }).then(function (r) { after(r, "Removed."); }).catch(fail);
+        work("Removing…");
+        brandCall("removeBrandImage", { slot: btn.dataset.rm, target: bkTarget }).then(function (res) { after(res, "Removed."); }).catch(fail);
       };
     });
     var reset = body.querySelector("#bkReset");
     if (reset) reset.onclick = function () {
-      if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Yes, clear everything"; msg.textContent = "This clears the logo, colour, pattern and storefront you tried in this tab."; return; }
-      Suite.resetDemo(); BRAND = {}; paint(root);
-      var m = document.querySelector("#bkMsg"); if (m) m.textContent = "Demo reset: back to blank.";
+      if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Yes, clear everything"; msg.textContent = "This clears the logo, themes and storefront you tried in this tab."; return; }
+      Suite.resetDemo(); BRAND = null; bkTarget = "company"; paint(root);
+      setTimeout(function () { var m = document.querySelector("#bkMsg"); if (m) m.textContent = "Demo reset: back to blank."; }, 50);
     };
   }
 
