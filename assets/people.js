@@ -28,6 +28,7 @@
   function demoCall(action, p) {
     if (action === "listUsers") return { ok: true, users: demo.users, roles: ["admin", "factory", "sales", "accounts", "hr", "marketing"] };
     if (action === "listCustomers") return { ok: true, customers: demo.customers };
+    if (action === "profile") return { ok: true, plants: [{ plant_id: "P1", name: "Soap Plant", active: true }, { plant_id: "P2", name: "Detergent Plant", active: true }] };
     if (action === "saveUser") {
       var u = Object.assign({ status: "active", locked: false, lastLogin: "" }, p.user); delete u.password;
       demo.users = demo.users.filter(function (x) { return x.username !== u.username; }).concat([u]);
@@ -92,10 +93,13 @@
 
   function staff(body) {
     body.innerHTML = "<p>Loading…</p>";
-    call("listUsers").then(function (res) {
+    var plantsReq = call("profile").then(function (p) { return (p.plants || []).filter(function (x) { return x.active; }); }).catch(function () { return []; });
+    Promise.all([call("listUsers"), plantsReq]).then(function (both) {
+      var res = both[0]; PLANTS = both[1];
       var rows = res.users.map(function (u) {
         var state = u.status !== "active" ? '<span class="status soon">Off</span>' : u.locked ? '<span class="status soon">Locked</span>' : '<span class="status live">Active</span>';
         return "<tr><td><b>" + esc(u.name) + "</b><br><span class=\"muted\">" + esc(u.username) + (u.empCode ? " · " + esc(u.empCode) : "") + "</span></td><td>" + esc(Suite.teamName(u.role)) +
+          (u.role === "factory" && PLANTS.length > 1 ? '<br><span class="muted">' + esc(plantLabel(u.plants)) + "</span>" : "") +
           "</td><td>" + state + "</td><td>" + when(u.lastLogin) + '</td><td><button class="btn btn-line btn-small" type="button" data-edit="' + esc(u.username) + '">Edit</button></td></tr>';
       });
       body.innerHTML = '<div class="row-head"><h3>Staff sign-ins</h3><button class="btn btn-ink btn-small" type="button" id="addUser">Add a person</button></div>' +
@@ -137,6 +141,24 @@
     row.appendChild(b); row.parentNode.insertBefore(note, row.nextSibling);
   }
 
+  var PLANTS = [];
+  function plantLabel(ids) {
+    ids = ids || [];
+    var names = PLANTS.filter(function (p) { return ids.indexOf(p.plant_id) > -1; }).map(function (p) { return p.name; });
+    return names.length ? names.join(", ") : "All plants";
+  }
+  /* Factory team only: which plants this person works in. None ticked = every plant. */
+  function plantPicker(u) {
+    if (PLANTS.length < 2) return "";
+    var mine = u.plants || [];
+    return '<fieldset class="field" id="plantBox" style="border:0;padding:0;margin:0 0 12px"><span>Plants they work in</span>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:6px">' +
+      PLANTS.map(function (p) {
+        return '<label style="display:flex;align-items:center;gap:6px;font-weight:400;white-space:nowrap"><input type="checkbox" style="width:auto;margin:0" name="plant" value="' + esc(p.plant_id) + '"' +
+          (mine.indexOf(p.plant_id) > -1 ? " checked" : "") + "> " + esc(p.name) + "</label>";
+      }).join("") + '</div><p class="muted" style="margin:6px 0 0">They will see only these plants in StockBook. Leave all unticked to let them see every plant. Admins always see every plant.</p></fieldset>';
+  }
+
   function userForm(body, u) {
     var isNew = !u; u = u || { username: "", name: "", role: "factory", status: "active" };
     var box = body.querySelector("#userForm");
@@ -150,16 +172,24 @@
       '<label class="field"><span>Employee code (optional)</span><input name="empCode" value="' + esc(u.empCode || "") + '" maxlength="20" placeholder="e.g. HG-014"></label>' +
       '<label class="field"><span>Email (optional)</span><input name="email" type="email" value="' + esc(u.email || "") + '" maxlength="120"></label>' +
       '<label class="field"><span>Phone (optional)</span><input name="phone" type="tel" value="' + esc(u.phone || "") + '" maxlength="20"></label>' +
-      "</div>" + (isNew ? '<p class="muted">Give them this password. When they first sign in, they will be asked to choose their own. They will also appear in Payroll for HR to add their salary.</p>' : "") +
+      "</div>" + plantPicker(u) + (isNew ? '<p class="muted">Give them this password. When they first sign in, they will be asked to choose their own. They will also appear in Payroll for HR to add their salary.</p>' : "") +
       '<div id="pwReset"></div>' + (u.locked ? '<p class="muted">This sign-in is locked after too many wrong passwords. Setting a new password unlocks it.</p>' : "") +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">' + (isNew ? "Add person" : "Save changes") +
       '</button><button class="btn btn-line" type="button" data-cancel>Cancel</button></div></form>';
     var f = box.querySelector("form");
     f.querySelector("[data-cancel]").onclick = function () { box.innerHTML = ""; };
+    var pbox = f.querySelector("#plantBox");
+    function showPlants() { if (pbox) pbox.hidden = f.role.value !== "factory"; }
+    f.role.addEventListener("change", showPlants); showPlants();
+    function d_plants() {
+      if (!pbox || f.role.value !== "factory") return [];
+      return Array.prototype.slice.call(f.querySelectorAll("input[name=plant]:checked")).map(function (x) { return x.value; });
+    }
     f.onsubmit = function (e) {
       e.preventDefault();
       var d = { name: f.name.value.trim(), username: f.username.value.trim().toLowerCase(), role: f.role.value, status: f.status.value, password: f.password.value,
-                empCode: f.empCode.value.trim().toUpperCase(), email: f.email.value.trim(), phone: f.phone.value.trim() };
+                empCode: f.empCode.value.trim().toUpperCase(), email: f.email.value.trim(), phone: f.phone.value.trim(),
+                plants: d_plants() };
       var err = !d.name ? "Enter the person's name." : !d.username ? "Choose a username." : isNew && d.password.length < 8 ? "Give them a starting password of at least 8 characters." : "";
       if (err) { f.querySelector(".form-error").textContent = err; return; }
       f.querySelector("[type=submit]").disabled = true;
