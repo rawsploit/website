@@ -31,6 +31,7 @@
         <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
         <span class="brand-name" data-site-name>Kalavara</span>
       </a>
+      <img class="side-logo" data-client-logo hidden alt="">
       <div class="side-client" data-client-name></div>
       <div class="side-user" id="who"></div>
     </div>
@@ -73,6 +74,7 @@
   var client = Suite.client();
 
   $("who").textContent = s.name + " · " + Suite.teamName(s.role);
+  Suite.loadBrand();
 
   /* A module (inside its frame) can ask to open a built-in page, e.g. Field Sales → Billing.
      Only Google's module frames are listened to, and only known pages can be opened. */

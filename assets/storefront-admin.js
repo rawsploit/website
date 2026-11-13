@@ -153,7 +153,7 @@
   }
 
   function draw(root) {
-    root.innerHTML = '<div class="view sfa">' + (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 18px">Demo company: try it out. Changes stay in this browser tab only.</p>' : "") +
+    root.innerHTML = '<div class="view sfa">' + (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 18px">Demo company: try it out. Changes stay in this browser tab only. <button class="btn btn-line btn-small" type="button" id="sfReset" style="margin-left:8px">Reset demo</button></p>' : "") +
       statusHtml() +
       '<div class="panel"><div class="row-head" style="margin-bottom:12px"><h3 style="margin:0">Banners</h3><span class="muted">Tap a space to change it</span></div>' +
       '<div class="sfa-banners">' + mapHtml() + slotEditorHtml() + "</div></div>" +
@@ -263,6 +263,12 @@
       busy(root, "Taking offline…");
       call("unpublishStorefront").then(function (res) { done(root, res, "The storefront is offline."); })
         .catch(function (e) { fail(root, e); });
+    };
+
+    var reset = root.querySelector("#sfReset");
+    if (reset) reset.onclick = function () {
+      if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Yes, clear everything"; return; }
+      Suite.resetDemo(); demo = null; picked = "hero"; render(root);
     };
 
     var accOn = root.querySelector("#sfAccentOn"), acc = root.querySelector("#sfAccent");

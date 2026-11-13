@@ -203,7 +203,9 @@
     var page = res.page || {};
     var company = res.company || Suite.client().name;
     Suite.brand();
-    applyAccent(page.accent);
+    var kit = Suite.brandCached();
+    if (Suite.isDemo() && !res.logo) res.logo = kit.logo || "";
+    applyAccent(page.accent || kit.accent || res.brandAccent);
     document.title = company + (page.tagline ? " | " + page.tagline : "");
     products = res.products || [];
 

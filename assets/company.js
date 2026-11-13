@@ -18,8 +18,10 @@
     { id: "plants", name: "Plants" },
     { id: "routes", name: "Sales routes" },
     { id: "distributors", name: "Distributors" },
-    { id: "products", name: "Products" }
+    { id: "products", name: "Products" },
+    { id: "brand", name: "Brand" }
   ];
+  var BRAND = null;        // logo, colour and pattern (admins only)
   var STATES = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh",
     "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh",
     "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra",
@@ -63,6 +65,7 @@
     if (id === "routes") return P.routes.some(function (r) { return r.active; });
     if (id === "distributors") return P.distributors.length > 0;
     if (id === "products") return P.products.some(function (p) { return p.active; });
+    if (id === "brand") { var b = BRAND || Suite.brandCached(); return !!(b.logo || b.accent); }
     return false;
   }
 
@@ -74,7 +77,7 @@
     }).join("");
     bar.querySelectorAll("[data-step]").forEach(function (b) { b.onclick = function () { step = b.dataset.step; paint(root); }; });
     var body = root.querySelector("#wizBody");
-    ({ company: stepCompany, plants: stepPlants, routes: stepRoutes, distributors: stepDistributors, products: stepProducts })[step](body, root);
+    ({ company: stepCompany, plants: stepPlants, routes: stepRoutes, distributors: stepDistributors, products: stepProducts, brand: stepBrand })[step](body, root);
   }
   function nextStep(root) {
     var i = STEPS.map(function (s) { return s.id; }).indexOf(step);
@@ -97,7 +100,6 @@
       '<label class="field"><span>GSTIN</span><input name="gstin" value="' + esc(c.gstin || "") + '" maxlength="15"></label>' +
       '<label class="field"><span>Phone</span><input name="phone" value="' + esc(c.phone || "") + '"></label>' +
       '<label class="field"><span>E-mail</span><input name="email" type="email" value="' + esc(c.email || "") + '"></label>' +
-      '<label class="field"><span>Logo link (optional)</span><input name="logo" type="url" value="' + esc(c.logo || "") + '" placeholder="https://…"></label>' +
       "</div>" +
       '<h3 style="margin:10px 0 4px;font-size:17px">Payment details on invoices (optional)</h3><p class="muted" style="margin:0 0 12px">Printed on tax invoices and bills so shops know where to pay.</p>' +
       '<div class="form-grid">' +
@@ -116,7 +118,7 @@
       var err = f.querySelector(".form-error");
       if (!f.name.value.trim()) { err.textContent = "Enter your company name."; return; }
       if (!f.state.value) { err.textContent = "Pick your state (it decides CGST + SGST or IGST on bills)."; return; }
-      var data = {}; ["name", "address", "state", "pincode", "gstin", "phone", "email", "logo", "upi", "upi_qr", "bank", "account", "ifsc"].forEach(function (k) { data[k] = f[k].value.trim(); });
+      var data = {}; ["name", "address", "state", "pincode", "gstin", "phone", "email", "upi", "upi_qr", "bank", "account", "ifsc"].forEach(function (k) { data[k] = f[k].value.trim(); });
       call("saveCompanyProfile", { company: data }).then(function (r) { P.company = r.company; nextStep(root); })
         .catch(function (e2) { err.textContent = e2.message; });
     };
@@ -634,6 +636,133 @@
     }
     return { call: call };
   })();
+
+  /* ---------------- 6. brand kit (admins only) ---------------- */
+  var SWATCHES = ["#0E5E63", "#1F6F43", "#2E7D32", "#1D4FA8", "#2A45A6", "#5B2C83", "#7A1F2E", "#B3261E", "#B86E00", "#3E4A59"];
+
+  function brandCall(action, payload) {
+    if (Suite.isDemo()) {
+      var b = Suite.brandCached();
+      if (action === "saveBrand") b.accent = payload.accent || "";
+      else if (action === "uploadBrandImage") b[payload.slot] = payload.dataUrl;
+      else if (action === "removeBrandImage") b[payload.slot] = "";
+      Suite.brandKeep(b);
+      return Promise.resolve({ ok: true, brand: Suite.brandCached() });
+    }
+    return call(action, payload);
+  }
+
+  function stepBrand(body, root) {
+    if (!BRAND) {
+      body.innerHTML = '<p class="muted">Loading your brand…</p>';
+      brandCall(Suite.isDemo() ? "saveBrand" : "brandKit", Suite.isDemo() ? { accent: Suite.brandCached().accent || "" } : {})
+        .then(function (r) { BRAND = r.brand || {}; stepBrand(body, root); })
+        .catch(function (e) { body.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
+      return;
+    }
+    var b = BRAND, col = Suite.brandColours(b.accent) || Suite.brandColours("#0E5E63");
+    var preview =
+      '<div class="bk-preview" style="--p-acc:' + col.acc + ";--p-deep:" + col.deep + ";--p-mid:" + col.mid + ";--p-ink:" + col.ink + '">' +
+        '<div class="bk-side">' + (b.logo ? '<img src="' + esc(b.logo) + '" alt="">' : '<div class="bk-nologo">Your logo</div>') +
+          "<b>StockBook</b><small>Daily stock</small><span class=\"on\">Dashboard</span><span>Production</span><span>Stock report</span><span>Returns</span></div>" +
+        '<div class="bk-main' + (b.pattern ? " pat" : "") + '"' + (b.pattern ? ' style="--p-pat:url(\'' + esc(b.pattern) + '\')"' : "") + '>' +
+          '<div class="bk-title" style="color:' + col.acc + '">Daily dashboard</div><div class="bk-cards"><i></i><i></i><i></i></div><div class="bk-table"></div></div>' +
+      "</div>";
+    body.innerHTML = '<div class="panel bk"><h3>6. Brand</h3>' +
+      (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 16px">Demo company: try a logo, colour and pattern. They stay in this browser tab only. <button class="btn btn-line btn-small" type="button" id="bkReset" style="margin-left:8px">Reset demo</button></p>' : "") +
+      '<p class="muted" style="margin:0 0 18px">Your logo, colour and background pattern appear in the portal, on the sign-in page, on your storefront and in every module\'s sidebar. ' +
+      "Modules pick up a change the next time each person signs in.</p>" +
+      '<div class="bk-grid"><div>' + preview + '<p class="muted" style="font-size:13.5px;margin:8px 0 0">Preview of a module with your brand.</p></div><div>' +
+
+      '<div class="bk-item"><h4>Company logo</h4><p class="muted">PNG with a clear (transparent) background works best. About <b>400 × 200 pixels</b>, wider than tall. Under 1 MB.</p>' +
+        '<div class="row-actions"><label class="btn btn-line btn-small">' + (b.logo ? "Change logo" : "Upload logo") + '<input type="file" id="bkLogo" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+        (b.logo ? '<button class="btn btn-line btn-small" type="button" data-rm="logo">Remove</button>' : "") + "</div></div>" +
+
+      '<div class="bk-item"><h4>Sidebar colour</h4><p class="muted">One colour; the sidebar shades it from dark to light. Buttons and headings follow it.</p>' +
+        '<div class="bk-swatches">' + SWATCHES.map(function (h) {
+          return '<button type="button" class="bk-sw' + (b.accent === h ? " on" : "") + '" data-sw="' + h + '" style="background:' + h + '" aria-label="Colour ' + h + '"></button>';
+        }).join("") + '<label class="bk-own" title="Pick your own colour"><input type="color" id="bkColour" value="' + esc(b.accent || col.acc) + '"> Own colour</label></div>' +
+        '<div class="row-actions"><button class="btn btn-ink btn-small" type="button" id="bkSave" disabled>Save colour</button>' +
+        (b.accent ? '<button class="btn btn-line btn-small" type="button" id="bkStd">Use the standard colour</button>' : "") + "</div></div>" +
+
+      '<div class="bk-item"><h4>Background pattern (optional)</h4><p class="muted">A small, light, square tile, about <b>400 × 400 pixels</b>. It repeats faintly behind the pages. Under 1 MB.</p>' +
+        '<div class="row-actions"><label class="btn btn-line btn-small">' + (b.pattern ? "Change pattern" : "Upload pattern") + '<input type="file" id="bkPattern" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+        (b.pattern ? '<button class="btn btn-line btn-small" type="button" data-rm="pattern">Remove</button>' : "") + "</div></div>" +
+
+      '<p class="muted" id="bkMsg" role="status"></p><p class="form-error" id="bkErr" role="alert"></p>' +
+      "</div></div></div>";
+
+    var msg = body.querySelector("#bkMsg"), err = body.querySelector("#bkErr");
+    var picked = b.accent || "";
+    function after(r, text) {
+      BRAND = r.brand || {};
+      Suite.brandKeep(BRAND); Suite.applyBrand(BRAND);
+      paint(root);
+      var m = document.querySelector("#bkMsg"); if (m) m.textContent = text;
+    }
+    function fail(e) { msg.textContent = ""; err.textContent = (e && e.message) || "That didn't work. Try again."; }
+    function pick(hex) {
+      picked = hex.toUpperCase();
+      body.querySelectorAll(".bk-sw").forEach(function (x) { x.classList.toggle("on", x.dataset.sw === picked); });
+      var c = Suite.brandColours(picked), pv = body.querySelector(".bk-preview");
+      pv.style.setProperty("--p-acc", c.acc); pv.style.setProperty("--p-deep", c.deep); pv.style.setProperty("--p-mid", c.mid); pv.style.setProperty("--p-ink", c.ink);
+      body.querySelector(".bk-title").style.color = c.acc;
+      body.querySelector("#bkSave").disabled = picked === (b.accent || "");
+    }
+    body.querySelectorAll("[data-sw]").forEach(function (x) { x.onclick = function () { pick(x.dataset.sw); }; });
+    body.querySelector("#bkColour").addEventListener("input", function () { pick(this.value); });
+    body.querySelector("#bkSave").onclick = function () {
+      err.textContent = ""; msg.textContent = "Saving…";
+      brandCall("saveBrand", { accent: picked }).then(function (r) { after(r, "Colour saved."); }).catch(fail);
+    };
+    var std = body.querySelector("#bkStd");
+    if (std) std.onclick = function () {
+      err.textContent = ""; msg.textContent = "Saving…";
+      brandCall("saveBrand", { accent: "" }).then(function (r) { after(r, "Back to the standard colour."); }).catch(fail);
+    };
+    [["#bkLogo", "logo", 800], ["#bkPattern", "pattern", 600]].forEach(function (x) {
+      var input = body.querySelector(x[0]);
+      input.onchange = function () {
+        var f = input.files && input.files[0]; if (!f) return;
+        err.textContent = ""; msg.textContent = "Uploading…";
+        shrinkKeep(f, x[2]).then(function (dataUrl) { return brandCall("uploadBrandImage", { slot: x[1], dataUrl: dataUrl }); })
+          .then(function (r) { after(r, x[1] === "logo" ? "Logo saved." : "Pattern saved."); })
+          .catch(function (e) { input.value = ""; fail(e); });
+      };
+    });
+    body.querySelectorAll("[data-rm]").forEach(function (btn) {
+      btn.onclick = function () {
+        err.textContent = ""; msg.textContent = "Removing…";
+        brandCall("removeBrandImage", { slot: btn.dataset.rm }).then(function (r) { after(r, "Removed."); }).catch(fail);
+      };
+    });
+    var reset = body.querySelector("#bkReset");
+    if (reset) reset.onclick = function () {
+      if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Yes, clear everything"; msg.textContent = "This clears the logo, colour, pattern and storefront you tried in this tab."; return; }
+      Suite.resetDemo(); BRAND = {}; paint(root);
+      var m = document.querySelector("#bkMsg"); if (m) m.textContent = "Demo reset: back to blank.";
+    };
+  }
+
+  /* Shrinks a picture in the browser; PNGs stay PNG so a clear background stays clear. */
+  function shrinkKeep(file, maxSide) {
+    return new Promise(function (resolve, reject) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { reject(new Error("Choose a PNG, JPG or WebP picture.")); return; }
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        var w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        var ctx = cv.getContext("2d"), png = file.type === "image/png";
+        if (!png) { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); }
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(png ? cv.toDataURL("image/png") : cv.toDataURL("image/jpeg", 0.88));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("That file couldn't be read as a picture.")); };
+      img.src = url;
+    });
+  }
 
   window.Company = { render: render };
 })();

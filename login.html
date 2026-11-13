@@ -31,6 +31,7 @@
 <main class="login-main">
   <div class="login-card">
     <a class="back-shop" id="backShop" hidden>‹ Back to the products</a>
+    <img class="login-logo" data-client-logo hidden alt="">
     <div class="switch" role="group" aria-label="Who is signing in">
       <button type="button" id="asStaff" aria-pressed="true">Staff</button>
       <button type="button" id="asCustomer" aria-pressed="false">Customer</button>
@@ -73,6 +74,7 @@
 (function () {
   var kind = Suite.params.get("as") === "customer" ? "customer" : "staff";
   var $ = function (id) { return document.getElementById(id); };
+  Suite.loadBrand();
   if (Suite.params.get("from") === "store") { $("backShop").hidden = false; $("backShop").href = Suite.link("store.html"); }
 
   function render() {

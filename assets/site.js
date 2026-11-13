@@ -127,6 +127,66 @@
     if (document.title.indexOf("{site}") !== -1) document.title = document.title.replace("{site}", window.SITE.name);
   }
 
+  /* ---------- brand kit (Admin → Company setup → Brand) ----------
+     Logo, colour and background pattern. Kept in this browser so pages draw at once,
+     then refreshed from the core. The demo keeps it in this tab only (Reset demo clears it). */
+  var BRAND_KEY = "suite.brand.";
+  function brandCached() {
+    try {
+      var raw = isDemo() ? sessionStorage.getItem("suite.demoBrand") : localStorage.getItem(BRAND_KEY + clientId());
+      return JSON.parse(raw || "null") || {};
+    } catch (e) { return {}; }
+  }
+  function brandKeep(b) {
+    try {
+      var raw = JSON.stringify({ logo: b.logo || "", accent: b.accent || "", pattern: b.pattern || "" });
+      if (isDemo()) sessionStorage.setItem("suite.demoBrand", raw); else localStorage.setItem(BRAND_KEY + clientId(), raw);
+    } catch (e) { /* storage full or blocked: the page still shows it now */ }
+  }
+  function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function mixHex(rgb, to, t) {
+    return "#" + rgb.map(function (v, i) { var x = Math.round(v + (to[i] - v) * t); return ("0" + x.toString(16)).slice(-2); }).join("");
+  }
+  /* colours made from one picked colour: deep (darker), mid (lighter), soft (pale), ink (text on it) */
+  function brandColours(hex) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex || "")) return null;
+    var c = hexRgb(hex), lum = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+    return { acc: hex, deep: mixHex(c, [0, 0, 0], 0.35), mid: mixHex(c, [255, 255, 255], 0.18), soft: mixHex(c, [255, 255, 255], 0.9),
+             ink: lum > 0.62 ? "#1B1E2B" : "#FFFFFF" };
+  }
+  function applyBrand(b) {
+    b = b || {};
+    var root = document.documentElement.style, body = document.body;
+    var col = brandColours(b.accent);
+    if (body) {
+      body.classList.toggle("branded", !!col);
+      body.classList.toggle("has-pattern", !!b.pattern);
+    }
+    if (col) {
+      root.setProperty("--b-acc", col.acc); root.setProperty("--b-deep", col.deep); root.setProperty("--b-mid", col.mid);
+      root.setProperty("--b-soft", col.soft); root.setProperty("--b-ink", col.ink);
+    }
+    root.setProperty("--b-pattern", b.pattern ? 'url("' + String(b.pattern).replace(/["\\()]/g, "") + '")' : "none");
+    document.querySelectorAll("img[data-client-logo]").forEach(function (img) {
+      if (b.logo) { img.src = b.logo; img.alt = client().name; img.hidden = false; } else { img.hidden = true; img.removeAttribute("src"); }
+    });
+  }
+  /* draws the kept brand at once, then fetches the latest (real companies) */
+  function loadBrand() {
+    var b = brandCached();
+    applyBrand(b);
+    if (isDemo() || !client().api) return Promise.resolve(b);
+    return api("status", {}).then(function (r) {
+      if (r && r.ok && r.brand) { brandKeep(r.brand); applyBrand(r.brand); return r.brand; }
+      return b;
+    }).catch(function () { return b; });
+  }
+  /* Demo company: forget every picture, colour and word anyone added in this tab. */
+  function resetDemo() {
+    ["suite.demoBrand", "suite.sfDemo", "suite.sfDemoState"].forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) {} });
+    applyBrand({});
+  }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -152,6 +212,7 @@
 
   window.Suite = {
     params: params, clientId: clientId, client: client, isDemo: isDemo, link: link,
+    brandCached: brandCached, brandKeep: brandKeep, brandColours: brandColours, applyBrand: applyBrand, loadBrand: loadBrand, resetDemo: resetDemo,
     getSession: getSession, clearSession: clearSession, signIn: signIn, api: api, setSession: setSession,
     modulesFor: modulesFor, teamName: teamName, brand: brand, esc: esc,
     contactInfo: contactInfo, contactHtml: contactHtml
