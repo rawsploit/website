@@ -19,6 +19,7 @@
 <script src="assets/people.js"></script>
 <script src="assets/company.js"></script>
 <script src="assets/catalog-admin.js"></script>
+<script src="assets/storefront-admin.js"></script>
 <script src="assets/xlsx.js"></script>
 <script src="assets/sales-desk.js"></script>
 </head>
@@ -86,6 +87,7 @@
   var CAN_CATALOG = s.role === "admin" || s.role === "marketing";
   var PAGES = [
     { id: "catalog",   name: "Product catalog",   marketing: true, desc: "Photos, descriptions and groups customers see. Packs and prices come from Company setup." },
+    { id: "storefront", name: "Storefront",       marketing: true, desc: "Your public shop page: banners, words and colour. Preview, then publish." },
     { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." },
     { id: "billing",   name: "Billing",    van: true, team: "sales",    after: "fieldsales",  roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
     { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts", "viewer"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
@@ -204,13 +206,14 @@
   function go(id, fromHistory) {
     var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
     var allowed = id === "home" || id === "password" || ((id === "people" || id === "company") && s.role === "admin") ||
-      ((id === "catalog" || id === "customers") && CAN_CATALOG) ||
+      ((id === "catalog" || id === "customers" || id === "storefront") && CAN_CATALOG) ||
       VAN_PAGES.some(function (p) { return p.id === id; }) || mods.indexOf(m) !== -1;
     if (!allowed) id = "home";
     var page = PAGES.filter(function (p) { return p.id === id; })[0];
     if (page && page.href) { location.href = Suite.link(page.href); return; }
     if (id === "salesdesk") SalesDesk.render($("view"), Suite.params.get("tab"));
     else if (id === "catalog") CatalogAdmin.render($("view"));
+    else if (id === "storefront") StorefrontAdmin.render($("view"));
     else if (id === "customers") People.renderCustomers($("view"));
     else if (id === "people") People.renderPeople($("view"));
     else if (id === "company") Company.render($("view"));

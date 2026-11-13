@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Products</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0E5E63">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/config.js"></script>
+<script src="assets/site.js"></script>
+<style>
+  /* Storefront: the company's own shop page. Colours follow the accent Marketing picks. */
+  body.sf { background:#fff; --acc: var(--ink); --acc-ink:#fff; --acc-soft: var(--paper); }
+  body.sf[hidden] { display:block !important; visibility:hidden; }
+  .sf-wrap { max-width:1280px; margin:0 auto; padding:0 20px; }
+  .sf-ribbon { background:#FFF3D6; color:#6B4300; font-size:14.5px; border-bottom:1px solid #F0D9A0; }
+  .sf-ribbon .sf-wrap { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding-top:8px; padding-bottom:8px; }
+  .sf-ribbon a { color:#6B4300; font-weight:600; }
+
+  .sf-top { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #ECEEF3; }
+  .sf-top .sf-wrap { display:flex; align-items:center; gap:20px; padding-top:12px; padding-bottom:12px; }
+  .sf-brand { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text); min-width:0; flex-shrink:0; }
+  .sf-brand img { height:46px; width:auto; max-width:160px; object-fit:contain; display:block; }
+  .sf-brand b { font:800 20px/1.1 var(--head); color:var(--acc); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px; }
+  .sf-search { flex:1; display:flex; align-items:center; background:#F4F5F8; border:1.5px solid #E3E6ED; border-radius:12px; padding:0 6px 0 14px; max-width:620px; }
+  .sf-search:focus-within { border-color:var(--acc); background:#fff; }
+  .sf-search input { flex:1; border:0; background:transparent; font:400 16px var(--body); padding:11px 6px; min-width:0; color:var(--text); }
+  .sf-search input:focus { outline:none; }
+  .sf-search button { border:0; background:var(--acc); color:var(--acc-ink); width:38px; height:34px; border-radius:9px; cursor:pointer; display:grid; place-items:center; }
+  .sf-actions { display:flex; align-items:center; gap:10px; margin-left:auto; flex-shrink:0; }
+  .sf-btn { display:inline-flex; align-items:center; gap:8px; border-radius:999px; font:600 15px var(--body); padding:10px 18px; text-decoration:none; cursor:pointer; border:1.5px solid var(--acc); white-space:nowrap; }
+  .sf-btn.solid { background:var(--acc); color:var(--acc-ink); }
+  .sf-btn.line { background:#fff; color:var(--acc); }
+  .sf-staff { color:var(--muted); font-size:14px; text-decoration:none; white-space:nowrap; }
+  .sf-staff:hover { color:var(--acc); text-decoration:underline; }
+
+  .sf-cats { border-bottom:1px solid #ECEEF3; background:#fff; }
+  .sf-cats .sf-wrap { display:flex; gap:8px; overflow-x:auto; padding-top:10px; padding-bottom:10px; scrollbar-width:thin; }
+  .sf-chip { flex-shrink:0; border:1.5px solid #E3E6ED; background:#fff; color:var(--text); font:600 14.5px var(--body); padding:7px 15px; border-radius:999px; cursor:pointer; }
+  .sf-chip:hover { border-color:var(--acc); color:var(--acc); }
+  .sf-chip[aria-pressed="true"] { background:var(--acc); border-color:var(--acc); color:var(--acc-ink); }
+
+  .sf-banners { display:grid; gap:16px; margin:22px auto 8px; }
+  .sf-slot { position:relative; overflow:hidden; border-radius:18px; background:var(--acc-soft); display:block; }
+  .sf-slot img { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; }
+  .sf-slot.fit-contain img { object-fit:contain; }
+  .sf-slot[data-tap] { cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
+  .sf-slot[data-tap]:hover { transform:translateY(-2px); box-shadow:0 10px 26px rgba(20,25,45,.12); }
+  .sf-slot.sl-hero { grid-area:hero; aspect-ratio:5 / 2; }
+  .sf-slot.sl-tile1 { grid-area:tile1; aspect-ratio:16 / 9; }
+  .sf-slot.sl-tile2 { grid-area:tile2; aspect-ratio:16 / 9; }
+  .sf-slot.sl-side { grid-area:side; min-height:260px; }
+  .sf-text-hero { display:flex; flex-direction:column; justify-content:center; padding:clamp(22px,4vw,48px); background:linear-gradient(135deg, var(--acc) 0%, var(--acc-deep) 100%); color:var(--acc-ink); }
+  .sf-text-hero h1 { font:800 clamp(26px,3.6vw,46px)/1.08 var(--head); margin:0 0 10px; color:inherit; max-width:16ch; }
+  .sf-text-hero p { font-size:clamp(15px,1.5vw,19px); margin:0 0 20px; max-width:46ch; opacity:.92; }
+  .sf-text-hero .sf-btn { align-self:flex-start; background:var(--acc-ink); color:var(--acc); border-color:var(--acc-ink); }
+
+  .sf-intro { text-align:center; margin:34px auto 6px; max-width:760px; }
+  .sf-intro h1 { font:800 clamp(24px,3vw,36px)/1.15 var(--head); color:var(--acc); margin:0 0 8px; }
+  .sf-intro p { color:var(--muted); font-size:17px; margin:0 auto; max-width:60ch; }
+  .sf-points { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 26px; margin:22px auto 0; }
+  .sf-point { display:flex; align-items:center; gap:9px; font:600 15.5px var(--body); color:var(--text); }
+  .sf-point i { width:30px; height:30px; border-radius:50%; background:var(--acc-soft); color:var(--acc); display:grid; place-items:center; font-style:normal; }
+
+  .sf-products { margin:40px auto 10px; scroll-margin-top:90px; }
+  .sf-products-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .sf-products-head h2 { font:800 24px var(--head); color:var(--text); margin:0; }
+  .sf-products-head span { color:var(--muted); font-size:15px; }
+  .sf-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:18px; }
+  .sf-card { border:1px solid #ECEEF3; border-radius:16px; overflow:hidden; background:#fff; display:flex; flex-direction:column; transition:box-shadow .15s ease, transform .15s ease; }
+  .sf-card:hover { box-shadow:0 10px 26px rgba(20,25,45,.10); transform:translateY(-2px); }
+  .sf-pic { aspect-ratio:1 / 1; background:#F6F7FA; display:grid; place-items:center; }
+  .sf-pic img { width:100%; height:100%; object-fit:contain; padding:12px; display:block; }
+  .sf-pic span { font:800 54px var(--head); color:var(--acc); opacity:.35; }
+  .sf-card-body { padding:12px 14px 14px; display:flex; flex-direction:column; gap:4px; flex:1; }
+  .sf-card-body small { color:var(--acc); font:600 12.5px var(--body); text-transform:uppercase; letter-spacing:.04em; }
+  .sf-card-body b { font:700 16.5px/1.25 var(--body); color:var(--text); }
+  .sf-card-body p { color:var(--muted); font-size:14px; margin:0; line-height:1.4; }
+  .sf-card-body a { margin-top:auto; padding-top:10px; color:var(--acc); font:600 14px var(--body); text-decoration:none; }
+  .sf-card-body a:hover { text-decoration:underline; }
+  .sf-none { color:var(--muted); padding:30px 0; text-align:center; }
+
+  .sf-cta { margin:48px auto 0; background:var(--acc-soft); border-radius:20px; padding:28px clamp(20px,4vw,40px); display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+  .sf-cta h3 { font:800 22px var(--head); color:var(--acc); margin:0 0 4px; }
+  .sf-cta p { margin:0; color:var(--muted); }
+  .sf-foot { margin-top:48px; border-top:1px solid #ECEEF3; padding:22px 0 30px; color:var(--muted); font-size:14px; }
+  .sf-foot .sf-wrap { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+
+  @media (max-width:860px) {
+    .sf-top .sf-wrap { flex-wrap:wrap; gap:12px; }
+    .sf-search { order:3; flex-basis:100%; max-width:none; }
+    .sf-staff { display:none; }
+    .sf-brand img { height:38px; }
+  }
+  @media (max-width:760px) {
+    .sf-banners { gap:10px; }
+    .sf-slot { border-radius:14px; }
+    .sf-slot.sl-side { aspect-ratio:4 / 5; min-height:0; width:100%; justify-self:stretch; }
+    .sf-btn { padding:9px 14px; font-size:14.5px; }
+    .sf-grid { grid-template-columns:repeat(2, 1fr); gap:12px; }
+  }
+</style>
+</head>
+<body class="sf" hidden>
+
+<div class="sf-ribbon" id="ribbon" hidden><div class="sf-wrap"><span><b>Preview.</b> This is your draft. Visitors don't see it until you publish.</span><a id="backToEditor" href="#">‹ Back to the designer</a></div></div>
+
+<header class="sf-top">
+  <div class="sf-wrap">
+    <a class="sf-brand" href="#" id="brand"></a>
+    <form class="sf-search" id="searchBox" role="search" hidden>
+      <input id="q" type="search" placeholder="Search products" aria-label="Search products" autocomplete="off">
+      <button type="submit" aria-label="Search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <div class="sf-actions">
+      <a class="sf-staff" id="staffLink" href="#">Staff sign-in</a>
+      <a class="sf-btn solid" id="signIn" href="#">Sign in to order</a>
+    </div>
+  </div>
+</header>
+<nav class="sf-cats" id="cats" aria-label="Product groups" hidden><div class="sf-wrap" id="catList"></div></nav>
+
+<main>
+  <div class="sf-wrap">
+    <section class="sf-banners" id="banners" aria-label="Highlights"></section>
+    <section class="sf-intro" id="intro" hidden></section>
+    <section class="sf-products" id="products" hidden>
+      <div class="sf-products-head"><h2 id="prodTitle">Our products</h2><span id="prodCount"></span></div>
+      <div class="sf-grid" id="grid"></div>
+    </section>
+    <section class="sf-cta" id="cta">
+      <div><h3>Buying for your shop?</h3><p>Sign in with your customer code to see prices and place orders.</p></div>
+      <a class="sf-btn solid" id="ctaBtn" href="#">Sign in to order</a>
+    </section>
+  </div>
+</main>
+<footer class="sf-foot"><div class="sf-wrap"><span id="footName"></span><span data-credit></span></div></footer>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = Suite.esc;
+  var preview = Suite.params.get("preview") === "1";
+  var signInUrl = Suite.link("login.html", { as: "customer", from: "store" });
+  var toSignIn = function () { location.replace(Suite.link("login.html")); };
+
+  /* Demo company: no shop page unless Marketing is previewing a design in this tab. */
+  function demoData() {
+    var page = null;
+    try { page = JSON.parse(sessionStorage.getItem("suite.sfDemo") || "null"); } catch (e) {}
+    if (!page) return { ok: true, on: false };
+    return { ok: true, on: true, preview: true, company: Suite.client().name, logo: Suite.client().logo || "", page: page,
+      products: [
+        { name: "Floor Cleaner", category: "Cleaning", description: "Pine fresh, for tiles and marble.", image: "" },
+        { name: "Dish Wash Liquid", category: "Cleaning", description: "Cuts grease, gentle on hands.", image: "" },
+        { name: "Bath Soap", category: "Personal care", description: "Mild everyday soap.", image: "" },
+        { name: "Detergent Powder", category: "Laundry", description: "For machine and hand wash.", image: "" }
+      ] };
+  }
+
+  function load() {
+    if (Suite.isDemo()) return Promise.resolve(preview ? demoData() : { ok: true, on: false });
+    if (preview) {
+      var s = Suite.getSession();
+      if (!s || s.kind !== "staff") return Promise.resolve({ ok: true, on: false });
+      return Suite.api("storefrontPreview", { token: s.token });
+    }
+    return Suite.api("storefront", {});
+  }
+
+  load().then(function (res) {
+    if (!res || !res.ok || !res.on) return toSignIn();
+    draw(res);
+  }).catch(toSignIn);
+
+  /* ---------- colours ---------- */
+  function hex2rgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function mix(rgb, to, t) { return "rgb(" + rgb.map(function (v, i) { return Math.round(v + (to[i] - v) * t); }).join(",") + ")"; }
+  function applyAccent(hex) {
+    var b = document.body.style;
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex || "")) {
+      var css = getComputedStyle(document.body).getPropertyValue("--ink").trim();
+      hex = /^#[0-9a-fA-F]{6}$/.test(css) ? css : "#0E5E63";
+    }
+    var rgb = hex2rgb(hex);
+    var lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    b.setProperty("--acc", hex);
+    b.setProperty("--acc-ink", lum > 0.62 ? "#1B1E2B" : "#FFFFFF");
+    b.setProperty("--acc-soft", mix(rgb, [255, 255, 255], 0.9));
+    b.setProperty("--acc-deep", mix(rgb, [0, 0, 0], 0.28));
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", hex);
+  }
+
+  /* ---------- page ---------- */
+  var products = [], filterCat = "", query = "";
+
+  function draw(res) {
+    var page = res.page || {};
+    var company = res.company || Suite.client().name;
+    Suite.brand();
+    applyAccent(page.accent);
+    document.title = company + (page.tagline ? " | " + page.tagline : "");
+    products = res.products || [];
+
+    var logo = res.logo || Suite.client().logo || "";
+    $("brand").innerHTML = (logo ? '<img src="' + esc(logo) + '" alt="' + esc(company) + '">' : "<b>" + esc(company) + "</b>");
+    $("brand").onclick = function (e) { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    $("footName").textContent = "© " + new Date().getFullYear() + " " + company;
+    $("signIn").href = $("ctaBtn").href = signInUrl;
+    $("staffLink").href = Suite.link("login.html", { as: "staff", from: "store" });
+
+    if (res.preview || preview) {
+      $("ribbon").hidden = false;
+      $("backToEditor").href = Suite.link("portal.html", { m: "storefront" });
+    }
+
+    drawBanners(page, company);
+    drawIntro(page, company);
+
+    var cats = products.map(function (p) { return p.category; }).filter(function (c, i, a) { return c && a.indexOf(c) === i; });
+    if (page.showCategories !== false && cats.length > 1) {
+      $("cats").hidden = false;
+      $("catList").innerHTML = ['<button type="button" class="sf-chip" data-cat="" aria-pressed="true">All products</button>'].concat(cats.map(function (c) {
+        return '<button type="button" class="sf-chip" data-cat="' + esc(c) + '" aria-pressed="false">' + esc(c) + "</button>";
+      })).join("");
+      $("catList").onclick = function (e) {
+        var b = e.target.closest("[data-cat]"); if (!b) return;
+        pickCat(b.dataset.cat, true);
+      };
+    }
+    if (page.showSearch !== false && products.length) {
+      $("searchBox").hidden = false;
+      $("q").oninput = function () { query = this.value.trim().toLowerCase(); drawProducts(); };
+      $("searchBox").onsubmit = function (e) { e.preventDefault(); query = $("q").value.trim().toLowerCase(); drawProducts(); goProducts(); };
+    }
+    $("products").hidden = page.showProducts === false || !products.length;
+    if (!$("products").hidden) drawProducts();
+    document.body.hidden = false;
+  }
+
+  function slotHtml(id, slot) {
+    var tap = slot.tap ? ' data-tap="' + esc(slot.tap) + '" role="link" tabindex="0"' : "";
+    return '<div class="sf-slot sl-' + id + (slot.fit === "contain" ? " fit-contain" : "") + '"' + tap + ">" +
+      '<img src="' + esc(slot.image) + '" alt="' + esc(slot.alt || "") + '" loading="' + (id === "hero" ? "eager" : "lazy") + '"></div>';
+  }
+
+  function drawBanners(page, company) {
+    var b = page.banners || {};
+    var has = function (k) { return b[k] && b[k].image; };
+    var heroText = !has("hero");
+    var html = heroText
+      ? '<div class="sf-slot sl-hero sf-text-hero"><h1>' + esc(page.headline || company) + "</h1>" +
+        (page.tagline ? "<p>" + esc(page.tagline) + "</p>" : "") + '<a class="sf-btn" href="' + esc(signInUrl) + '">Sign in to order</a></div>'
+      : slotHtml("hero", b.hero);
+    var tiles = ["tile1", "tile2"].filter(has);
+    tiles.forEach(function (k) { html += slotHtml(k, b[k]); });
+    if (has("side")) html += slotHtml("side", b.side);
+
+    // lay the spaces out like a shop window: big banner, tiles under it, tall one at the side
+    var el = $("banners");
+    var tileRow = tiles.length === 2 ? "tile1 tile2" : tiles.length === 1 ? tiles[0] + " " + tiles[0] : "";
+    function layout() {
+      var phone = window.matchMedia("(max-width:760px)").matches;
+      var cols, rows;
+      if (phone) {
+        cols = "1fr 1fr"; rows = ["hero hero"];
+        if (tileRow) rows.push(tileRow);
+        if (has("side")) rows.push("side side");
+      } else if (has("side")) {
+        cols = tiles.length ? "1fr 1fr 1fr" : "2fr 1fr";
+        rows = tiles.length ? ["hero hero side", tileRow + " side"] : ["hero side"];
+      } else {
+        cols = "1fr 1fr"; rows = ["hero hero"].concat(tileRow ? [tileRow] : []);
+      }
+      el.style.gridTemplateColumns = cols;
+      el.style.gridTemplateAreas = rows.map(function (r) { return '"' + r + '"'; }).join(" ");
+    }
+    layout();
+    window.addEventListener("resize", layout);
+    el.innerHTML = html;
+    el.querySelectorAll("[data-tap]").forEach(function (s) {
+      var run = function () { tapTo(s.dataset.tap); };
+      s.onclick = run;
+      s.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); } };
+    });
+  }
+
+  function tapTo(tap) {
+    if (tap === "signin") location.href = signInUrl;
+    else if (tap === "products") goProducts();
+    else if (tap.indexOf("cat:") === 0) pickCat(tap.slice(4), true);
+  }
+
+  function drawIntro(page, company) {
+    var heroHasPicture = page.banners && page.banners.hero && page.banners.hero.image;
+    var points = page.points || [];
+    var words = heroHasPicture && (page.headline || page.tagline || page.blurb);
+    var blurbOnly = !heroHasPicture && page.blurb;
+    if (!words && !blurbOnly && !points.length) return;
+    var html = "";
+    if (words) html += (page.headline ? "<h1>" + esc(page.headline) + "</h1>" : "") + (page.tagline || page.blurb ? "<p>" + esc(page.blurb || page.tagline) + "</p>" : "");
+    else if (blurbOnly) html += "<p>" + esc(page.blurb) + "</p>";
+    if (points.length) html += '<div class="sf-points">' + points.map(function (p) {
+      return '<span class="sf-point"><i><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></i>' + esc(p) + "</span>";
+    }).join("") + "</div>";
+    $("intro").innerHTML = html;
+    $("intro").hidden = false;
+  }
+
+  function pickCat(cat, scroll) {
+    filterCat = cat;
+    document.querySelectorAll("#catList [data-cat]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.cat === cat)); });
+    drawProducts();
+    if (scroll) goProducts();
+  }
+  function goProducts() { if (!$("products").hidden) $("products").scrollIntoView({ behavior: "smooth", block: "start" }); }
+
+  function drawProducts() {
+    var list = products.filter(function (p) {
+      if (filterCat && p.category !== filterCat) return false;
+      if (query && (p.name + " " + p.category + " " + (p.description || "")).toLowerCase().indexOf(query) === -1) return false;
+      return true;
+    });
+    $("prodTitle").textContent = filterCat || (query ? "Search results" : "Our products");
+    $("prodCount").textContent = list.length + (list.length === 1 ? " product" : " products");
+    $("grid").innerHTML = list.length ? list.map(function (p) {
+      var pic = p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy">' : "<span>" + esc(p.name.charAt(0)) + "</span>";
+      return '<article class="sf-card"><div class="sf-pic">' + pic + '</div><div class="sf-card-body">' +
+        (p.category ? "<small>" + esc(p.category) + "</small>" : "") + "<b>" + esc(p.name) + "</b>" +
+        (p.description ? "<p>" + esc(p.description) + "</p>" : "") +
+        '<a href="' + esc(signInUrl) + '">Sign in for price ›</a></div></article>';
+    }).join("") : '<p class="sf-none">Nothing matches that. Try another word, or see all products.</p>';
+  }
+})();
+</script>
+</body>
+</html>

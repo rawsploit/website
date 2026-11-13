@@ -399,3 +399,37 @@ a { color: var(--ink); }
 .pw-box { background: var(--paper); border: 1px solid var(--ink-soft); border-radius: var(--radius-s); padding: 12px 14px; margin: 12px 0; line-height: 1.6; }
 .btn-danger { color: #A23A2A !important; border-color: #E2B4AB !important; }
 .btn-danger:hover { background: #FBEDEA !important; }
+
+/* ---------- Storefront designer (Marketing) ---------- */
+.sfa-status { margin-top: 0; }
+.sfa-status-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.sfa-status h3 .status { margin-left: 8px; vertical-align: middle; }
+.sfa-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.sfa-msg { margin: 10px 0 0; }
+.sfa-msg:empty, .sfa .form-error:empty { display: none; }
+.sfa-banners { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.sfa-map { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-areas: "hero hero side" "tile1 tile2 side"; gap: 8px; }
+.sfa-cell { position: relative; border: 2px dashed var(--rule-strong); border-radius: 10px; background: var(--paper); cursor: pointer; overflow: hidden; padding: 0; min-height: 0; font: inherit; }
+.sfa-cell.sl-hero { grid-area: hero; aspect-ratio: 5 / 2; }
+.sfa-cell.sl-tile1 { grid-area: tile1; aspect-ratio: 16 / 9; }
+.sfa-cell.sl-tile2 { grid-area: tile2; aspect-ratio: 16 / 9; }
+.sfa-cell.sl-side { grid-area: side; }
+.sfa-cell img { position: absolute; inset: 0; width: 100%; height: 100%; background: #fff; }
+.sfa-cell span { position: absolute; left: 6px; bottom: 6px; background: rgba(255,255,255,.92); color: var(--text); font: 600 12.5px var(--body); padding: 3px 8px; border-radius: 6px; text-align: left; line-height: 1.25; }
+.sfa-cell span small { display: block; color: var(--muted); font-weight: 400; }
+.sfa-cell:hover { border-color: var(--ink); }
+.sfa-cell.on { border: 2.5px solid var(--ink); box-shadow: 0 0 0 3px var(--tint-3); }
+.sfa-slot-pic { border-radius: 10px; background: var(--paper); border: 1px solid var(--rule); overflow: hidden; display: grid; place-items: center; margin-bottom: 14px; }
+.sfa-slot-pic.sl-hero { aspect-ratio: 5 / 2; } .sfa-slot-pic.sl-tile1, .sfa-slot-pic.sl-tile2 { aspect-ratio: 16 / 9; } .sfa-slot-pic.sl-side { aspect-ratio: 8 / 11; max-height: 300px; margin-left: auto; margin-right: auto; }
+.sfa-slot-pic img { width: 100%; height: 100%; display: block; background: #fff; }
+.sfa-slot-pic p { padding: 14px; text-align: center; margin: 0; font-size: 14px; }
+.sfa-ta { width: 100%; font: 400 16px var(--body); padding: 10px 12px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); resize: vertical; }
+.sfa-points { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.sfa-points input { width: 100%; font: 400 15px var(--body); padding: 9px 11px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); }
+.sfa-colour { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sfa-colour input[type=color] { width: 52px; height: 38px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); padding: 2px; background: #fff; cursor: pointer; }
+.sfa-checks { display: flex; gap: 10px 26px; flex-wrap: wrap; }
+.sfa-savebar { position: sticky; bottom: 0; background: var(--paper); padding: 14px 0; margin-top: 18px; display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--rule); z-index: 2; }
+@media (max-width: 900px) { .sfa-banners { grid-template-columns: 1fr; } }
+.back-shop { display: inline-block; margin: 0 0 14px; font: 600 15px var(--body); color: var(--ink); text-decoration: none; }
+.back-shop:hover { text-decoration: underline; }
