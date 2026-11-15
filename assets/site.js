@@ -97,7 +97,9 @@
   /* Modules that have a look-only mode for the Viewer team. */
   var VIEW_ONLY_MODULES = ["collections", "nexus", "cashrecon", "books", "pnl", "payroll", "mis"];
   function modulesFor(role) {
+    var tally = brandCached().accounts === "tally";
     return window.MODULES.filter(function (m) {
+      if (tally && m.id === "books") return false;          // accounts are kept in Tally
       if (role === "viewer") return VIEW_ONLY_MODULES.indexOf(m.id) !== -1;
       return role === "admin" || m.teams.indexOf(role) !== -1;
     });
@@ -139,7 +141,8 @@
   }
   function brandKeep(b) {
     try {
-      var raw = JSON.stringify({ logo: b.logo || "", accent: b.accent || "", pattern: b.pattern || "", look: b.look || null });
+      var raw = JSON.stringify({ logo: b.logo || "", accent: b.accent || "", pattern: b.pattern || "", look: b.look || null,
+                                 accounts: b.accounts || brandCached().accounts || "books" });
       if (isDemo()) sessionStorage.setItem("suite.demoBrand", raw); else localStorage.setItem(BRAND_KEY + clientId(), raw);
     } catch (e) { /* storage full or blocked: the page still shows it now */ }
   }
@@ -201,7 +204,14 @@
     applyBrand(b);
     if (isDemo() || !client().api) return Promise.resolve(b);
     return api("status", {}).then(function (r) {
-      if (r && r.ok && r.brand) { brandKeep(r.brand); applyBrand(r.brand); return r.brand; }
+      if (r && r.ok && r.brand) {
+        var before = b.accounts || "books";
+        r.brand.accounts = r.accounts || "books";
+        brandKeep(r.brand); applyBrand(r.brand);
+        // accounts moved between Kalavara and Tally: redraw the menu once
+        if (before !== r.brand.accounts && typeof window.onAccountsChanged === "function") window.onAccountsChanged();
+        return r.brand;
+      }
       return b;
     }).catch(function () { return b; });
   }

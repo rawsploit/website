@@ -74,6 +74,7 @@
   var client = Suite.client();
 
   $("who").textContent = s.name + " · " + Suite.teamName(s.role);
+  window.onAccountsChanged = function () { location.reload(); };
   Suite.loadBrand();
 
   /* A module (inside its frame) can ask to open a built-in page, e.g. Field Sales → Billing.

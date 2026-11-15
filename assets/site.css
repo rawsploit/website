@@ -513,3 +513,9 @@ body.has-accent.login-page .login-card h2, body.has-accent .main-bar h2 { color:
 .bk-preview.top .bk-main { flex: 1; }
 @media (max-width: 1100px) { .bk-grid.with-list { grid-template-columns: 200px minmax(0, 1fr); } .bk-grid.with-list .bk-prev { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .bk-modes, .bk-grid.with-list { grid-template-columns: 1fr; } }
+/* accounts step: Kalavara books or Tally */
+.acc-tally { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 16px; }
+.acc-status { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.acc-steps { padding-left: 20px; margin: 0 0 14px; }
+.acc-steps li { margin: 0 0 14px; line-height: 1.5; }
+.acc-cmd { background: #10181F; color: #E6F0F2; padding: 10px 12px; border-radius: 8px; font: 13px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all; margin: 8px 0 6px; }

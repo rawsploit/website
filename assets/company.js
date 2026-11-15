@@ -19,6 +19,7 @@
     { id: "routes", name: "Sales routes" },
     { id: "distributors", name: "Distributors" },
     { id: "products", name: "Products" },
+    { id: "accounts", name: "Accounts" },
     { id: "brand", name: "Brand" }
   ];
   var BRAND = null;        // logo, colour and pattern (admins only)
@@ -65,6 +66,7 @@
     if (id === "routes") return P.routes.some(function (r) { return r.active; });
     if (id === "distributors") return P.distributors.length > 0;
     if (id === "products") return P.products.some(function (p) { return p.active; });
+    if (id === "accounts") { var acc = ACC || {}; return acc.source === "books" ? !!ACC : !!(acc.linked && acc.lastSync); }
     if (id === "brand") { var b = (BRAND && BRAND.brand) || Suite.brandCached(); return !!(b.logo || b.accent || (b.look && b.look.side)); }
     return false;
   }
@@ -77,7 +79,7 @@
     }).join("");
     bar.querySelectorAll("[data-step]").forEach(function (b) { b.onclick = function () { step = b.dataset.step; paint(root); }; });
     var body = root.querySelector("#wizBody");
-    ({ company: stepCompany, plants: stepPlants, routes: stepRoutes, distributors: stepDistributors, products: stepProducts, brand: stepBrand })[step](body, root);
+    ({ company: stepCompany, plants: stepPlants, routes: stepRoutes, distributors: stepDistributors, products: stepProducts, accounts: stepAccounts, brand: stepBrand })[step](body, root);
   }
   function nextStep(root) {
     var i = STEPS.map(function (s) { return s.id; }).indexOf(step);
@@ -637,6 +639,121 @@
     return { call: call };
   })();
 
+  /* ---------------- 6. accounts: Kalavara books or Tally ---------------- */
+  var ACC = null;
+
+  function accCall(action, payload) {
+    if (Suite.isDemo()) {
+      var d = { ok: true, source: "books", linked: false, company: Suite.client().name, counts: {}, lastSync: "", lastError: "" };
+      try { d = Object.assign(d, JSON.parse(sessionStorage.getItem("suite.demoAccounts") || "{}")); } catch (e) {}
+      if (action === "saveAccountsSource") d.source = payload.source;
+      if (action === "newTallyKey") return Promise.reject(new Error("The demo company can't pair with a real Tally. Try it on your own company."));
+      try { sessionStorage.setItem("suite.demoAccounts", JSON.stringify({ source: d.source })); } catch (e) {}
+      return Promise.resolve(d);
+    }
+    return call(action, payload);
+  }
+
+  function ago(iso) {
+    if (!iso) return "";
+    var mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + " min ago";
+    if (mins < 1440) return Math.round(mins / 60) + " h ago";
+    return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  }
+
+  function stepAccounts(body, root) {
+    if (!ACC) {
+      body.innerHTML = '<p class="muted">Loading…</p>';
+      accCall("accountsSetup", {}).then(function (r) { ACC = r; stepAccounts(body, root); })
+        .catch(function (e) { body.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
+      return;
+    }
+    var a = ACC, tally = a.source === "tally";
+    var status = "";
+    if (tally) {
+      if (!a.linked) status = '<span class="status soon">Not paired yet</span>';
+      else if (a.lastError && (!a.lastSync || a.lastError.slice(0, 24) > a.lastSync)) status = '<span class="status soon">Problem</span> <span class="muted">' + esc(a.lastError.split(" · ").slice(1).join(" · ")) + "</span>";
+      else if (a.lastSync) status = '<span class="status live">Connected</span> <span class="muted">Last synced ' + esc(ago(a.lastSync)) + " · " +
+        (a.counts.ledgers || 0) + " ledgers · " + (a.counts.items || 0) + " stock items · " + (a.counts.vouchers || 0) + " vouchers</span>";
+      else status = '<span class="status soon">Paired · waiting for the first sync</span>';
+    }
+    var nameNote = tally && a.tallyCompany && a.company && a.tallyCompany.trim().toLowerCase() !== a.company.trim().toLowerCase()
+      ? '<p class="form-error">Tally sends data from "' + esc(a.tallyCompany) + '", but this company is "' + esc(a.company) + '". Make the names the same in both.</p>' : "";
+
+    body.innerHTML = '<div class="panel"><h3>6. Accounts</h3>' +
+      '<p class="muted" style="margin:0 0 16px">Where do you keep your accounts? Trade Recon, Cash Recon, Profit & Loss and the MIS Dashboard read the books from here.</p>' +
+      '<div class="bk-modes">' +
+        '<label class="bk-mode' + (!tally ? " on" : "") + '"><input type="radio" name="accSrc" value="books"' + (!tally ? " checked" : "") + '><span><b>In Kalavara (Accounting-Books)</b><small>For companies without Tally. Ledgers, GST bills, receipts and payments, with Tally-style keys.</small></span></label>' +
+        '<label class="bk-mode' + (tally ? " on" : "") + '"><input type="radio" name="accSrc" value="tally"' + (tally ? " checked" : "") + '><span><b>In Tally</b><small>You already use Tally. Kalavara reads your ledgers, stock items and vouchers from it automatically.</small></span></label>' +
+      "</div>" +
+      (tally ?
+        '<div class="acc-tally">' +
+          '<div class="acc-status">' + status + "</div>" + nameNote +
+          '<ol class="acc-steps">' +
+            "<li><b>Switch on Tally's connection.</b> In Tally: <b>F1 (Help) → Settings → Connectivity → Client/Server configuration</b>. Set <i>TallyPrime acts as</i> to <b>Both</b> and <i>Port</i> to <b>9000</b>, then Ctrl + A. Keep Tally open with <b>" + esc(a.company || "your company") + "</b> loaded.</li>" +
+            "<li><b>Download Kalavara Tally Link</b> on the PC where Tally runs. It's a small script, already paired with this company." +
+              '<div class="row-actions" style="margin-top:8px"><button class="btn btn-ink btn-small" type="button" id="accKey">' + (a.linked ? "Download again (new code)" : "Pair and download") + "</button>" +
+              (a.linked ? '<button class="btn btn-line btn-small btn-danger" type="button" id="accUnlink">Unpair</button>' : "") + "</div>" +
+              (a.linked ? '<p class="muted" style="margin:6px 0 0">Paired with code ending …' + esc(a.keyHint) + ". Downloading again makes a new code; the old script stops working.</p>" : "") + "</li>" +
+            "<li><b>Start it once.</b> Open <b>PowerShell</b> (Start → type PowerShell) and paste:" +
+              '<pre class="acc-cmd" id="accCmd">powershell -ExecutionPolicy Bypass -File "$HOME\\Downloads\\KalavaraTallyLink.ps1" -Install</pre>' +
+              '<button class="btn btn-line btn-small" type="button" id="accCopy">Copy</button>' +
+              '<p class="muted" style="margin:6px 0 0">It sends your Tally data now, then every 15 minutes while you are signed in to Windows. To test without sending, put <b>-Check</b> instead of -Install.</p></li>' +
+          "</ol>" +
+          '<div class="row-actions"><button class="btn btn-line btn-small" type="button" id="accRefresh">Refresh status</button></div>' +
+        "</div>" : "") +
+      '<p class="muted" id="accMsg" role="status"></p><p class="form-error" id="accErr" role="alert"></p></div>';
+
+    var msg = body.querySelector("#accMsg"), err = body.querySelector("#accErr");
+    function after(r, text) { ACC = r; paint(root); var m = document.querySelector("#accMsg"); if (m) m.textContent = text || ""; }
+    function fail(e) { msg.textContent = ""; err.textContent = (e && e.message) || "That didn't work. Try again."; }
+    body.querySelectorAll("input[name=accSrc]").forEach(function (rd) {
+      rd.onchange = function () {
+        err.textContent = ""; msg.textContent = "Saving…";
+        accCall("saveAccountsSource", { source: rd.value }).then(function (r) {
+          var b = Suite.brandCached(); b.accounts = r.source; Suite.brandKeep(b);
+          after(r, r.source === "tally" ? "Accounts are kept in Tally. Pair it below. Accounting-Books leaves the menu the next time the portal opens." : "Accounts are kept in Kalavara (Accounting-Books).");
+        }).catch(fail);
+      };
+    });
+    var keyBtn = body.querySelector("#accKey");
+    if (keyBtn) keyBtn.onclick = function () {
+      err.textContent = ""; msg.textContent = "Pairing…";
+      Promise.all([accCall("newTallyKey", {}), fetch("assets/tally-link.ps1", { cache: "no-store" }).then(function (x) {
+        if (!x.ok) throw new Error("Couldn't get the script. Check your connection and try again."); return x.text();
+      })]).then(function (both) {
+        var r = both[0], tpl = both[1];
+        var ps = function (v) { return String(v || "").replace(/'/g, "''"); };
+        var text = tpl.replace("__CORE_URL__", ps(Suite.client().api)).replace("__LINK_KEY__", ps(r.key)).replace("__COMPANY__", ps(r.company));
+        var blob = new Blob(["﻿" + text.replace(/\r?\n/g, "\r\n")], { type: "text/plain;charset=utf-8" });
+        var link = document.createElement("a");
+        link.href = URL.createObjectURL(blob); link.download = "KalavaraTallyLink.ps1";
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(function () { URL.revokeObjectURL(link.href); }, 4000);
+        delete r.key;
+        after(r, "Downloaded KalavaraTallyLink.ps1. Now do step 3 on the Tally PC.");
+      }).catch(fail);
+    };
+    var un = body.querySelector("#accUnlink");
+    if (un) un.onclick = function () {
+      if (!un.dataset.sure) { un.dataset.sure = "1"; un.textContent = "Yes, unpair"; msg.textContent = "The script on the Tally PC will stop sending."; return; }
+      accCall("unlinkTally", {}).then(function (r) { after(r, "Unpaired."); }).catch(fail);
+    };
+    var copy = body.querySelector("#accCopy");
+    if (copy) copy.onclick = function () {
+      var t = body.querySelector("#accCmd").textContent;
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { msg.textContent = "Copied."; })
+        .catch(function () { msg.textContent = "Select the line and copy it."; });
+    };
+    var ref = body.querySelector("#accRefresh");
+    if (ref) ref.onclick = function () {
+      msg.textContent = "Checking…";
+      accCall("accountsSetup", {}).then(function (r) { after(r, r.lastSync ? "Up to date." : "Nothing received yet."); }).catch(fail);
+    };
+  }
+
   /* ---------------- 6. brand kit (admins only) ----------------
      Logo, and the theme: one for every module, or each module its own.
      A theme is one colour, two colours (gradient) or the company's own picture, plus an optional pattern. */
@@ -772,7 +889,7 @@
       editor += '<p class="muted">' + esc(modName(bkTarget)) + " uses the company theme. Untick the box to give it its own colour, two colours or picture.</p>";
     }
 
-    body.innerHTML = '<div class="panel bk"><h3>6. Brand</h3>' +
+    body.innerHTML = '<div class="panel bk"><h3>7. Brand</h3>' +
       (Suite.isDemo() ? '<p class="demo-hint" style="margin:0 0 16px">Demo company: try a logo and themes. They stay in this browser tab only. <button class="btn btn-line btn-small" type="button" id="bkReset" style="margin-left:8px">Reset demo</button></p>' : "") +
       '<p class="muted" style="margin:0 0 18px">Your logo and theme appear in the portal, on the sign-in page, on your storefront and in the modules. Modules pick up a change the next time each person signs in.</p>' +
 
