@@ -128,7 +128,7 @@
         '<label class="btn btn-line btn-small" style="cursor:pointer">Upload a list (CSV)<input type="file" id="shFile" accept=".csv,text/csv" hidden></label>' +
         '<button class="btn btn-line btn-small" id="shTpl" type="button">Download template</button>' +
         '<button class="btn btn-line btn-small" id="shTally" type="button">Add shops from Tally</button></div>') + "</div>" +
-        '<div id="shMsg"></div><div id="shForm"></div>' +
+        '<div id="shMsg"></div><div id="shTallyGap"></div><div id="shForm"></div>' +
         '<label class="field" style="max-width:320px;margin-top:12px"><span>Filter</span><input id="shQ" placeholder="Shop name or route"></label>' +
         '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ID</th><th>Shop</th><th>Route</th><th>Phone (WhatsApp)</th><th>GSTIN</th><th>Type</th><th>Credit</th><th>Active</th><th></th></tr></thead><tbody id="shRows"></tbody></table></div>';
       var paint = function () {
@@ -147,6 +147,7 @@
         shopForm(body, shops.filter(function (s) { return s.shop_id === b.dataset.edit; })[0], function () { tabShops(body); });
       };
       if (!viewOnly()) body.querySelector("#shTally").onclick = function () { tallyShops(body); };
+      tallyGap(body);
       if (!viewOnly()) body.querySelector("#shTpl").onclick = function () {
         download("shops-template.csv", [["name", "route_id", "address", "phone", "gstin", "type", "credit", "active"],
           ["Example Stores", (routesCache[0] || {}).route_id || "R1", "Main Road", "9800000000", "", "A", "yes", "yes"]]);
@@ -171,6 +172,49 @@
         reader.readAsText(file);
       };
     }).catch(function (e) { errBox(body, e); });
+  }
+
+  /* Tally companies only: how the two shop lists differ, shown above the table.
+     Kalavara shops with no Sundry Debtor in Tally need a ledger before their bills are entered. */
+  function tallyGap(body) {
+    var box = body.querySelector("#shTallyGap");
+    if (!box) return;
+    call("tallyNewShops", {}).then(function (r) {
+      if (!r.tally || !r.synced) return;
+      var btn = body.querySelector("#shTally");
+      if (btn) btn.textContent = "Add shops from Tally" + (r.shops.length ? " (" + r.shops.length + ")" : "");
+      var miss = r.missing || [];
+      if (!miss.length) {
+        box.innerHTML = '<p class="demo-hint" style="margin:12px 0">✓ Every shop here has a ledger in Tally with the same name.</p>';
+        return;
+      }
+      var billedShops = miss.filter(function (m) { return m.bills; }).length;
+      box.innerHTML = '<details class="panel" style="margin:12px 0;border-left:4px solid #C77700"' + (billedShops ? " open" : "") + '><summary style="cursor:pointer"><b>' +
+        miss.length + " shop" + (miss.length === 1 ? " isn't" : "s aren't") + " in Tally yet</b>" +
+        (billedShops ? ' <span class="muted">· ' + billedShops + " already billed</span>" : "") + "</summary>" +
+        '<p class="muted" style="margin:8px 0 10px">Ask accounts to create these as <b>Sundry Debtors</b> in Tally, with exactly the same name, ' +
+        "before their bills are entered. Until then Trade Recon shows their bills as missing in Tally. They drop off this list after the next Tally sync.</p>" +
+        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Shop</th><th>Route</th><th>GSTIN</th><th>Bills</th><th>Billed</th><th>Last bill</th></tr></thead><tbody>' +
+        miss.map(function (m) {
+          return "<tr><td>" + esc(m.name) + "</td><td>" + esc(m.route_id) + "</td><td>" + esc(m.gstin) + '</td><td class="num">' + m.bills +
+            '</td><td class="num">' + (m.bills ? money(m.amount) : "–") + "</td><td>" + esc(m.last) + "</td></tr>";
+        }).join("") + "</tbody></table></div>" +
+        '<div class="row-btns" style="margin-top:10px"><button class="btn btn-line btn-small" type="button" id="tgCopy">Copy the list for accounts</button>' +
+        '<button class="btn btn-line btn-small" type="button" id="tgCsv">Download as CSV</button></div></details>';
+      box.querySelector("#tgCopy").onclick = function () {
+        var text = "Please create these as Sundry Debtors in Tally (same names):\n" + miss.map(function (m) {
+          return "- " + m.name + (m.route_id ? " (" + m.route_id + ")" : "") + (m.gstin ? ", GSTIN " + m.gstin : "");
+        }).join("\n");
+        var b = this;
+        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { b.textContent = "Copied"; })
+          .catch(function () { window.prompt("Copy this:", text); });
+      };
+      box.querySelector("#tgCsv").onclick = function () {
+        download("shops-not-in-tally.csv", [["Shop", "Route", "GSTIN", "Bills", "Billed", "Last bill"]].concat(miss.map(function (m) {
+          return [m.name, m.route_id, m.gstin, m.bills, m.amount, m.last];
+        })));
+      };
+    }).catch(function () {});
   }
 
   /* Tally's Sundry Debtors that aren't shops yet: pick a route each and add them,
@@ -359,7 +403,13 @@
       }),
       totals: [["Bills", 3], ["Sales", 4224], ["Returns value", 85], ["Net amount", 4139]] };
     if (action === "saveShops") return { ok: true, added: (p.shops || []).length > 1 ? p.shops.length : 0, updated: (p.shops || []).length > 1 ? 0 : 1, shops: demoShops };
-    if (action === "tallyNewShops") return { ok: true, tally: true, lastSync: "", shops: [{ name: "Fresh Mart", balance: 3000 }, { name: "Green Valley Stores", balance: 1500 }] };
+    if (action === "tallyNewShops") {
+      var demoTally = false;
+      try { demoTally = (JSON.parse(sessionStorage.getItem("suite.demoAccounts") || "{}").source === "tally"); } catch (e) {}
+      if (!demoTally) return { ok: true, tally: false, shops: [], missing: [] };
+    }
+    if (action === "tallyNewShops") return { ok: true, tally: true, synced: true, lastSync: "", shops: [{ name: "Fresh Mart", balance: 3000 }, { name: "Green Valley Stores", balance: 1500 }],
+      missing: [{ shop_id: "S0004", name: "Lakeside Traders", route_id: "R2", gstin: "", bills: 1, amount: 2280, last: today() }] };
     return { ok: false, message: "Not available in the demo company." };
   }
 
