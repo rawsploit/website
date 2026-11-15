@@ -22,7 +22,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.0'
+$Agent    = 'tally-link-ps 1.1'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -85,15 +85,21 @@ function Nodes($parent, [string]$name) {
 }
 
 function Read-Tally {
+  # balances up to today, from the start of this financial year (1 April)
+  $inv = [Globalization.CultureInfo]::InvariantCulture
+  $today = Get-Date
+  $fy = if ($today.Month -ge 4) { $today.Year } else { $today.Year - 1 }
+  $fyFrom = (Get-Date -Year $fy -Month 4 -Day 1).ToString('d-MMM-yyyy', $inv)
+  $upTo = $today.ToString('d-MMM-yyyy', $inv)
   # 1. ledgers with their group and balances (Tally: negative = debit)
-  $x = Get-TallyCollection 'Ledger' 'NAME,PARENT,OPENINGBALANCE,CLOSINGBALANCE,PARTYGSTIN'
+  $x = Get-TallyCollection 'Ledger' 'NAME,PARENT,OPENINGBALANCE,CLOSINGBALANCE,PARTYGSTIN' $fyFrom $upTo
   $ledgers = @()
   foreach ($l in (Nodes $x.ENVELOPE.BODY.DATA.COLLECTION 'LEDGER')) {
     $ledgers += @{ name = (NameOf $l); group = (Txt $l 'PARENT'); opening = (Num (Txt $l 'OPENINGBALANCE'));
                    closing = (Num (Txt $l 'CLOSINGBALANCE')); gstin = (Txt $l 'PARTYGSTIN') }
   }
   # 2. stock items with closing quantity and value
-  $x = Get-TallyCollection 'StockItem' 'NAME,PARENT,BASEUNITS,CLOSINGBALANCE,CLOSINGVALUE'
+  $x = Get-TallyCollection 'StockItem' 'NAME,PARENT,BASEUNITS,CLOSINGBALANCE,CLOSINGVALUE' $fyFrom $upTo
   $items = @()
   foreach ($i in (Nodes $x.ENVELOPE.BODY.DATA.COLLECTION 'STOCKITEM')) {
     $items += @{ name = (NameOf $i); group = (Txt $i 'PARENT'); unit = (Txt $i 'BASEUNITS');

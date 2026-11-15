@@ -22,6 +22,7 @@
 <script src="assets/storefront-admin.js"></script>
 <script src="assets/xlsx.js"></script>
 <script src="assets/sales-desk.js"></script>
+<script src="assets/tally-books.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -93,9 +94,11 @@
     { id: "storefront", name: "Storefront",       marketing: true, desc: "Your public shop page: banners, words and colour. Preview, then publish." },
     { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." },
     { id: "billing",   name: "Billing",    van: true, team: "sales",    after: "fieldsales",  roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
-    { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts", "viewer"], desc: "Today's bills live, formal tax invoices, shops and sales reports." }
+    { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts", "viewer"], desc: "Today's bills live, formal tax invoices, shops and sales reports." },
+    { id: "tallybooks", name: "Tally Books", van: true, tally: true, team: "accounts", after: "cashrecon", roles: ["admin", "accounts", "viewer"], desc: "Your Tally day book, ledgers and stock, brought in automatically. Read-only." }
   ];
-  var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1; });
+  var KEEPS_TALLY = Suite.brandCached().accounts === "tally";
+  var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1 && (!p.tally || KEEPS_TALLY); });
 
   /* ---- sidebar ---- */
   function navHtml() {
@@ -215,6 +218,7 @@
     var page = PAGES.filter(function (p) { return p.id === id; })[0];
     if (page && page.href) { location.href = Suite.link(page.href); return; }
     if (id === "salesdesk") SalesDesk.render($("view"), Suite.params.get("tab"));
+    else if (id === "tallybooks") TallyBooks.render($("view"), Suite.params.get("tab"));
     else if (id === "catalog") CatalogAdmin.render($("view"));
     else if (id === "storefront") StorefrontAdmin.render($("view"));
     else if (id === "customers") People.renderCustomers($("view"));

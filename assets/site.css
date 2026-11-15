@@ -519,3 +519,21 @@ body.has-accent.login-page .login-card h2, body.has-accent .main-bar h2 { color:
 .acc-steps { padding-left: 20px; margin: 0 0 14px; }
 .acc-steps li { margin: 0 0 14px; line-height: 1.5; }
 .acc-cmd { background: #10181F; color: #E6F0F2; padding: 10px 12px; border-radius: 8px; font: 13px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all; margin: 8px 0 6px; }
+/* Tally Books (accounts kept in Tally) */
+.tb-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.tb-head .status { margin-left: 6px; }
+.tb-switch { grid-template-columns: repeat(3, 1fr); max-width: 560px; }
+.tb-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.tb-filters input[type=search] { flex: 1; min-width: 220px; max-width: 420px; font: 400 15px var(--body); padding: 9px 12px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); }
+.tb-filters select { font: 400 15px var(--body); padding: 9px 10px; border: 1.5px solid var(--rule-strong); border-radius: var(--radius-s); background: #fff; }
+.tb-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--tint-3); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 14px; }
+.tb-chip button { border: 0; background: transparent; font-size: 18px; line-height: 1; cursor: pointer; color: var(--muted); }
+.tb-totals { display: flex; gap: 8px 22px; flex-wrap: wrap; margin: 0 0 12px; font-size: 14.5px; color: var(--muted); }
+.tb-totals b { color: var(--text); font-weight: 600; margin-right: 4px; }
+.tb-table tr.tb-row { cursor: pointer; }
+.tb-table tr.tb-row:hover td { background: var(--paper); }
+.tb-table tr.tb-group td { font-weight: 700; background: var(--paper); }
+.tb-table tr.tb-lines td { background: #FBFCFD; padding-top: 0; }
+.tb-table tr.tb-lines table { width: 100%; max-width: 560px; border-collapse: collapse; font-size: 14px; }
+.tb-table tr.tb-lines table td { background: transparent; padding: 4px 8px; border: 0; }
+.tb-table td.num, .tb-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
