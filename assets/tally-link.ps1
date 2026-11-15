@@ -22,7 +22,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.1'
+$Agent    = 'tally-link-ps 1.2'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -109,13 +109,27 @@ function Read-Tally {
   $toD = Get-Date; $fromD = $toD.AddDays(-$Days)
   $from = $fromD.ToString('d-MMM-yyyy', [Globalization.CultureInfo]::InvariantCulture)
   $to   = $toD.ToString('d-MMM-yyyy', [Globalization.CultureInfo]::InvariantCulture)
-  $x = Get-TallyCollection 'Voucher' 'DATE,VOUCHERTYPENAME,VOUCHERNUMBER,PARTYLEDGERNAME,NARRATION,GUID,ALLLEDGERENTRIES.LIST,LEDGERENTRIES.LIST' $from $to
+  $x = Get-TallyCollection 'Voucher' 'DATE,VOUCHERTYPENAME,VOUCHERNUMBER,PARTYLEDGERNAME,NARRATION,GUID,ALLLEDGERENTRIES.LIST,LEDGERENTRIES.LIST,ALLINVENTORYENTRIES.LIST' $from $to
   $vouchers = @()
   foreach ($v in (Nodes $x.ENVELOPE.BODY.DATA.COLLECTION 'VOUCHER')) {
+    # Tally can list the same line under both ALLLEDGERENTRIES and LEDGERENTRIES:
+    # take ALLLEDGERENTRIES, and LEDGERENTRIES only when the first is empty.
     $lines = @()
-    foreach ($e in (Nodes $v 'ALLLEDGERENTRIES.LIST') + (Nodes $v 'LEDGERENTRIES.LIST')) {
+    $entries = @(Nodes $v 'ALLLEDGERENTRIES.LIST')
+    if ($entries.Count -eq 0) { $entries = @(Nodes $v 'LEDGERENTRIES.LIST') }
+    foreach ($e in $entries) {
       $ln = Txt $e 'LEDGERNAME'
       if ($ln) { $lines += @{ ledger = $ln; amount = (Num (Txt $e 'AMOUNT')) } }
+    }
+    # item invoices keep the sales / purchase ledger under each item: add it if the voucher doesn't balance yet
+    $sum = 0; foreach ($ln in $lines) { $sum += $ln.amount }
+    if ([math]::Abs($sum) -gt 0.005) {
+      foreach ($ie in @(Nodes $v 'ALLINVENTORYENTRIES.LIST')) {
+        foreach ($ae in @(Nodes $ie 'ACCOUNTINGALLOCATIONS.LIST')) {
+          $ln = Txt $ae 'LEDGERNAME'
+          if ($ln) { $lines += @{ ledger = $ln; amount = (Num (Txt $ae 'AMOUNT')) } }
+        }
+      }
     }
     $party = Txt $v 'PARTYLEDGERNAME'
     $amount = 0
