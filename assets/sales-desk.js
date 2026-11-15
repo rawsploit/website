@@ -126,7 +126,8 @@
       body.innerHTML = '<div class="row-head" style="flex-wrap:wrap;gap:10px"><div><h3>Shops</h3><p class="muted" style="margin:4px 0 0">' + shops.length +
         ' shops. Sales staff see the shops on their route in Billing.</p></div>' + (viewOnly() ? "" : '<div class="row-btns"><button class="btn btn-ink btn-small" id="shAdd" type="button">Add a shop</button>' +
         '<label class="btn btn-line btn-small" style="cursor:pointer">Upload a list (CSV)<input type="file" id="shFile" accept=".csv,text/csv" hidden></label>' +
-        '<button class="btn btn-line btn-small" id="shTpl" type="button">Download template</button></div>') + "</div>" +
+        '<button class="btn btn-line btn-small" id="shTpl" type="button">Download template</button>' +
+        '<button class="btn btn-line btn-small" id="shTally" type="button">Add shops from Tally</button></div>') + "</div>" +
         '<div id="shMsg"></div><div id="shForm"></div>' +
         '<label class="field" style="max-width:320px;margin-top:12px"><span>Filter</span><input id="shQ" placeholder="Shop name or route"></label>' +
         '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ID</th><th>Shop</th><th>Route</th><th>Phone (WhatsApp)</th><th>GSTIN</th><th>Type</th><th>Credit</th><th>Active</th><th></th></tr></thead><tbody id="shRows"></tbody></table></div>';
@@ -145,6 +146,7 @@
         var b = e.target.closest("[data-edit]"); if (!b) return;
         shopForm(body, shops.filter(function (s) { return s.shop_id === b.dataset.edit; })[0], function () { tabShops(body); });
       };
+      if (!viewOnly()) body.querySelector("#shTally").onclick = function () { tallyShops(body); };
       if (!viewOnly()) body.querySelector("#shTpl").onclick = function () {
         download("shops-template.csv", [["name", "route_id", "address", "phone", "gstin", "type", "credit", "active"],
           ["Example Stores", (routesCache[0] || {}).route_id || "R1", "Main Road", "9800000000", "", "A", "yes", "yes"]]);
@@ -169,6 +171,69 @@
         reader.readAsText(file);
       };
     }).catch(function (e) { errBox(body, e); });
+  }
+
+  /* Tally's Sundry Debtors that aren't shops yet: pick a route each and add them,
+     keeping Tally's exact names so Trade Recon can match the bills. */
+  function tallyShops(body) {
+    var box = body.querySelector("#shForm");
+    box.innerHTML = '<div class="panel" style="margin:12px 0"><p>Reading the shops from Tally…</p></div>';
+    call("tallyNewShops", {}).then(function (r) {
+      if (!r.tally) {
+        box.innerHTML = '<div class="panel" style="margin:12px 0"><p>This company keeps its accounts in Kalavara, not Tally. ' +
+          'To use this, choose Tally under Company setup → Accounts and pair the Tally Link.</p><button class="btn btn-line btn-small" type="button" data-x>Close</button></div>';
+        box.querySelector("[data-x]").onclick = function () { box.innerHTML = ""; };
+        return;
+      }
+      var list = r.shops || [];
+      if (!list.length) {
+        box.innerHTML = '<div class="panel" style="margin:12px 0"><p>Every Sundry Debtor in Tally is already a shop here.' +
+          (r.lastSync ? ' <span class="muted">(Tally last synced ' + esc(String(r.lastSync).replace("T", " ").slice(0, 16)) + ")</span>" : "") +
+          '</p><button class="btn btn-line btn-small" type="button" data-x>Close</button></div>';
+        box.querySelector("[data-x]").onclick = function () { box.innerHTML = ""; };
+        return;
+      }
+      var opts = function (sel) {
+        return '<option value="">Route…</option>' + routesCache.map(function (rt) {
+          return '<option value="' + esc(rt.route_id) + '"' + (rt.route_id === sel ? " selected" : "") + ">" + esc(rt.route_id) + (rt.name ? " · " + esc(rt.name) : "") + "</option>";
+        }).join("");
+      };
+      box.innerHTML = '<div class="panel" style="margin:12px 0"><h3>Add shops from Tally</h3>' +
+        '<p class="muted" style="margin:4px 0 12px">' + list.length + " Sundry Debtor" + (list.length === 1 ? "" : "s") +
+        " in Tally that aren't shops here yet. The names stay exactly as in Tally. Pick each shop's route, then add them; phone and GSTIN can be filled in later with Edit.</p>" +
+        (routesCache.length ? "" : '<p class="form-error">Add your routes in Company setup first.</p>') +
+        '<div class="row-btns" style="margin-bottom:10px;align-items:center"><span>Route for all ticked:</span><select id="tsAll">' + opts("") + "</select></div>" +
+        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th><input type="checkbox" id="tsTick" checked></th><th>Shop (as in Tally)</th><th>Owes now</th><th>Route</th></tr></thead><tbody>' +
+        list.map(function (x, i) {
+          return '<tr><td><input type="checkbox" data-i="' + i + '" checked></td><td>' + esc(x.name) + '</td><td class="num">' + money(x.balance) +
+            '</td><td><select data-r="' + i + '">' + opts("") + "</select></td></tr>";
+        }).join("") + "</tbody></table></div>" +
+        '<p class="form-error" id="tsErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" id="tsGo" type="button">Add ticked shops</button>' +
+        '<button class="btn btn-line btn-small" type="button" data-x>Cancel</button></div></div>';
+      var q = function (sel) { return box.querySelectorAll(sel); };
+      box.querySelector("[data-x]").onclick = function () { box.innerHTML = ""; };
+      box.querySelector("#tsTick").onchange = function () { var on = this.checked; q("[data-i]").forEach(function (c) { c.checked = on; }); };
+      box.querySelector("#tsAll").onchange = function () {
+        var v = this.value;
+        q("[data-i]").forEach(function (c) { if (c.checked) box.querySelector('[data-r="' + c.dataset.i + '"]').value = v; });
+      };
+      box.querySelector("#tsGo").onclick = function () {
+        var err = box.querySelector("#tsErr"), pick = [], missing = [];
+        q("[data-i]").forEach(function (c) {
+          if (!c.checked) return;
+          var x = list[Number(c.dataset.i)], rt = box.querySelector('[data-r="' + c.dataset.i + '"]').value;
+          if (!rt) missing.push(x.name); else pick.push({ name: x.name, route_id: rt, credit: true, active: true });
+        });
+        if (missing.length) { err.textContent = "Pick a route for: " + missing.slice(0, 5).join(", ") + (missing.length > 5 ? " and " + (missing.length - 5) + " more" : "") + "."; return; }
+        if (!pick.length) { err.textContent = "Tick at least one shop."; return; }
+        err.textContent = "";
+        this.disabled = true;
+        call("saveShops", { shops: pick }).then(function (res) {
+          tabShops(body);
+          setTimeout(function () { var m = body.querySelector("#shMsg"); if (m) m.innerHTML = '<p class="demo-hint">' + res.added + " shop" + (res.added === 1 ? "" : "s") + " added from Tally.</p>"; }, 50);
+        }).catch(function (e) { err.textContent = e.message; box.querySelector("#tsGo").disabled = false; });
+      };
+    }).catch(function (e) { box.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
   }
 
   function shopForm(body, s, done) {
@@ -293,7 +358,8 @@
         return [b.bill_no, b.bill_date, b.kind === "RETURN" ? "Return" : "Bill", b.status, b.route_id, b.user_name, ({ "City Supermarket": "S0001", "Corner Store": "S0002", "Lakeside Traders": "S0004" })[b.shop_name] || "", b.shop_name, b.pay_mode, g * b.total, g * b.paid, g * (b.total - b.paid)];
       }),
       totals: [["Bills", 3], ["Sales", 4224], ["Returns value", 85], ["Net amount", 4139]] };
-    if (action === "saveShops") return { ok: true, added: 0, updated: 1, shops: demoShops };
+    if (action === "saveShops") return { ok: true, added: (p.shops || []).length > 1 ? p.shops.length : 0, updated: (p.shops || []).length > 1 ? 0 : 1, shops: demoShops };
+    if (action === "tallyNewShops") return { ok: true, tally: true, lastSync: "", shops: [{ name: "Fresh Mart", balance: 3000 }, { name: "Green Valley Stores", balance: 1500 }] };
     return { ok: false, message: "Not available in the demo company." };
   }
 
