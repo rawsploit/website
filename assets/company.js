@@ -56,7 +56,7 @@
       '<p class="muted" style="margin:0 0 14px">Fill this in once. Every module reads it: plants and their places, routes and vans, distributors and products.</p>' +
       '<div class="wiz-steps" id="wizSteps"></div><div id="wizBody"><p class="muted">Loading…</p></div></div>';
     call("profile").then(keep).then(function () { paint(root); })
-      .catch(function (e) { root.querySelector("#wizBody").innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
+      .catch(function (e) { var b = root.querySelector("#wizBody"); if (b) b.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });   // page may have been left already
   }
 
   function done(id) {
