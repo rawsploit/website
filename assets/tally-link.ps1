@@ -22,7 +22,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.2'
+$Agent    = 'tally-link-ps 1.3'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -157,13 +157,22 @@ function Tell-Problem([string]$msg) {
 # ---------------- install / uninstall ----------------
 if ($Uninstall) {
   schtasks.exe /Delete /TN $TaskName /F 2>$null | Out-Null
+  Remove-Item -Path (Join-Path $Home_ 'run-hidden.vbs') -ErrorAction SilentlyContinue
   Write-Log 'Stopped: automatic sync removed.'
   exit 0
 }
 if ($Install) {
   $target = Join-Path $Home_ 'KalavaraTallyLink.ps1'
   if ($PSCommandPath -ne $target) { Copy-Item -Path $PSCommandPath -Destination $target -Force }
-  $cmd = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $target + '"'
+  # PowerShell flashes a window for a moment even when "hidden", so a tiny VBScript
+  # starts it instead: wscript runs with no window at all (mode 0 = hidden).
+  $vbs = Join-Path $Home_ 'run-hidden.vbs'
+  $ps = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""' + $target + '""'
+  Set-Content -Path $vbs -Encoding ASCII -Value @(
+    'Set sh = CreateObject("WScript.Shell")',
+    ('sh.Run "' + $ps + '", 0, False')
+  )
+  $cmd = 'wscript.exe "' + $vbs + '"'
   schtasks.exe /Create /SC MINUTE /MO $Every /TN $TaskName /TR $cmd /F | Out-Null
   Write-Log ('Installed: syncing every ' + $Every + ' minutes while you are signed in to Windows.')
 }
