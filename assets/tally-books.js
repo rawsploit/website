@@ -130,8 +130,10 @@
     var q = filt.q.toLowerCase();
     var groups = {};
     D.ledgers.forEach(function (l) {
-      if (q && (l.name + " " + l.group).toLowerCase().indexOf(q) === -1) return;
-      (groups[l.group || "Others"] = groups[l.group || "Others"] || []).push(l);
+      if (q && (l.name + " " + (l.group === "Primary" ? "Profit & Loss" : l.group)).toLowerCase().indexOf(q) === -1) return;
+      // Tally keeps only the Profit & Loss ledger under "Primary" (no parent group)
+      var g = (!l.group || l.group === "Primary") ? "Profit & Loss" : l.group;
+      (groups[g] = groups[g] || []).push(l);
     });
     var names = Object.keys(groups).sort();
     var html = '<div class="tb-filters"><input type="search" id="tbQ" placeholder="Search ledger or group" value="' + esc(filt.q) + '"></div>';
