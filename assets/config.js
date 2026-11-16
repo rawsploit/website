@@ -45,7 +45,7 @@ window.MODULES = [
 window.CONTACT = {
   mail: ["rawsploit", "gmail", "com"],
   phone: ["91", "85905", "71252"],
-  leadsUrl: ""
+  leadsUrl: "https://script.google.com/macros/s/AKfycbxkUBtI8d2fcV-6lxJGyQ6A3y4-UPao9Tu9jJhMST0tDVL7qADcTLAMopmGOxsi7mZdBA/exec"
 };
 
 window.CLIENTS = {
