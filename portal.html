@@ -82,7 +82,7 @@
      Only Google's module frames are listened to, and only known pages can be opened. */
   window.addEventListener("message", function (e) {
     var d = e.data || {};
-    if (!d || d.kalavara !== "open" || typeof d.page !== "string") return;
+    if (!d || d.centraplant !== "open" || typeof d.page !== "string") return;
     if (!/^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(e.origin)) return;
     if (VAN_PAGES.some(function (p) { return p.id === d.page; })) go(d.page);
   });

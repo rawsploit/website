@@ -34,14 +34,14 @@
       demo.users = demo.users.filter(function (x) { return x.username !== u.username; }).concat([u]);
       return { ok: true };
     }
-    if (action === "resetPassword") return { ok: true, password: "Kala-1234-demo" };
+    if (action === "resetPassword") return { ok: true, password: "Plant-1234-demo" };
     if (action === "deleteUser") { demo.users = demo.users.filter(function (x) { return x.username !== p.username; }); return { ok: true }; }
     if (action === "deleteCustomer") { demo.customers = demo.customers.filter(function (x) { return x.code !== p.code; }); return { ok: true }; }
     if (action === "saveCustomers") {
       var np = [], added = 0, upd = 0;
       p.customers.forEach(function (c) {
         var code = String(c.code).toUpperCase(), had = demo.customers.some(function (x) { return x.code === code; });
-        if (had) upd++; else { added++; if (!c.password) np.push({ code: code, name: c.name, password: "Kala-1234-demo" }); }
+        if (had) upd++; else { added++; if (!c.password) np.push({ code: code, name: c.name, password: "Plant-1234-demo" }); }
         demo.customers = demo.customers.filter(function (x) { return x.code !== code; })
           .concat([{ code: code, name: c.name, phone: c.phone || "", status: /^(no|off)$/i.test(c.active || "") ? "off" : "active", lastLogin: "" }]);
       });

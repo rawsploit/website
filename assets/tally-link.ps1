@@ -46,7 +46,7 @@ function XmlEsc([string]$s) { [Security.SecurityElement]::Escape($s) }
 function Get-TallyCollection([string]$type, [string]$fetch, [string]$from, [string]$to) {
   $vars = '<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>' + (XmlEsc $Company) + '</SVCURRENTCOMPANY>'
   if ($from) { $vars += '<SVFROMDATE TYPE="Date">' + $from + '</SVFROMDATE><SVTODATE TYPE="Date">' + $to + '</SVTODATE>' }
-  $name = 'KalaLink' + $type
+  $name = 'CPLink' + $type
   $body = '<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>' + $name + '</ID></HEADER>' +
           '<BODY><DESC><STATICVARIABLES>' + $vars + '</STATICVARIABLES><TDL><TDLMESSAGE>' +
           '<COLLECTION NAME="' + $name + '" ISMODIFY="No"><TYPE>' + $type + '</TYPE><FETCH>' + $fetch + '</FETCH></COLLECTION>' +
@@ -155,21 +155,13 @@ function Tell-Problem([string]$msg) {
 }
 
 # ---------------- install / uninstall ----------------
-# The link used to be called "Kalavara Tally Link": remove that older task so it does not run twice.
-function Remove-OldLink {
-  schtasks.exe /Delete /TN 'Kalavara Tally Link' /F 2>$null | Out-Null
-  $old = Join-Path $env:LOCALAPPDATA 'KalavaraTallyLink'
-  if (Test-Path $old) { Remove-Item -Path $old -Recurse -Force -ErrorAction SilentlyContinue }
-}
 if ($Uninstall) {
   schtasks.exe /Delete /TN $TaskName /F 2>$null | Out-Null
-  Remove-OldLink
   Remove-Item -Path (Join-Path $Home_ 'run-hidden.vbs') -ErrorAction SilentlyContinue
   Write-Log 'Stopped: automatic sync removed.'
   exit 0
 }
 if ($Install) {
-  Remove-OldLink
   $target = Join-Path $Home_ 'CentraPlantTallyLink.ps1'
   if ($PSCommandPath -ne $target) { Copy-Item -Path $PSCommandPath -Destination $target -Force }
   # PowerShell flashes a window for a moment even when "hidden", so a tiny VBScript
