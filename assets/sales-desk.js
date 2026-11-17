@@ -175,7 +175,7 @@
   }
 
   /* Tally companies only: how the two shop lists differ, shown above the table.
-     Kalavara shops with no Sundry Debtor in Tally need a ledger before their bills are entered. */
+     CentraPlant shops with no Sundry Debtor in Tally need a ledger before their bills are entered. */
   function tallyGap(body) {
     var box = body.querySelector("#shTallyGap");
     if (!box) return;
@@ -224,7 +224,7 @@
     box.innerHTML = '<div class="panel" style="margin:12px 0"><p>Reading the shops from Tally…</p></div>';
     call("tallyNewShops", {}).then(function (r) {
       if (!r.tally) {
-        box.innerHTML = '<div class="panel" style="margin:12px 0"><p>This company keeps its accounts in Kalavara, not Tally. ' +
+        box.innerHTML = '<div class="panel" style="margin:12px 0"><p>This company keeps its accounts in CentraPlant, not Tally. ' +
           'To use this, choose Tally under Company setup → Accounts and pair the Tally Link.</p><button class="btn btn-line btn-small" type="button" data-x>Close</button></div>';
         box.querySelector("[data-x]").onclick = function () { box.innerHTML = ""; };
         return;

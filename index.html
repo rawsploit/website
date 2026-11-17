@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Kalavara">
+<meta name="apple-mobile-web-app-title" content="CentraPlant">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/config.js"></script>
@@ -23,8 +23,8 @@
 <header class="bar">
   <div class="wrap">
     <a class="brand" data-page="index.html" aria-label="Home">
-      <span class="brand-mark" data-site-initial aria-hidden="true">K</span>
-      <span class="brand-name" data-site-name>Kalavara</span>
+      <span class="brand-mark" data-site-initial aria-hidden="true">C</span>
+      <span class="brand-name" data-site-name>CentraPlant</span>
     </a>
     <div class="bar-actions">
       <a class="bar-link" href="#contact">Contact us</a>
@@ -129,7 +129,7 @@
       $("cError").textContent = err;
       if (err) return;
       if (d.website) return;               // filled in by a bot, not a person
-      var text = "New enquiry from mykalavara.com\n\nName: " + d.name + "\nCompany: " + d.company + "\nPhone: " + d.phone +
+      var text = "New enquiry from centraplant.com\n\nName: " + d.name + "\nCompany: " + d.company + "\nPhone: " + d.phone +
         "\nCity: " + (d.city || "-") + "\nMakes / sells: " + (d.what || "-") + "\n\n" + (d.note || "");
       function done(msg) { f.querySelectorAll(".field, #cSend").forEach(function (el) { el.hidden = true; }); $("cDone").textContent = msg; $("cDone").hidden = false; }
       if (C.leadsUrl) {
@@ -142,7 +142,7 @@
             $("cError").innerHTML = 'That didn\'t go through. Please try again, or email us at <a href="mailto:' + Suite.esc(C.email || "") + '">' + Suite.esc(C.email || "") + "</a>.";
           });
       } else {
-        location.href = "mailto:" + (C.email || "") + "?subject=" + encodeURIComponent("Kalavara enquiry: " + d.company) + "&body=" + encodeURIComponent(text);
+        location.href = "mailto:" + (C.email || "") + "?subject=" + encodeURIComponent("CentraPlant enquiry: " + d.company) + "&body=" + encodeURIComponent(text);
         done("Your email app should open with the details filled in. Press Send there and we'll call you within one working day.");
       }
     });

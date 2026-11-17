@@ -1,6 +1,6 @@
 /* ============================================================
    Tally Books (companies that keep their accounts in Tally).
-   Read-only view of what Kalavara Tally Link brings in:
+   Read-only view of what CentraPlant Tally Link brings in:
    Day Book, Ledgers and Stock Summary. Nothing here changes
    Tally. Tally writes debits as minus amounts; this screen
    shows them as Dr and Cr.

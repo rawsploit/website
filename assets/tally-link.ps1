@@ -1,12 +1,12 @@
 <#
-  Kalavara Tally Link
+  CentraPlant Tally Link
   Reads this PC's Tally (ledgers, stock items and recent vouchers) through Tally's
-  own connection on port 9000 and sends them to your company's Kalavara.
+  own connection on port 9000 and sends them to your company's CentraPlant.
 
-  First time:   powershell -ExecutionPolicy Bypass -File KalavaraTallyLink.ps1 -Install
+  First time:   powershell -ExecutionPolicy Bypass -File CentraPlantTallyLink.ps1 -Install
                 (copies itself to this PC, syncs now, then every 15 minutes)
-  Check only:   ... -File KalavaraTallyLink.ps1 -Check     (reads Tally, sends nothing)
-  Stop it:      ... -File KalavaraTallyLink.ps1 -Uninstall
+  Check only:   ... -File CentraPlantTallyLink.ps1 -Check     (reads Tally, sends nothing)
+  Stop it:      ... -File CentraPlantTallyLink.ps1 -Uninstall
 
   Tally must be open with the company loaded, and in Tally:
   F1 (Help) > Settings > Connectivity > Client/Server configuration:
@@ -22,12 +22,12 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.3'
+$Agent    = 'tally-link-ps 1.4'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$Home_ = Join-Path $env:LOCALAPPDATA 'KalavaraTallyLink'
-$TaskName = 'Kalavara Tally Link'
+$Home_ = Join-Path $env:LOCALAPPDATA 'CentraPlantTallyLink'
+$TaskName = 'CentraPlant Tally Link'
 if (-not (Test-Path $Home_)) { New-Item -ItemType Directory -Path $Home_ | Out-Null }
 $LogFile = Join-Path $Home_ 'link.log'
 
@@ -143,7 +143,7 @@ function Read-Tally {
             from = $fromD.ToString('yyyyMMdd'); to = $toD.ToString('yyyyMMdd') }
 }
 
-function Send-ToKalavara($payload) {
+function Send-ToCentraPlant($payload) {
   $json = $payload | ConvertTo-Json -Depth 6 -Compress
   $res = Invoke-RestMethod -Uri $CoreUrl -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($json)) `
            -ContentType 'text/plain; charset=utf-8' -TimeoutSec 300
@@ -151,18 +151,26 @@ function Send-ToKalavara($payload) {
 }
 
 function Tell-Problem([string]$msg) {
-  try { Send-ToKalavara @{ action = 'tallyProblem'; key = $LinkKey; message = $msg } | Out-Null } catch { }
+  try { Send-ToCentraPlant @{ action = 'tallyProblem'; key = $LinkKey; message = $msg } | Out-Null } catch { }
 }
 
 # ---------------- install / uninstall ----------------
+# The link used to be called "Kalavara Tally Link": remove that older task so it does not run twice.
+function Remove-OldLink {
+  schtasks.exe /Delete /TN 'Kalavara Tally Link' /F 2>$null | Out-Null
+  $old = Join-Path $env:LOCALAPPDATA 'KalavaraTallyLink'
+  if (Test-Path $old) { Remove-Item -Path $old -Recurse -Force -ErrorAction SilentlyContinue }
+}
 if ($Uninstall) {
   schtasks.exe /Delete /TN $TaskName /F 2>$null | Out-Null
+  Remove-OldLink
   Remove-Item -Path (Join-Path $Home_ 'run-hidden.vbs') -ErrorAction SilentlyContinue
   Write-Log 'Stopped: automatic sync removed.'
   exit 0
 }
 if ($Install) {
-  $target = Join-Path $Home_ 'KalavaraTallyLink.ps1'
+  Remove-OldLink
+  $target = Join-Path $Home_ 'CentraPlantTallyLink.ps1'
   if ($PSCommandPath -ne $target) { Copy-Item -Path $PSCommandPath -Destination $target -Force }
   # PowerShell flashes a window for a moment even when "hidden", so a tiny VBScript
   # starts it instead: wscript runs with no window at all (mode 0 = hidden).
@@ -185,12 +193,12 @@ try {
   if ($Check) { Write-Log 'Check only: nothing sent.'; exit 0 }
   $payload = @{ action = 'tallyPush'; key = $LinkKey; company = $Company; agent = $Agent;
                 from = $data.from; to = $data.to; ledgers = $data.ledgers; items = $data.items; vouchers = $data.vouchers }
-  $res = Send-ToKalavara $payload
+  $res = Send-ToCentraPlant $payload
   if ($res.ok) {
-    Write-Log 'Sent to Kalavara.'
-    if ($res.nameMatches -eq $false) { Write-Log 'Note: the company name in Tally differs from the one in Kalavara.' }
+    Write-Log 'Sent to CentraPlant.'
+    if ($res.nameMatches -eq $false) { Write-Log 'Note: the company name in Tally differs from the one in CentraPlant.' }
   } else {
-    Write-Log ('Kalavara said: ' + $res.message)
+    Write-Log ('CentraPlant said: ' + $res.message)
   }
 } catch {
   $m = $_.Exception.Message

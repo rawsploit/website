@@ -639,7 +639,7 @@
     return { call: call };
   })();
 
-  /* ---------------- 6. accounts: Kalavara books or Tally ---------------- */
+  /* ---------------- 6. accounts: CentraPlant books or Tally ---------------- */
   var ACC = null;
 
   function accCall(action, payload) {
@@ -685,20 +685,20 @@
     body.innerHTML = '<div class="panel"><h3>6. Accounts</h3>' +
       '<p class="muted" style="margin:0 0 16px">Where do you keep your accounts? Trade Recon, Cash Recon, Profit & Loss and the MIS Dashboard read the books from here.</p>' +
       '<div class="bk-modes">' +
-        '<label class="bk-mode' + (!tally ? " on" : "") + '"><input type="radio" name="accSrc" value="books"' + (!tally ? " checked" : "") + '><span><b>In Kalavara (Accounting-Books)</b><small>For companies without Tally. Ledgers, GST bills, receipts and payments, with Tally-style keys.</small></span></label>' +
-        '<label class="bk-mode' + (tally ? " on" : "") + '"><input type="radio" name="accSrc" value="tally"' + (tally ? " checked" : "") + '><span><b>In Tally</b><small>You already use Tally. Kalavara reads your ledgers, stock items and vouchers from it automatically.</small></span></label>' +
+        '<label class="bk-mode' + (!tally ? " on" : "") + '"><input type="radio" name="accSrc" value="books"' + (!tally ? " checked" : "") + '><span><b>In CentraPlant (Accounting-Books)</b><small>For companies without Tally. Ledgers, GST bills, receipts and payments, with Tally-style keys.</small></span></label>' +
+        '<label class="bk-mode' + (tally ? " on" : "") + '"><input type="radio" name="accSrc" value="tally"' + (tally ? " checked" : "") + '><span><b>In Tally</b><small>You already use Tally. CentraPlant reads your ledgers, stock items and vouchers from it automatically.</small></span></label>' +
       "</div>" +
       (tally ?
         '<div class="acc-tally">' +
           '<div class="acc-status">' + status + "</div>" + nameNote +
           '<ol class="acc-steps">' +
             "<li><b>Switch on Tally's connection.</b> In Tally: <b>F1 (Help) → Settings → Connectivity → Client/Server configuration</b>. Set <i>TallyPrime acts as</i> to <b>Both</b> and <i>Port</i> to <b>9000</b>, then Ctrl + A. Keep Tally open with <b>" + esc(a.company || "your company") + "</b> loaded.</li>" +
-            "<li><b>Download Kalavara Tally Link</b> on the PC where Tally runs. It's a small script, already paired with this company." +
+            "<li><b>Download CentraPlant Tally Link</b> on the PC where Tally runs. It's a small script, already paired with this company." +
               '<div class="row-actions" style="margin-top:8px"><button class="btn btn-ink btn-small" type="button" id="accKey">' + (a.linked ? "Download again (new code)" : "Pair and download") + "</button>" +
               (a.linked ? '<button class="btn btn-line btn-small btn-danger" type="button" id="accUnlink">Unpair</button>' : "") + "</div>" +
               (a.linked ? '<p class="muted" style="margin:6px 0 0">Paired with code ending …' + esc(a.keyHint) + ". Downloading again makes a new code; the old script stops working.</p>" : "") + "</li>" +
             "<li><b>Start it once.</b> Open <b>PowerShell</b> (Start → type PowerShell) and paste:" +
-              '<pre class="acc-cmd" id="accCmd">powershell -ExecutionPolicy Bypass -File "$HOME\\Downloads\\KalavaraTallyLink.ps1" -Install</pre>' +
+              '<pre class="acc-cmd" id="accCmd">powershell -ExecutionPolicy Bypass -File "$HOME\\Downloads\\CentraPlantTallyLink.ps1" -Install</pre>' +
               '<button class="btn btn-line btn-small" type="button" id="accCopy">Copy</button>' +
               '<p class="muted" style="margin:6px 0 0">It sends your Tally data now, then every 15 minutes while you are signed in to Windows. To test without sending, put <b>-Check</b> instead of -Install.</p></li>' +
           "</ol>" +
@@ -714,7 +714,7 @@
         err.textContent = ""; msg.textContent = "Saving…";
         accCall("saveAccountsSource", { source: rd.value }).then(function (r) {
           var b = Suite.brandCached(); b.accounts = r.source; Suite.brandKeep(b);
-          after(r, r.source === "tally" ? "Accounts are kept in Tally. Pair it below. Accounting-Books leaves the menu the next time the portal opens." : "Accounts are kept in Kalavara (Accounting-Books).");
+          after(r, r.source === "tally" ? "Accounts are kept in Tally. Pair it below. Accounting-Books leaves the menu the next time the portal opens." : "Accounts are kept in CentraPlant (Accounting-Books).");
         }).catch(fail);
       };
     });
@@ -729,11 +729,11 @@
         var text = tpl.replace("__CORE_URL__", ps(Suite.client().api)).replace("__LINK_KEY__", ps(r.key)).replace("__COMPANY__", ps(r.company));
         var blob = new Blob(["﻿" + text.replace(/\r?\n/g, "\r\n")], { type: "text/plain;charset=utf-8" });
         var link = document.createElement("a");
-        link.href = URL.createObjectURL(blob); link.download = "KalavaraTallyLink.ps1";
+        link.href = URL.createObjectURL(blob); link.download = "CentraPlantTallyLink.ps1";
         document.body.appendChild(link); link.click(); link.remove();
         setTimeout(function () { URL.revokeObjectURL(link.href); }, 4000);
         delete r.key;
-        after(r, "Downloaded KalavaraTallyLink.ps1. Now do step 3 on the Tally PC.");
+        after(r, "Downloaded CentraPlantTallyLink.ps1. Now do step 3 on the Tally PC.");
       }).catch(fail);
     };
     var un = body.querySelector("#accUnlink");

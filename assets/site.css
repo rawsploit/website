@@ -513,7 +513,7 @@ body.has-accent.login-page .login-card h2, body.has-accent .main-bar h2 { color:
 .bk-preview.top .bk-main { flex: 1; }
 @media (max-width: 1100px) { .bk-grid.with-list { grid-template-columns: 200px minmax(0, 1fr); } .bk-grid.with-list .bk-prev { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .bk-modes, .bk-grid.with-list { grid-template-columns: 1fr; } }
-/* accounts step: Kalavara books or Tally */
+/* accounts step: CentraPlant books or Tally */
 .acc-tally { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 16px; }
 .acc-status { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .acc-steps { padding-left: 20px; margin: 0 0 14px; }

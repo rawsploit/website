@@ -2,7 +2,7 @@
    SITE SETTINGS  —  change the suite name here, nowhere else.
    ============================================================ */
 window.SITE = {
-  name: "Kalavara",
+  name: "CentraPlant",
   tagline: "Stock, sales and accounts for growing factories, in one place.",
   credit: "Designed by rawsploit@gmail.com",
   year: 2026
@@ -40,7 +40,7 @@ window.MODULES = [
 /* Contact section on the home page.
    The email and phone are kept in pieces and only put together in the browser,
    so spam robots reading the page source don't find them.
-   leadsUrl = the Kalavara Leads web app URL (saves each enquiry to a sheet and emails you);
+   leadsUrl = the CentraPlant Leads web app URL (saves each enquiry to a sheet and emails you);
    blank = the form opens the visitor's email app instead. */
 window.CONTACT = {
   mail: ["rawsploit", "gmail", "com"],
@@ -57,7 +57,7 @@ window.CLIENTS = {
     /* demo: Accounting-Books runs as a self-contained preview (data stays in the browser tab) */
     modules: { books: "demo/accounting-books.html" }
   },
-  /* first real test deployment (Kalavara Demo folder, sample data only) */
+  /* first real test deployment (CentraPlant Demo folder, sample data only) */
   test: {
     name: "HyGenie Pvt. Ltd.",
     logo: "",

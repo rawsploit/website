@@ -1,6 +1,6 @@
 {
-  "name": "Kalavara",
-  "short_name": "Kalavara",
+  "name": "CentraPlant",
+  "short_name": "CentraPlant",
   "description": "Stock, sales and accounts for growing factories, in one place.",
   "start_url": "./login.html",
   "scope": "./",

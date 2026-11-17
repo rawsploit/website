@@ -208,7 +208,7 @@
         var before = b.accounts || "books";
         r.brand.accounts = r.accounts || "books";
         brandKeep(r.brand); applyBrand(r.brand);
-        // accounts moved between Kalavara and Tally: redraw the menu once
+        // accounts moved between CentraPlant and Tally: redraw the menu once
         if (before !== r.brand.accounts && typeof window.onAccountsChanged === "function") window.onAccountsChanged();
         return r.brand;
       }
@@ -227,7 +227,7 @@
     });
   }
 
-  /* Kalavara's own contact buttons (WhatsApp, call, email), put together in the browser only */
+  /* CentraPlant's own contact buttons (WhatsApp, call, email), put together in the browser only */
   function contactInfo() {
     var C = window.CONTACT || {};
     var digits = (C.phone || []).join("");
@@ -237,7 +237,7 @@
   function contactHtml(withEmail) {
     var c = contactInfo(), h = "";
     if (c.digits) h += '<a class="btn btn-ink btn-small" target="_blank" rel="noopener" href="https://wa.me/' + c.digits +
-      "?text=" + encodeURIComponent("Hello, I'd like to know more about Kalavara.") + '">WhatsApp us</a>' +
+      "?text=" + encodeURIComponent("Hello, I'd like to know more about CentraPlant.") + '">WhatsApp us</a>' +
       '<a class="btn btn-line btn-small" href="tel:+' + c.digits + '">Call ' + esc(c.shown) + "</a>";
     h = '<span class="contact-btns">' + h + "</span>";
     if (withEmail !== false && c.email) h += '<span>Email: <a href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a></span>";

@@ -1,6 +1,6 @@
 /* ============================================================
    Tiny Excel (.xlsx) writer, no libraries.
-   Kalavara report standard: header on row 1 (bold, frozen, with
+   CentraPlant report standard: header on row 1 (bold, frozen, with
    filters), one complete record per row, real dates and numbers,
    no merged cells, no total rows inside the data. Report details
    and totals go on a separate "About" sheet.
