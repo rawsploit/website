@@ -1,11 +1,11 @@
 /* Service worker: makes the site installable, keeps the app shell
    available offline, and shows a "No signal" page when offline.
    Bump VERSION whenever the shell files change. */
-const VERSION = "suite-v69";
+const VERSION = "suite-v70";
 const SHELL = [
   "./", "index.html", "login.html", "portal.html", "catalog.html", "setup.html", "offline.html", "billing.html", "invoice.html", "store.html",
   "assets/site.css", "assets/site.js", "assets/config.js", "assets/people.js", "assets/company.js", "assets/catalog-admin.js", "assets/storefront-admin.js", "assets/billing.js", "assets/sales-desk.js", "assets/tally-books.js", "assets/xlsx.js", "assets/qr.js", "assets/install.js",
-  "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-64.png"
+  "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-64.png", "icons/brand-96.png", "assets/logo-full.png"
 ];
 
 self.addEventListener("install", function (e) {

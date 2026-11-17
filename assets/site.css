@@ -63,6 +63,9 @@ a { color: var(--ink); }
   display: grid; place-items: center; font-family: var(--head); font-weight: 800; color: var(--ink); font-size: 16px;
   background: repeating-linear-gradient(to bottom, transparent 0 6px, var(--rule) 6px 7px);
 }
+/* CentraPlant mark (white tile, so it also sits well on a client's coloured sidebar) */
+.brand-logo { width: 38px; height: 38px; border-radius: 8px; display: block; flex: none; }
+.hero-logo { display: block; width: 284px; max-width: 70%; height: auto; margin: 0 0 18px -6px; }
 .brand-name { font-family: var(--head); font-weight: 800; font-stretch: 125%; font-size: 20px; color: var(--ink); }
 .bar-actions { display: flex; gap: 10px; }
 
