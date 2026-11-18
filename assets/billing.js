@@ -20,6 +20,7 @@
     st = st || {};
     st.entries = st.entries || [];
     st.seq = st.seq || {};
+    st.newShops = st.newShops || [];     // shops added on this phone: { uuid, shop_id "N:<uuid>", ..., state }
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(st)); }
@@ -66,6 +67,14 @@
   function productBySku(sku) { return (st.boot.products || []).filter(function (p) { return p.sku === sku; })[0]; }
   function todays() { return st.entries.filter(function (e) { return e.date === st.day.date; }); }
   function pending() { return st.entries.filter(function (e) { return e.state !== "sent"; }); }
+  function pendingShops() { return st.newShops.filter(function (n) { return n.state !== "sent"; }); }
+  function loose(t) { return String(t || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  function phoneKey(t) { var d = String(t || "").replace(/\D/g, ""); return d.length >= 10 ? d.slice(-10) : ""; }
+  /* shops added here but not yet on the office list go back into the downloaded list */
+  function keepNewShops() {
+    if (!st.boot) return;
+    pendingShops().forEach(function (n) { if (!shopById(n.shop_id)) st.boot.shops.push(n.shop); });
+  }
 
   /* Next number in a series, never below what the office already has. */
   function nextNo(kind, route, date) {
@@ -82,7 +91,7 @@
     if (s && s.kind === "staff") {
       if (FIELD_ROLES.indexOf(s.role) === -1) { stop("Billing is for sales staff. Your team uses the Sales Desk instead."); return false; }
       if (st.who && st.who.user !== s.user) {           // a different person on this phone
-        if (pending().length) { stop(st.who.name + " still has " + pending().length + " unsent entr" + (pending().length === 1 ? "y" : "ies") + " on this phone. Sign in as " + st.who.name + " and send them first."); return false; }
+        if (pending().length || pendingShops().length) { stop(st.who.name + " still has " + pending().length + " unsent entr" + (pending().length === 1 ? "y" : "ies") + " on this phone. Sign in as " + st.who.name + " and send them first."); return false; }
         st = { entries: [], seq: {} };
       }
       st.who = { user: s.user, name: s.name, role: s.role, token: s.token, expires: s.expires || 0 };
@@ -116,8 +125,9 @@
   var syncing = false;
   function sync(manual) {
     var list = pending().filter(function (e) { return e.state !== "err" || manual; });
+    var shopsOut = pendingShops().filter(function (n) { return n.state !== "err" || manual; });
     status();
-    if (syncing || !list.length) return Promise.resolve();
+    if (syncing || (!list.length && !shopsOut.length)) return Promise.resolve();
     if (!navigator.onLine) { if (manual) flash("No signal right now. Your bills are safe on the phone and will go when signal returns.", "warn"); return Promise.resolve(); }
     if (!tokenOk() && !Suite.isDemo()) { st.needLogin = true; save(); status(); if (manual) askLogin(); return Promise.resolve(); }
     syncing = true; status();
@@ -130,7 +140,19 @@
     var skips = batch.filter(function (e) { return e.kind === "SKIP"; }).map(function (e) {
       return { uuid: e.uuid, skip_date: e.date, created_at: e.created_at, shop_id: e.shop_id, reason: e.reason };
     });
-    return call("salesSync", { bills: bills, skips: skips }).then(function (res) {
+    var newShops = shopsOut.map(function (n) { return { uuid: n.uuid, name: n.shop.name, route_id: n.shop.route_id, address: n.shop.address, phone: n.shop.phone, gstin: n.shop.gstin }; });
+    return call("salesSync", { bills: bills, skips: skips, newShops: newShops }).then(function (res) {
+      // new shops: swap the phone's temporary id for the office's real one everywhere
+      var ids = res.shopIds || {}, shopBad = {};
+      (res.shopFailed || []).forEach(function (f) { shopBad[f.uuid] = f; });
+      st.newShops.forEach(function (n) {
+        if (ids[n.uuid]) {
+          var real = ids[n.uuid], tmp = n.shop_id;
+          st.entries.forEach(function (e) { if (e.shop_id === tmp) e.shop_id = real; });
+          (st.boot.shops || []).forEach(function (sh) { if (sh.shop_id === tmp) { sh.shop_id = real; sh.pending = true; } });
+          n.shop_id = real; n.shop.shop_id = real; n.state = "sent"; delete n.err; delete n.existing;
+        } else if (shopBad[n.uuid]) { n.state = "err"; n.err = shopBad[n.uuid].message; n.existing = shopBad[n.uuid].existing; }
+      });
       var acc = {}; (res.accepted || []).forEach(function (u) { acc[u] = true; });
       var bad = {}; (res.failed || []).forEach(function (f) { bad[f.uuid] = f.message; });
       st.entries.forEach(function (e) {
@@ -152,7 +174,8 @@
   }
 
   function status() {
-    var b = $("syncBtn"), n = pending().length, errs = st.entries.filter(function (e) { return e.state === "err"; }).length;
+    var b = $("syncBtn"), n = pending().length + pendingShops().length,
+        errs = st.entries.filter(function (e) { return e.state === "err"; }).length + st.newShops.filter(function (x) { return x.state === "err"; }).length;
     b.className = "sync";
     if (syncing) { b.textContent = "Sending…"; return; }
     if (errs) { b.className = "sync off"; b.textContent = errs + " need attention"; return; }
@@ -211,6 +234,8 @@
       if (!navigator.onLine && !Suite.isDemo()) { flash("No signal. Find signal once to download the list.", "warn"); btn.disabled = false; btn.textContent = "Try again"; return; }
       call("salesBootstrap", {}).then(function (res) {
         st.boot = res; st.bootAt = Date.now();
+        st.newShops = pendingShops();            // the office list now has the sent ones
+        keepNewShops();
         save();
         if (!res.routes.length) { flash("No routes are set up yet. Ask the office to add routes in Company setup.", "err"); show(viewStart, [], false); return; }
         if (!res.products.length) { flash("No finished products with prices yet. Ask the office to add them in Company setup.", "err"); show(viewStart, [], false); return; }
@@ -244,8 +269,8 @@
     var t = dayTotals();
     $("main").innerHTML = '<div id="flash"></div>' +
       '<div class="sum"><div><b>' + t.bills + '</b><span>Bills</span></div><div><b>' + money(t.sales) + '</b><span>Sales</span></div><div><b>' + money(t.cash) + "</b><span>Cash in hand</span></div></div>" +
-      '<input class="search" id="q" type="search" placeholder="Search shop" aria-label="Search shop">' +
-      '<div id="shops"></div>' +
+      '<div style="display:flex;gap:8px;align-items:center"><input class="search" id="q" type="search" placeholder="Search shop" aria-label="Search shop" style="flex:1;margin:0">' +
+      '<button class="btn btn-line" id="newShop" type="button" style="white-space:nowrap">+ New shop</button></div><div id="shops" style="margin-top:10px"></div>' +
       '<p class="muted" style="text-align:center;margin-top:16px">' + shops.length + " shops on " + esc(st.day.route) + '. <button class="link-btn" id="changeRoute" type="button">Change route</button></p>' +
       fieldSalesLink();
     paintFlash($("flash"));
@@ -256,10 +281,13 @@
         var es = todays().filter(function (e) { return e.shop_id === s.shop_id; });
         var billed = es.filter(function (e) { return e.kind === "BILL"; }), skipped = es.some(function (e) { return e.kind === "SKIP"; });
         var waiting = es.some(function (e) { return e.state !== "sent"; }), err = es.some(function (e) { return e.state === "err"; });
+        var ns = newShopFor(s.shop_id);
+        if (ns && ns.state === "err") err = true;
         var tag = err ? '<span class="tag err">Check</span>'
           : billed.length ? '<span class="tag ' + (waiting ? "wait" : "billed") + '">' + money(billed.reduce(function (n, e) { return n + e.total; }, 0)) + "</span>"
           : skipped ? '<span class="tag skipped">Skipped</span>' : "";
-        return '<button class="shop" type="button" data-shop="' + esc(s.shop_id) + '"><span class="nm"><b>' + esc(s.name) + "</b><span>" +
+        return '<button class="shop" type="button" data-shop="' + esc(s.shop_id) + '"><span class="nm"><b>' + esc(s.name) +
+          (ns || s.pending || s.review === "pending" ? ' <small class="tag wait" style="font-size:11px">New</small>' : "") + "</b><span>" +
           esc(s.address || s.phone || "") + "</span></span>" + tag + "</button>";
       }).join("") : '<p class="muted">' + (shops.length ? "No shop matches that search." : "No shops on this route yet. Ask the office to add them in Sales Desk → Shops.") + "</p>";
     }
@@ -267,6 +295,7 @@
     $("q").oninput = paint;
     $("shops").onclick = function (e) { var b = e.target.closest("[data-shop]"); if (b) show(viewShop, [b.dataset.shop]); };
     $("changeRoute").onclick = function () { stack = []; show(viewStart); };
+    $("newShop").onclick = function () { show(viewNewShop, [$("q").value.trim()]); };
     $("bar").hidden = false;
     $("barIn").innerHTML = '<div class="tot"><b>' + money(t.collected) + '</b><span>Collected today</span></div><button class="btn btn-line" id="daySum" type="button">Day summary</button>';
     $("daySum").onclick = function () { show(viewDay); };
@@ -277,7 +306,11 @@
     if (!s) { home(); return; }
     header(s.name, s.address || st.day.route);
     var es = todays().filter(function (e) { return e.shop_id === id; });
-    $("main").innerHTML = '<div id="flash"></div><div class="card"><h2>' + esc(s.name) + '</h2><p class="muted" style="margin:0">' +
+    var ns = newShopFor(id);
+    var fix = ns && ns.state === "err" ? '<div class="msg err" style="margin-bottom:12px"><b>The office couldn\'t add this shop.</b> ' + esc(ns.err || "") +
+      '<div class="stack" style="margin-top:10px">' + (ns.existing ? '<button class="btn btn-ink" type="button" id="useExisting">Bill \u201c' + esc(ns.existing.name) + '\u201d instead</button>' : "") +
+      '<button class="btn btn-line" type="button" id="renameShop">Change the name and send again</button></div></div>' : "";
+    $("main").innerHTML = '<div id="flash"></div>' + fix + '<div class="card"><h2>' + esc(s.name) + '</h2><p class="muted" style="margin:0">' +
       [s.address, s.phone, s.gstin ? "GSTIN " + s.gstin : "", s.credit ? "Credit allowed" : "Cash only"].filter(Boolean).map(esc).join(" · ") + "</p></div>" +
       '<div class="acts"><button class="main" type="button" data-act="BILL">New bill</button><button type="button" data-act="RETURN">Return</button>' +
       '<button type="button" data-act="COLLECTION">Collection</button><button type="button" data-act="SKIP" style="grid-column:1/-1">Not billed today (skip)</button></div>' +
@@ -291,6 +324,78 @@
       else show(viewSkip, [id]);
     };
     bindEntryLines();
+    var ue = $("useExisting");
+    if (ue) ue.onclick = function () {
+      // move this shop's entries to the existing shop and forget the new one
+      var to = ns.existing.shop_id;
+      if (!shopById(to)) st.boot.shops.push({ shop_id: to, name: ns.existing.name, route_id: ns.existing.route_id || st.day.route, address: "", phone: "", gstin: "", credit: true });
+      st.entries.forEach(function (e) { if (e.shop_id === id) { e.shop_id = to; e.shop_name = ns.existing.name; if (e.state === "err") e.state = "wait"; delete e.err; } });
+      st.newShops = st.newShops.filter(function (x) { return x !== ns; });
+      st.boot.shops = st.boot.shops.filter(function (x) { return x.shop_id !== id; });
+      save(); stack.pop(); show(viewShop, [to], true); sync(true);
+    };
+    var rn = $("renameShop");
+    if (rn) rn.onclick = function () {
+      var name = window.prompt("New name for this shop (add the area to tell it apart):", s.name + " ");
+      if (!name || !name.trim()) return;
+      name = name.trim().replace(/\s+/g, " ").slice(0, 120);
+      s.name = name; ns.shop.name = name; ns.state = "wait"; delete ns.err; delete ns.existing;
+      st.entries.forEach(function (e) { if (e.shop_id === id) { e.shop_name = name; if (e.state === "err") e.state = "wait"; delete e.err; } });
+      save(); show(viewShop, [id], false); sync(true);
+    };
+  }
+  function newShopFor(id) { return st.newShops.filter(function (n) { return n.shop_id === id; })[0]; }
+
+  /* Add a shop that isn't on the list. Works without signal; the office gets it with the next send,
+     before its bills, and accounts creates it in Tally. Checks the phone's list for the same shop first. */
+  function viewNewShop(prefill) {
+    header("New shop", "On route " + st.day.route);
+    $("main").innerHTML = '<div id="flash"></div><form class="card" id="nsF" novalidate><h2 style="font-size:16px">Shop details</h2>' +
+      '<label class="field"><span>Shop name (as on the board)</span><input name="name" maxlength="120" value="' + esc(prefill || "") + '" required></label>' +
+      '<label class="field"><span>Area / address</span><input name="address" maxlength="200"></label>' +
+      '<label class="field"><span>Phone (WhatsApp)</span><input name="phone" inputmode="tel" maxlength="20"></label>' +
+      '<label class="field"><span>GSTIN (if the shop has one)</span><input name="gstin" maxlength="15" style="text-transform:uppercase"></label>' +
+      '<div id="nsWarn"></div><p class="form-error" id="nsErr"></p><button class="btn btn-ink" type="submit" style="width:100%">Add shop</button>' +
+      '<p class="muted" style="margin:10px 0 0;font-size:13px">You can bill it straight away. Accounts checks new shops and creates them in Tally.</p></form>';
+    paintFlash($("flash"));
+    var f = $("nsF"), confirmed = false;
+    f.name.oninput = f.phone.oninput = f.gstin.oninput = function () { confirmed = false; $("nsWarn").innerHTML = ""; };
+    f.onsubmit = function (e) {
+      e.preventDefault();
+      var d = { name: f.name.value.trim().replace(/\s+/g, " "), address: f.address.value.trim(), phone: f.phone.value.trim(), gstin: f.gstin.value.trim().toUpperCase().replace(/\s+/g, "") };
+      var err = $("nsErr"); err.textContent = "";
+      if (!d.name) { err.textContent = "Enter the shop's name."; return; }
+      if (d.gstin && !/^[0-9]{2}[A-Z0-9]{13}$/.test(d.gstin)) { err.textContent = "A GSTIN has 15 characters. Leave it empty if you're not sure."; return; }
+      var all = st.boot.shops || [];
+      var same = all.filter(function (x) { return loose(x.name) === loose(d.name); })[0];
+      if (same) {
+        $("nsWarn").innerHTML = '<div class="msg warn"><b>' + esc(same.name) + "</b> is already on the list" + (same.route_id !== st.day.route ? " (route " + esc(same.route_id) + ")" : "") +
+          '. <div class="stack" style="margin-top:8px"><button class="btn btn-ink" type="button" data-go="' + esc(same.shop_id) + '">Open ' + esc(same.name) + "</button></div>" +
+          '<p style="margin:8px 0 0">If it\'s a different shop, add the area to the name.</p></div>';
+        $("nsWarn").querySelector("[data-go]").onclick = function () { stack.pop(); show(viewShop, [same.shop_id]); };
+        return;
+      }
+      var look = all.filter(function (x) { return (d.phone && phoneKey(x.phone) && phoneKey(x.phone) === phoneKey(d.phone)) || (d.gstin && String(x.gstin || "").toUpperCase() === d.gstin); });
+      if (look.length && !confirmed) {
+        $("nsWarn").innerHTML = '<div class="msg warn">Same ' + (d.gstin && String(look[0].gstin || "").toUpperCase() === d.gstin ? "GSTIN" : "phone number") + " as <b>" + esc(look[0].name) + "</b>" +
+          (look[0].route_id !== st.day.route ? " (route " + esc(look[0].route_id) + ")" : "") + '. Is it the same shop?<div class="stack" style="margin-top:8px">' +
+          '<button class="btn btn-ink" type="button" data-go="' + esc(look[0].shop_id) + '">Yes, open ' + esc(look[0].name) + "</button>" +
+          '<button class="btn btn-line" type="button" id="nsDiff">No, it\'s a different shop (e.g. a branch)</button></div></div>';
+        $("nsWarn").querySelector("[data-go]").onclick = function () { stack.pop(); show(viewShop, [look[0].shop_id]); };
+        $("nsDiff").onclick = function () { confirmed = true; f.requestSubmit ? f.requestSubmit() : f.onsubmit(new Event("submit")); };
+        return;
+      }
+      var u = uuid();
+      var shop = { shop_id: "N:" + u, name: d.name, route_id: st.day.route, address: d.address, phone: d.phone, gstin: d.gstin, credit: true, isNew: true };
+      st.newShops.push({ uuid: u, shop_id: shop.shop_id, shop: shop, state: "wait", created_at: new Date().toISOString() });
+      st.boot.shops.push(shop);
+      save();
+      stack.pop();
+      flashMsg = { text: "Shop added. You can bill it now; it goes to the office with your next send.", kind: "ok", html: false };
+      show(viewShop, [shop.shop_id]);
+      sync(false);
+    };
+    f.name.focus();
   }
 
   function entryLine(e) {
@@ -807,12 +912,16 @@
         payModes: { BILL: ["Cash", "UPI", "Credit", "Cheque"], RETURN: ["Cash refund", "Credit note"], COLLECTION: ["Cash", "UPI", "Cheque"] },
         skipReasons: ["Shop closed", "No order", "Owner not available", "Has enough stock", "Payment pending", "Other"] };
     }
-    if (action === "salesSync") return { ok: true, accepted: (p.bills || []).concat(p.skips || []).map(function (x) { return x.uuid; }), failed: [], renumbered: {} };
+    if (action === "salesSync") {
+      var ids = {}; (p.newShops || []).forEach(function (n, i) { ids[n.uuid] = "S09" + ("0" + (i + 1)).slice(-2) + Date.now() % 100; });
+      return { ok: true, accepted: (p.bills || []).concat(p.skips || []).map(function (x) { return x.uuid; }), failed: [], renumbered: {}, shopIds: ids, shopFailed: [] };
+    }
     return { ok: false, message: "Not available in the demo." };
   }
 
   /* ---------- start ---------- */
   load();
+  keepNewShops();
   if (!identify()) return;
   if (st.boot && st.day && st.day.date === today()) home(); else show(viewStart);
   sync(false);

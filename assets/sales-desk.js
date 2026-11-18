@@ -151,7 +151,8 @@
       var paint = function () {
         var q = body.querySelector("#shQ").value.trim().toLowerCase();
         body.querySelector("#shRows").innerHTML = shops.filter(function (s) { return !q || (s.name + " " + s.route_id).toLowerCase().indexOf(q) !== -1; }).map(function (s, i) {
-          return "<tr" + (s.active ? "" : ' class="is-cancelled"') + "><td>" + esc(s.shop_id) + "</td><td>" + esc(s.name) + "<br><small class=\"muted\">" + esc(s.address) + "</small></td><td>" + esc(s.route_id) +
+          var badge = s.review === "pending" ? ' <span class="status soon">New · ' + esc(s.added_by || "") + "</span>" : s.review === "rejected" ? ' <span class="status" style="background:#FDECEA;color:#9B1C1C">Rejected by accounts</span>' : "";
+          return "<tr" + (s.active ? "" : ' class="is-cancelled"') + "><td>" + esc(s.shop_id) + "</td><td>" + esc(s.name) + badge + "<br><small class=\"muted\">" + esc(s.address) + "</small></td><td>" + esc(s.route_id) +
             "</td><td>" + esc(s.phone) + "</td><td>" + esc(s.gstin) + "</td><td>" + esc(s.type) + "</td><td>" + (s.credit ? "Yes" : "No") + "</td><td>" + (s.active ? "Yes" : "No") +
             "</td><td>" + (viewOnly() ? "" : '<button class="btn btn-line btn-small" type="button" data-edit="' + esc(s.shop_id) + '">Edit</button>') + "</td></tr>";
         }).join("") || '<tr><td colspan="9" class="muted">No shops yet. Add them one by one, or upload a list.</td></tr>';
@@ -227,6 +228,7 @@
             var waiting = st === "approved" || st === "sending";
             var label = !o || st === "cancelled" ? '<span class="muted">Not yet</span>'
               : waiting ? '<span class="status soon">Waiting for the Tally Link</span>'
+              : st === "pending" ? '<span class="status soon">New from ' + esc(String(o.created_by).split(" ")[0]) + ': awaiting approval</span>' + (o.result ? '<br><small>' + esc(o.result) + "</small>" : "")
               : st === "posted" ? '<span class="status live">Created</span> <small class="muted">shows after the next sync</small>'
               : st === "exists" ? '<span class="status live">Already there</span>'
               : '<span class="status" style="background:#FDECEA;color:#9B1C1C">Failed</span><br><small>' + esc(o.result) + "</small>";
@@ -277,7 +279,7 @@
   }
 
   /* everything sent to Tally lately, newest first */
-  var OB_LABEL = { approved: "Waiting for the Tally Link", sending: "Being sent", posted: "Created in Tally", exists: "Already in Tally", failed: "Failed", cancelled: "Cancelled" };
+  var OB_LABEL = { pending: "Awaiting approval", approved: "Waiting for the Tally Link", sending: "Being sent", posted: "Created in Tally", exists: "Already in Tally", failed: "Failed", cancelled: "Cancelled" };
   function outboxHtml(items) {
     if (!items.length) return "";
     var open = items.some(function (x) { return x.status === "failed"; });
@@ -286,7 +288,7 @@
       '<div class="tbl-wrap" style="margin-top:10px"><table class="tbl"><thead><tr><th>When</th><th>What</th><th>Status</th><th>Tally said</th><th></th></tr></thead><tbody>' +
       items.slice(0, 50).map(function (x) {
         var acts = viewOnly() ? "" : (x.status === "failed" ? '<button class="btn btn-line btn-small" type="button" data-ob="retry" data-id="' + esc(x.id) + '">Try again</button> ' : "") +
-          (x.status === "approved" || x.status === "failed" ? '<button class="btn btn-line btn-small" type="button" data-ob="cancel" data-id="' + esc(x.id) + '">Cancel</button>' : "");
+          (x.status === "approved" || x.status === "failed" || x.status === "pending" ? '<button class="btn btn-line btn-small" type="button" data-ob="cancel" data-id="' + esc(x.id) + '">Cancel</button>' : "");
         return "<tr><td>" + esc(String(x.created).replace("T", " ").slice(0, 16)) + "</td><td>New ledger: " + esc(x.name) + "<br><small class=\"muted\">by " + esc(x.created_by) +
           "</small></td><td>" + esc(OB_LABEL[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td>" + acts + "</td></tr>";
       }).join("") + "</tbody></table></div></details>";

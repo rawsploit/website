@@ -100,7 +100,7 @@
     { id: "customers", name: "Customer sign-ins", marketing: true, desc: "Add customers and reset their passwords." },
     { id: "billing",   name: "Billing",    van: true, team: "sales",    after: "fieldsales",  roles: ["sales", "admin"],    href: "billing.html", desc: "Bill shops from your phone, even without signal. Print or send the bill on WhatsApp." },
     { id: "salesdesk", name: "Sales Desk", van: true, team: "accounts", after: "collections", roles: ["admin", "accounts", "viewer"], desc: "Today's bills live, formal tax invoices, shops and sales reports." },
-    { id: "tallybooks", name: "Tally Books", van: true, tally: true, team: "accounts", after: "cashrecon", roles: ["admin", "accounts", "viewer"], desc: "Your Tally day book, ledgers and stock, brought in automatically. Read-only." }
+    { id: "tallybooks", name: "Tally Books", van: true, tally: true, team: "accounts", after: "cashrecon", roles: ["admin", "accounts", "viewer"], desc: "Your Tally day book, ledgers and stock, brought in automatically, and the batch of new entries waiting for your approval before they go into Tally." }
   ];
   var KEEPS_TALLY = Suite.brandCached().accounts === "tally";
   var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1 && (!p.tally || KEEPS_TALLY); });

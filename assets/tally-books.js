@@ -1,14 +1,16 @@
 /* ============================================================
    Tally Books (companies that keep their accounts in Tally).
-   Read-only view of what CentraPlant Tally Link brings in:
-   Day Book, Ledgers and Stock Summary. Nothing here changes
-   Tally. Tally writes debits as minus amounts; this screen
-   shows them as Dr and Cr.
+   What CentraPlant Tally Link brings in (Day Book, Ledgers,
+   Stock Summary: read-only), and "To Tally": the accountant's
+   batch of what goes into Tally (new shop ledgers for now).
+   The link only ever creates; it never deletes or alters.
+   Tally writes debits as minus amounts; this screen shows
+   them as Dr and Cr.
    ============================================================ */
 (function () {
   "use strict";
   var esc = Suite.esc;
-  var D = null, tab = "daybook", filt = { q: "", type: "", ledger: "" }, open = {};
+  var D = null, OB = [], tab = "", filt = { q: "", type: "", ledger: "" }, open = {};
 
   /* ---------- data ---------- */
   function demoData() {
@@ -46,13 +48,48 @@
     };
   }
   function load() {
-    if (Suite.isDemo()) return Promise.resolve(demoData());
+    if (Suite.isDemo()) { OB = demoOutbox(); return Promise.resolve(demoData()); }
     var s = Suite.getSession();
-    return Suite.api("tallyBooks", { token: s.token }).then(function (r) {
+    return Promise.all([
+      Suite.api("tallyBooks", { token: s.token }),
+      Suite.api("tallyOutbox", { token: s.token }).catch(function () { return { ok: false }; })
+    ]).then(function (both) {
+      var r = both[0];
       if (!r.ok) throw new Error(r.message || "Couldn't open Tally Books.");
+      OB = both[1] && both[1].ok ? both[1].items || [] : [];
       return r;
     });
   }
+  function demoOutbox() {
+    var k = "suite.demoTallyBatch", list = null;
+    try { list = JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) {}
+    if (!list) {
+      var t = new Date(Date.now() - 50 * 60000).toISOString();
+      list = [
+        { id: "D1", kind: "ledger", ref: "S0101", name: "Sri Ganesh Stores", status: "pending", created: t, created_by: "anu (Billing)", result: "", details: { group: "Sundry Debtors", gstin: "", state: "Kerala", address: "Near Bus Stand", phone: "9800001111" } },
+        { id: "D2", kind: "ledger", ref: "S0102", name: "Fresh Mart Junction", status: "pending", created: t, created_by: "ravi (Field Sales)", result: "Check: same GSTIN as \u201cFresh Mart\u201d (S0003, route R1). Fine if it's a branch of the same business.", details: { group: "Sundry Debtors", gstin: "32AAAAA1111A1Z1", state: "Kerala", address: "Junction", phone: "" } }
+      ];
+      try { sessionStorage.setItem(k, JSON.stringify(list)); } catch (e) {}
+    }
+    return list;
+  }
+  function obCall(action, payload) {
+    if (Suite.isDemo()) {
+      OB.forEach(function (x) {
+        if ((payload.ids || [payload.id]).indexOf(x.id) === -1) return;
+        if (action === "tallyApprove") { x.status = payload.what === "reject" ? "cancelled" : "approved"; x.result = payload.what === "reject" ? "Rejected: " + payload.reason : ""; }
+        if (action === "tallyOutboxAction") x.status = payload.what === "cancel" ? "cancelled" : "approved";
+      });
+      try { sessionStorage.setItem("suite.demoTallyBatch", JSON.stringify(OB)); } catch (e) {}
+      return Promise.resolve({ ok: true, done: (payload.ids || [1]).length });
+    }
+    return Suite.api(action, Object.assign({ token: Suite.getSession().token }, payload)).then(function (r) {
+      if (!r.ok) throw new Error(r.message || "That didn't work.");
+      return r;
+    });
+  }
+  function canAct() { var s = Suite.getSession(); return !!s && (s.role === "admin" || s.role === "accounts"); }
+  function pendingCount() { return OB.filter(function (x) { return x.status === "pending"; }).length; }
 
   /* ---------- formatting ---------- */
   function inr(n) { return Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -70,9 +107,9 @@
 
   /* ---------- screen ---------- */
   function render(root, startTab) {
-    if (/^(daybook|ledgers|stock)$/.test(startTab || "")) tab = startTab;
+    if (/^(totally|daybook|ledgers|stock)$/.test(startTab || "")) tab = startTab;
     root.innerHTML = '<div class="view"><p>Loading from Tally…</p></div>';
-    load().then(function (r) { D = r; draw(root); })
+    load().then(function (r) { D = r; if (!tab) tab = pendingCount() ? "totally" : "daybook"; draw(root); })
       .catch(function (e) { root.innerHTML = '<div class="view"><p class="form-error">' + esc(e.message) + "</p></div>"; });
   }
 
@@ -85,7 +122,7 @@
       (Suite.isDemo() ? ' <span class="status custom">Demo data</span>' : "") + "</div>" +
       '<button class="btn btn-line btn-small" type="button" id="tbReload">Refresh</button></div>' +
       '<div class="switch tb-switch">' +
-      [["daybook", "Day Book"], ["ledgers", "Ledgers"], ["stock", "Stock Summary"]].map(function (t) {
+      [["totally", "To Tally" + (pendingCount() ? " (" + pendingCount() + ")" : "")], ["daybook", "Day Book"], ["ledgers", "Ledgers"], ["stock", "Stock Summary"]].map(function (t) {
         return '<button type="button" data-tab="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + "</button>";
       }).join("") + "</div>";
   }
@@ -160,10 +197,85 @@
       }).join("") + '<tr class="tb-group"><td>Total</td><td></td><td></td><td class="num">' + inr(total) + "</td></tr></tbody></table></div>";
   }
 
+
+  /* ---------- To Tally: the accountant's batch ---------- */
+  var OB_STATUS = { pending: "Awaiting your approval", approved: "Approved · waiting for the Tally Link", sending: "Being sent", posted: "Created in Tally",
+                    exists: "Already in Tally", failed: "Failed", cancelled: "Cancelled / rejected" };
+  function toTallyView() {
+    var act = canAct();
+    var pend = OB.filter(function (x) { return x.status === "pending"; });
+    var queued = OB.filter(function (x) { return x.status === "approved" || x.status === "sending"; });
+    var failed = OB.filter(function (x) { return x.status === "failed"; });
+    var done = OB.filter(function (x) { return /^(posted|exists|cancelled)$/.test(x.status); }).slice(0, 30);
+    var when = function (iso) { return iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; };
+    var detail = function (x) {
+      var d = x.details || {};
+      return [d.group, d.gstin ? "GSTIN " + d.gstin : "No GSTIN", d.state, d.phone, d.address].filter(Boolean).map(esc).join(" · ");
+    };
+    var html = '<p class="muted" style="margin:4px 0 14px">What CentraPlant will put into Tally. Nothing goes in until it\'s approved here, ' +
+      "and the Tally Link only <b>creates</b> new entries: it never deletes or changes anything already in Tally. Ledgers go in before anything that needs them.</p>";
+    html += "<h3 style=\"margin:0 0 8px\">Waiting for approval" + (pend.length ? " (" + pend.length + ")" : "") + "</h3>";
+    if (!pend.length) html += '<p class="muted">Nothing waiting. New shops added by salesmen (Billing or Field Sales) appear here.</p>';
+    else {
+      html += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + (act ? '<th><input type="checkbox" id="obAll" checked aria-label="Tick all"></th>' : "") +
+        "<th>What</th><th>Details</th><th>Added by</th></tr></thead><tbody>" +
+        pend.map(function (x) {
+          return "<tr>" + (act ? '<td><input type="checkbox" data-ob="' + esc(x.id) + '" checked></td>' : "") +
+            "<td><b>New ledger:</b> " + esc(x.name) + (x.result ? '<br><span class="status soon" style="white-space:normal;display:inline-block;margin-top:4px">' + esc(x.result.replace(/^Check:\s*/, "Check: ")) + "</span>" : "") +
+            "</td><td><small>" + detail(x) + "</small></td><td><small>" + esc(x.created_by) + "<br>" + esc(when(x.created)) + "</small></td></tr>";
+        }).join("") + "</tbody></table></div>" +
+        (act ? '<p class="form-error" id="obErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="obApprove">Approve ticked</button>' +
+               '<button class="btn btn-line btn-small" type="button" id="obReject">Reject ticked…</button></div>' : "");
+    }
+    if (queued.length) html += '<p class="demo-hint" style="margin:16px 0 0">' + queued.length + " approved, waiting for the Tally Link (it runs every 15 minutes while Tally is open).</p>";
+    if (failed.length) {
+      html += '<h3 style="margin:20px 0 8px">Didn\'t go into Tally (' + failed.length + ")</h3>" + '<div class="tbl-wrap"><table class="tbl"><tbody>' +
+        failed.map(function (x) {
+          return "<tr><td><b>New ledger:</b> " + esc(x.name) + "<br><small>" + esc(x.result) + "</small></td><td>" +
+            (act ? '<button class="btn btn-line btn-small" type="button" data-retry="' + esc(x.id) + '">Try again</button> <button class="btn btn-line btn-small" type="button" data-cancel="' + esc(x.id) + '">Cancel</button>' : "") + "</td></tr>";
+        }).join("") + "</tbody></table></div>";
+    }
+    if (done.length) {
+      html += '<details style="margin-top:20px"><summary style="cursor:pointer"><b>Done lately</b> <span class="muted">(' + done.length + ")</span></summary>" +
+        '<div class="tbl-wrap" style="margin-top:8px"><table class="tbl"><tbody>' + done.map(function (x) {
+          return "<tr><td>New ledger: " + esc(x.name) + "</td><td>" + esc(OB_STATUS[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td><small>" + esc(when(x.done || x.created)) + "</small></td></tr>";
+        }).join("") + "</tbody></table></div></details>";
+    }
+    return html;
+  }
+  function bindToTally(root) {
+    var all = root.querySelector("#obAll");
+    if (all) all.onchange = function () { var on = this.checked; root.querySelectorAll("[data-ob]").forEach(function (c) { c.checked = on; }); };
+    var picked = function () { var ids = []; root.querySelectorAll("[data-ob]:checked").forEach(function (c) { ids.push(c.dataset.ob); }); return ids; };
+    var err = root.querySelector("#obErr");
+    var go = function (payload, btn) {
+      if (!payload.ids.length) { err.textContent = "Tick at least one."; return; }
+      btn.disabled = true; err.textContent = "";
+      obCall("tallyApprove", payload).then(function () { render(root, "totally"); }).catch(function (e) { err.textContent = e.message; btn.disabled = false; });
+    };
+    var ap = root.querySelector("#obApprove");
+    if (ap) ap.onclick = function () { go({ ids: picked() }, ap); };
+    var rj = root.querySelector("#obReject");
+    if (rj) rj.onclick = function () {
+      var ids = picked(); if (!ids.length) { err.textContent = "Tick at least one."; return; }
+      var why = window.prompt("Why are you rejecting " + (ids.length === 1 ? "this" : "these " + ids.length) + "? (the salesman and office will see this, e.g. \"same as Fresh Mart\")");
+      if (!why || !why.trim()) return;
+      go({ ids: ids, what: "reject", reason: why.trim() }, rj);
+    };
+    root.querySelectorAll("[data-retry],[data-cancel]").forEach(function (b) {
+      b.onclick = function () {
+        b.disabled = true;
+        obCall("tallyOutboxAction", { id: b.dataset.retry || b.dataset.cancel, what: b.dataset.retry ? "retry" : "cancel" })
+          .then(function () { render(root, "totally"); }).catch(function (e) { b.disabled = false; window.alert(e.message); });
+      };
+    });
+  }
+
   function draw(root) {
-    var body = tab === "ledgers" ? ledgersView() : tab === "stock" ? stockView() : dayBook();
+    var body = tab === "totally" ? toTallyView() : tab === "ledgers" ? ledgersView() : tab === "stock" ? stockView() : dayBook();
     root.innerHTML = '<div class="view tb">' + head() + '<div class="tb-body">' + body + "</div></div>";
-    root.querySelector("#tbReload").onclick = function () { render(root); };
+    root.querySelector("#tbReload").onclick = function () { render(root, tab); };
+    if (tab === "totally") bindToTally(root);
     root.querySelectorAll("[data-tab]").forEach(function (b) {
       b.onclick = function () { tab = b.dataset.tab; filt.q = ""; draw(root); };
     });
