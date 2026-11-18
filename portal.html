@@ -28,10 +28,14 @@
 <div class="shell">
   <aside class="side" id="side">
     <div class="side-top">
-      <a class="brand" data-page="portal.html" aria-label="Home">
-        <img class="brand-logo" src="icons/brand-96.png" alt="" width="38" height="38">
-        <span class="brand-name" data-site-name>CentraPlant</span>
-      </a>
+      <div class="side-head">
+        <a class="brand" data-page="portal.html" aria-label="Home">
+          <img class="brand-logo" src="icons/brand-96.png" alt="" width="38" height="38">
+          <span class="brand-name" data-site-name>CentraPlant</span>
+        </a>
+        <button class="side-toggle" id="sideToggle" type="button" aria-controls="side">&#9776;</button>
+      </div>
+      <button class="side-pin" id="sidePin" type="button">Keep menu open</button>
       <img class="side-logo" data-client-logo hidden alt="">
       <div class="side-client" data-client-name></div>
       <div class="side-user" id="who"></div>
@@ -42,6 +46,7 @@
       <p style="margin-top:12px" data-credit></p>
     </div>
   </aside>
+  <div class="side-scrim" id="sideScrim"></div>
 
   <section class="main">
     <div class="main-bar">
@@ -101,8 +106,20 @@
   var VAN_PAGES = PAGES.filter(function (p) { return p.van && p.roles.indexOf(s.role) !== -1 && (!p.tally || KEEPS_TALLY); });
 
   /* ---- sidebar ---- */
+  function abbr(id, name) {
+    if (id === "home") return "\u2302";
+    var w = String(name).replace(/&/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").split(/[\s\-\/]+/)
+      .filter(function (x) { return x && ["and", "of", "the", "my"].indexOf(x.toLowerCase()) === -1; });
+    if (!w.length) return "?";
+    if (w.length > 1) return (w[0][0] + w[1][0]).toUpperCase();
+    return w[0][0].toUpperCase() + (w[0][1] || "").toLowerCase();
+  }
+  function navBtn(id, name) {
+    return '<button type="button" data-go="' + id + '" title="' + esc(name) + '"><span class="nav-ico" aria-hidden="true">' +
+      esc(abbr(id, name)) + '</span><span class="nav-txt">' + esc(name) + "</span></button>";
+  }
   function navHtml() {
-    var html = '<button type="button" data-go="home">Home</button>';
+    var html = navBtn("home", "Home");
     var shown = {}, placed = {};
     var groups = s.role === "admin" || s.role === "viewer"
       ? window.TEAMS.filter(function (t) { return t.id !== "admin" && t.id !== "viewer"; })
@@ -122,26 +139,26 @@
       });
       if (!list.length) return;
       html += "<h4>" + esc(g.name) + "</h4>" + list.map(function (m) {
-        return '<button type="button" data-go="' + m.id + '">' + esc(m.name) + "</button>";
+        return navBtn(m.id, m.name);
       }).join("");
     });
     var rest = VAN_PAGES.filter(function (p) { return !placed[p.id]; });
     if (rest.length) {
       html += "<h4>Sales</h4>" + rest.map(function (p) {
-        return '<button type="button" data-go="' + p.id + '">' + esc(p.name) + "</button>";
+        return navBtn(p.id, p.name);
       }).join("");
     }
     if (CAN_CATALOG) {
       html += "<h4>Marketing</h4>" + PAGES.filter(function (p) { return p.marketing && (p.id !== "customers" || s.role !== "admin"); }).map(function (p) {
-        return '<button type="button" data-go="' + p.id + '">' + esc(p.name) + "</button>";
+        return navBtn(p.id, p.name);
       }).join("");
     }
     if (s.role === "admin") {
       html += "<h4>Admin</h4>" + mods.filter(function (m) { return !m.teams.length; }).map(function (m) {
-        return '<button type="button" data-go="' + m.id + '">' + esc(m.name) + "</button>";
-      }).join("") + '<button type="button" data-go="company">Company setup</button><button type="button" data-go="people">People and setup</button>';
+        return navBtn(m.id, m.name);
+      }).join("") + navBtn("company", "Company setup") + navBtn("people", "People and setup");
     }
-    html += '<h4>You</h4><button type="button" data-go="password">My password</button>';
+    html += "<h4>You</h4>" + navBtn("password", "My password");
     return html;
   }
   $("nav").innerHTML = navHtml();
@@ -208,6 +225,33 @@
       "</p><p>An admin connects it in People and setup. Until then, nothing here can change your data.</p></div></div>";
   }
 
+  /* Inside a module that has its own menu, ours shrinks to a slim strip of badges.
+     The toggle slides it out over the page; "Keep menu open" makes it stay full on this device. */
+  var PIN_KEY = "suite.sidePinned", inModule = false;
+  function pinned() { try { return localStorage.getItem(PIN_KEY) === "1"; } catch (e) { return false; } }
+  function setPinned(v) { try { if (v) localStorage.setItem(PIN_KEY, "1"); else localStorage.removeItem(PIN_KEY); } catch (e) {} }
+  function sideLabel(text) { var t = $("sideToggle"); t.title = text; t.setAttribute("aria-label", text); }
+  function applySide() {
+    var rail = inModule && !pinned();
+    document.body.classList.toggle("in-module", inModule);
+    document.body.classList.toggle("rail", rail);
+    $("side").classList.remove("peek");
+    $("sideToggle").innerHTML = rail ? "&#9776;" : "&laquo;";
+    $("sideToggle").setAttribute("aria-expanded", rail ? "false" : "true");
+    sideLabel(rail ? "Show menu" : "Make menu slim");
+  }
+  $("sideToggle").onclick = function () {
+    if (!document.body.classList.contains("rail")) { setPinned(false); applySide(); return; }
+    var open = $("side").classList.toggle("peek");
+    this.innerHTML = open ? "&times;" : "&#9776;";
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+    sideLabel(open ? "Close menu" : "Show menu");
+  };
+  $("sidePin").onclick = function () { setPinned(true); applySide(); };
+  $("sideScrim").onclick = applySide;
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $("side").classList.contains("peek")) applySide(); });
+
+  var BUILT_IN = ["home", "password", "people", "company", "catalog", "customers", "storefront", "salesdesk", "tallybooks"];
   var current = null;
   function go(id, fromHistory) {
     var m = window.MODULES.filter(function (x) { return x.id === id; })[0];
@@ -230,6 +274,8 @@
     document.querySelectorAll("#nav button").forEach(function (b) {
       if (b.dataset.go === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
+    inModule = BUILT_IN.indexOf(id) === -1;
+    applySide();
     $("side").classList.remove("open");
     $("menuBtn").setAttribute("aria-expanded", "false");
     $("homeBtn").hidden = id === "home";

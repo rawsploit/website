@@ -540,3 +540,42 @@ body.has-accent.login-page .login-card h2, body.has-accent .main-bar h2 { color:
 .tb-table tr.tb-lines table { width: 100%; max-width: 560px; border-collapse: collapse; font-size: 14px; }
 .tb-table tr.tb-lines table td { background: transparent; padding: 4px 8px; border: 0; }
 .tb-table td.num, .tb-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- slim portal menu (inside modules that have their own menu) ---------- */
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-toggle, .side-pin, .side-scrim { display: none; }
+.nav-ico { display: none; }
+@media (min-width: 901px) {
+  body.in-module .side-toggle {
+    display: inline-flex; align-items: center; justify-content: center; flex: none; width: 34px; height: 34px;
+    border: 1px solid var(--rule-strong); border-radius: 8px; background: transparent; color: inherit; font-size: 17px; cursor: pointer;
+  }
+  body.in-module .side-toggle:hover { background: var(--tint-1); }
+  body.rail .shell { grid-template-columns: 64px 1fr; }
+  body.rail .side { position: relative; z-index: 30; min-width: 0; }
+  body.rail .side:not(.peek) .brand-name, body.rail .side:not(.peek) .side-logo, body.rail .side:not(.peek) .side-client,
+  body.rail .side:not(.peek) .side-user, body.rail .side:not(.peek) .side-foot { display: none; }
+  body.rail .side:not(.peek) .side-top { padding: 12px 0; }
+  body.rail .side:not(.peek) .side-head { flex-direction: column; gap: 10px; }
+  body.rail .side:not(.peek) nav { padding: 8px 6px; }
+  body.rail .side:not(.peek) nav h4 { height: 1px; margin: 8px 10px; background: var(--rule); font-size: 0; overflow: hidden; }
+  body.rail .side:not(.peek) nav button { text-align: center; padding: 4px 0; box-shadow: none; background: none; }
+  body.rail .side:not(.peek) .nav-txt { display: none; }
+  body.rail .side:not(.peek) .nav-ico {
+    display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px;
+    font: 700 13px var(--head); letter-spacing: .02em; background: var(--tint-1); color: var(--ink);
+  }
+  body.rail .side:not(.peek) nav button[data-go="home"] .nav-ico { font-size: 20px; }
+  body.rail .side:not(.peek) nav button:hover .nav-ico { background: var(--tint-2); }
+  body.rail .side:not(.peek) nav button[aria-current="page"] .nav-ico { background: var(--ink); color: #fff; }
+  body.rail .side.peek { position: fixed; top: 0; bottom: 0; left: 0; width: 270px; box-shadow: 8px 0 24px rgba(20, 25, 60, .18); }
+  body.rail .side.peek .side-pin {
+    display: block; margin-top: 10px; background: none; border: 0; padding: 0; font: 600 13.5px var(--body);
+    color: var(--ink); text-decoration: underline; cursor: pointer;
+  }
+  body.rail .side.peek ~ .side-scrim { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(20, 25, 60, .25); }
+  body.branded.rail .side:not(.peek) .nav-ico { background: rgba(255,255,255,.14); color: var(--b-ink); }
+  body.branded.rail .side:not(.peek) nav button[aria-current="page"] .nav-ico { background: var(--b-ink); color: var(--b-side, #1F2A6B); }
+  body.branded.rail .side:not(.peek) nav h4 { background: rgba(255,255,255,.22); }
+  body.branded.rail .side.peek .side-pin, body.branded .side-toggle { color: var(--b-ink); border-color: rgba(255,255,255,.4); }
+}
