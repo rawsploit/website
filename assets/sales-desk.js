@@ -118,6 +118,23 @@
   }
 
   /* ---------- shops ---------- */
+  /* Save shops; if the server warns about a clash (same GSTIN or phone as another shop or a Tally ledger),
+     show the warnings and let the person save anyway or go back. */
+  function saveShopsAsk(list, msgEl, done, failed) {
+    var send = function (confirm) {
+      return call("saveShops", Object.assign({ shops: list }, confirm ? { confirmClashes: true } : {})).then(function (res) {
+        if (!res.confirm) { done(res); return; }
+        msgEl.innerHTML = '<div class="panel" style="margin:12px 0;border-left:4px solid #C77700"><b>Please check before saving</b><ul style="margin:8px 0 10px 18px">' +
+          res.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + (res.more ? "<li>…and " + res.more + " more.</li>" : "") + "</ul>" +
+          '<p class="muted" style="margin:0 0 10px">If it\'s a branch of the same business, save it. If it\'s the same shop, go back and use the existing name.</p>' +
+          '<div class="row-btns"><button class="btn btn-ink btn-small" type="button" data-yes>Save anyway</button><button class="btn btn-line btn-small" type="button" data-no>Go back</button></div></div>';
+        msgEl.querySelector("[data-yes]").onclick = function () { this.disabled = true; send(true).catch(failed); };
+        msgEl.querySelector("[data-no]").onclick = function () { msgEl.innerHTML = ""; if (failed) failed(null); };
+      });
+    };
+    return send(false).catch(failed);
+  }
+
   function tabShops(body) {
     body.innerHTML = "<p>Loading shops…</p>";
     call("listShops").then(function (r) {
@@ -164,10 +181,10 @@
           var msg = body.querySelector("#shMsg");
           if (!list.length) { msg.innerHTML = '<p class="form-error">That file has no rows under the header.</p>'; return; }
           msg.innerHTML = "<p>Uploading " + list.length + " shops…</p>";
-          call("saveShops", { shops: list }).then(function (res) {
+          saveShopsAsk(list, msg, function (res) {
             tabShops(body);
             setTimeout(function () { var m = body.querySelector("#shMsg"); if (m) m.innerHTML = '<p class="demo-hint">' + res.added + " added, " + res.updated + " updated.</p>"; }, 50);
-          }).catch(function (e) { msg.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
+          }, function (e) { if (e) msg.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
         };
         reader.readAsText(file);
       };
@@ -179,29 +196,70 @@
   function tallyGap(body) {
     var box = body.querySelector("#shTallyGap");
     if (!box) return;
-    call("tallyNewShops", {}).then(function (r) {
+    Promise.all([call("tallyNewShops", {}), call("tallyOutbox", {}).catch(function () { return { items: [] }; })]).then(function (both) {
+      var r = both[0], ob = both[1] || { items: [] };
       if (!r.tally || !r.synced) return;
       var btn = body.querySelector("#shTally");
       if (btn) btn.textContent = "Add shops from Tally" + (r.shops.length ? " (" + r.shops.length + ")" : "");
+      // latest outbox item for each shop
+      var last = {};
+      (ob.items || []).forEach(function (x) { if (x.kind === "ledger" && !last[x.ref]) last[x.ref] = x; });
       var miss = r.missing || [];
+      var html = "";
       if (!miss.length) {
-        box.innerHTML = '<p class="demo-hint" style="margin:12px 0">✓ Every shop here has a ledger in Tally with the same name.</p>';
-        return;
+        html = '<p class="demo-hint" style="margin:12px 0">✓ Every shop here has a ledger in Tally with the same name.</p>';
+      } else {
+        var billedShops = miss.filter(function (m) { return m.bills; }).length;
+        var canSend = !viewOnly() && ob.linked !== false;
+        // open while something still needs doing: a billed shop, or one not sent yet / failed
+        var todo = miss.some(function (m) { var o = last[m.shop_id]; return !o || o.status === "failed" || o.status === "cancelled"; });
+        html = '<details class="panel" style="margin:12px 0;border-left:4px solid #C77700"' + (billedShops || (canSend && todo) ? " open" : "") + '><summary style="cursor:pointer"><b>' +
+          miss.length + " shop" + (miss.length === 1 ? " isn't" : "s aren't") + " in Tally yet</b>" +
+          (billedShops ? ' <span class="muted">· ' + billedShops + " already billed</span>" : "") + "</summary>" +
+          '<p class="muted" style="margin:8px 0 10px">' + (canSend
+            ? "Tick the shops and press <b>Create in Tally</b>: the Tally Link adds them as <b>Sundry Debtors</b> with these exact names on its next run (every 15 minutes, while Tally is open). "
+            : "Ask accounts to create these as <b>Sundry Debtors</b> in Tally, with exactly the same name. ") +
+          "Until then Trade Recon shows their bills as missing in Tally.</p>" +
+          '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + (canSend ? '<th><input type="checkbox" id="tgAll"></th>' : "") +
+          "<th>Shop</th><th>Route</th><th>GSTIN</th><th>Bills</th><th>Billed</th><th>In Tally</th></tr></thead><tbody>" +
+          miss.map(function (m) {
+            var o = last[m.shop_id], st = o ? o.status : "";
+            var waiting = st === "approved" || st === "sending";
+            var label = !o || st === "cancelled" ? '<span class="muted">Not yet</span>'
+              : waiting ? '<span class="status soon">Waiting for the Tally Link</span>'
+              : st === "posted" ? '<span class="status live">Created</span> <small class="muted">shows after the next sync</small>'
+              : st === "exists" ? '<span class="status live">Already there</span>'
+              : '<span class="status" style="background:#FDECEA;color:#9B1C1C">Failed</span><br><small>' + esc(o.result) + "</small>";
+            return "<tr>" + (canSend ? '<td><input type="checkbox" data-send="' + esc(m.shop_id) + '"' + (waiting || st === "posted" ? " disabled" : "") + "></td>" : "") +
+              "<td>" + esc(m.name) + "</td><td>" + esc(m.route_id) + "</td><td>" + esc(m.gstin) + '</td><td class="num">' + m.bills +
+              '</td><td class="num">' + (m.bills ? money(m.amount) : "–") + "</td><td>" + label + "</td></tr>";
+          }).join("") + "</tbody></table></div>" +
+          '<p class="form-error" id="tgErr"></p><div class="row-btns" style="margin-top:6px">' +
+          (canSend ? '<button class="btn btn-ink btn-small" type="button" id="tgSend">Create in Tally</button>' : "") +
+          '<button class="btn btn-line btn-small" type="button" id="tgCopy">Copy the list for accounts</button>' +
+          '<button class="btn btn-line btn-small" type="button" id="tgCsv">Download as CSV</button></div></details>';
       }
-      var billedShops = miss.filter(function (m) { return m.bills; }).length;
-      box.innerHTML = '<details class="panel" style="margin:12px 0;border-left:4px solid #C77700"' + (billedShops ? " open" : "") + '><summary style="cursor:pointer"><b>' +
-        miss.length + " shop" + (miss.length === 1 ? " isn't" : "s aren't") + " in Tally yet</b>" +
-        (billedShops ? ' <span class="muted">· ' + billedShops + " already billed</span>" : "") + "</summary>" +
-        '<p class="muted" style="margin:8px 0 10px">Ask accounts to create these as <b>Sundry Debtors</b> in Tally, with exactly the same name, ' +
-        "before their bills are entered. Until then Trade Recon shows their bills as missing in Tally. They drop off this list after the next Tally sync.</p>" +
-        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Shop</th><th>Route</th><th>GSTIN</th><th>Bills</th><th>Billed</th><th>Last bill</th></tr></thead><tbody>' +
-        miss.map(function (m) {
-          return "<tr><td>" + esc(m.name) + "</td><td>" + esc(m.route_id) + "</td><td>" + esc(m.gstin) + '</td><td class="num">' + m.bills +
-            '</td><td class="num">' + (m.bills ? money(m.amount) : "–") + "</td><td>" + esc(m.last) + "</td></tr>";
-        }).join("") + "</tbody></table></div>" +
-        '<div class="row-btns" style="margin-top:10px"><button class="btn btn-line btn-small" type="button" id="tgCopy">Copy the list for accounts</button>' +
-        '<button class="btn btn-line btn-small" type="button" id="tgCsv">Download as CSV</button></div></details>';
-      box.querySelector("#tgCopy").onclick = function () {
+      html += outboxHtml(ob.items || []);
+      box.innerHTML = html;
+      var all = box.querySelector("#tgAll");
+      if (all) all.onchange = function () { var on = this.checked; box.querySelectorAll("[data-send]:not(:disabled)").forEach(function (c) { c.checked = on; }); };
+      var send = box.querySelector("#tgSend");
+      if (send) send.onclick = function () {
+        var ids = []; box.querySelectorAll("[data-send]:checked").forEach(function (c) { ids.push(c.dataset.send); });
+        var err = box.querySelector("#tgErr");
+        if (!ids.length) { err.textContent = "Tick the shops to create in Tally."; return; }
+        err.textContent = ""; this.disabled = true;
+        call("tallySendShops", { shop_ids: ids }).then(function (res) {
+          tallyGap(body);
+          var m = body.querySelector("#shMsg");
+          if (m) m.innerHTML = '<p class="demo-hint">' + (res.queued.length ? res.queued.length + " shop" + (res.queued.length === 1 ? "" : "s") +
+            " sent to the Tally outbox. The Tally Link creates them on its next run." : "Nothing new to send.") +
+            (res.skipped.length ? " Skipped: " + esc(res.skipped.join("; ")) + "." : "") + "</p>";
+        }).catch(function (e) { err.textContent = e.message; send.disabled = false; });
+      };
+      bindOutbox(box, body);
+      var copy = box.querySelector("#tgCopy");
+      if (copy) copy.onclick = function () {
         var text = "Please create these as Sundry Debtors in Tally (same names):\n" + miss.map(function (m) {
           return "- " + m.name + (m.route_id ? " (" + m.route_id + ")" : "") + (m.gstin ? ", GSTIN " + m.gstin : "");
         }).join("\n");
@@ -209,12 +267,38 @@
         (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { b.textContent = "Copied"; })
           .catch(function () { window.prompt("Copy this:", text); });
       };
-      box.querySelector("#tgCsv").onclick = function () {
+      var csv = box.querySelector("#tgCsv");
+      if (csv) csv.onclick = function () {
         download("shops-not-in-tally.csv", [["Shop", "Route", "GSTIN", "Bills", "Billed", "Last bill"]].concat(miss.map(function (m) {
           return [m.name, m.route_id, m.gstin, m.bills, m.amount, m.last];
         })));
       };
     }).catch(function () {});
+  }
+
+  /* everything sent to Tally lately, newest first */
+  var OB_LABEL = { approved: "Waiting for the Tally Link", sending: "Being sent", posted: "Created in Tally", exists: "Already in Tally", failed: "Failed", cancelled: "Cancelled" };
+  function outboxHtml(items) {
+    if (!items.length) return "";
+    var open = items.some(function (x) { return x.status === "failed"; });
+    return '<details class="panel" style="margin:12px 0"' + (open ? " open" : "") + '><summary style="cursor:pointer"><b>Sent to Tally</b> <span class="muted">· ' +
+      items.length + " item" + (items.length === 1 ? "" : "s") + (open ? " · some failed" : "") + "</span></summary>" +
+      '<div class="tbl-wrap" style="margin-top:10px"><table class="tbl"><thead><tr><th>When</th><th>What</th><th>Status</th><th>Tally said</th><th></th></tr></thead><tbody>' +
+      items.slice(0, 50).map(function (x) {
+        var acts = viewOnly() ? "" : (x.status === "failed" ? '<button class="btn btn-line btn-small" type="button" data-ob="retry" data-id="' + esc(x.id) + '">Try again</button> ' : "") +
+          (x.status === "approved" || x.status === "failed" ? '<button class="btn btn-line btn-small" type="button" data-ob="cancel" data-id="' + esc(x.id) + '">Cancel</button>' : "");
+        return "<tr><td>" + esc(String(x.created).replace("T", " ").slice(0, 16)) + "</td><td>New ledger: " + esc(x.name) + "<br><small class=\"muted\">by " + esc(x.created_by) +
+          "</small></td><td>" + esc(OB_LABEL[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td>" + acts + "</td></tr>";
+      }).join("") + "</tbody></table></div></details>";
+  }
+  function bindOutbox(box, body) {
+    box.querySelectorAll("[data-ob]").forEach(function (b) {
+      b.onclick = function () {
+        b.disabled = true;
+        call("tallyOutboxAction", { id: b.dataset.id, what: b.dataset.ob }).then(function () { tallyGap(body); })
+          .catch(function (e) { b.disabled = false; window.alert(e.message); });
+      };
+    });
   }
 
   /* Tally's Sundry Debtors that aren't shops yet: pick a route each and add them,
@@ -272,10 +356,11 @@
         if (!pick.length) { err.textContent = "Tick at least one shop."; return; }
         err.textContent = "";
         this.disabled = true;
-        call("saveShops", { shops: pick }).then(function (res) {
+        var goBtn = this;
+        saveShopsAsk(pick, err, function (res) {
           tabShops(body);
           setTimeout(function () { var m = body.querySelector("#shMsg"); if (m) m.innerHTML = '<p class="demo-hint">' + res.added + " shop" + (res.added === 1 ? "" : "s") + " added from Tally.</p>"; }, 50);
-        }).catch(function (e) { err.textContent = e.message; box.querySelector("#tsGo").disabled = false; });
+        }, function (e) { if (e) err.textContent = e.message; goBtn.disabled = false; });
       };
     }).catch(function (e) { box.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
   }
@@ -300,9 +385,11 @@
     f.onsubmit = function (e) {
       e.preventDefault();
       var data = { shop_id: s.shop_id || "", name: f.name.value.trim(), route_id: f.route_id.value, address: f.address.value.trim(), phone: f.phone.value.trim(),
-                   gstin: f.gstin.value.trim(), type: f.type.value.trim(), credit: f.credit.checked, active: f.active.checked };
+                   gstin: f.gstin.value.trim(), type: f.type.value.trim(), credit: f.credit.checked, active: f.active.checked, isNew: !s.shop_id };
       if (!data.name) { f.querySelector(".form-error").textContent = "Enter the shop name."; return; }
-      call("saveShops", { shops: [data] }).then(done).catch(function (e2) { f.querySelector(".form-error").textContent = e2.message; });
+      var warnBox = f.querySelector(".sd-warn") || f.insertBefore(Object.assign(document.createElement("div"), { className: "sd-warn" }), f.querySelector(".row-actions"));
+      f.querySelector(".form-error").textContent = "";
+      saveShopsAsk([data], warnBox, done, function (e2) { if (e2) f.querySelector(".form-error").textContent = e2.message; });
     };
     f.name.focus();
   }
@@ -410,6 +497,21 @@
     }
     if (action === "tallyNewShops") return { ok: true, tally: true, synced: true, lastSync: "", shops: [{ name: "Fresh Mart", balance: 3000 }, { name: "Green Valley Stores", balance: 1500 }],
       missing: [{ shop_id: "S0004", name: "Lakeside Traders", route_id: "R2", gstin: "", bills: 1, amount: 2280, last: today() }] };
+    if (action === "tallyOutbox") {
+      var ob = [];
+      try { ob = JSON.parse(sessionStorage.getItem("suite.demoOutbox") || "[]"); } catch (e) {}
+      return { ok: true, items: ob, linked: true };
+    }
+    if (action === "tallySendShops") {
+      var list = []; try { list = JSON.parse(sessionStorage.getItem("suite.demoOutbox") || "[]"); } catch (e) {}
+      var names = { S0004: "Lakeside Traders" };
+      (p.shop_ids || []).forEach(function (id) {
+        list.unshift({ id: "OB" + Date.now() + id, kind: "ledger", ref: id, name: names[id] || id, status: "approved", created: new Date().toISOString(), created_by: Suite.getSession().user || "you", result: "", done: "" });
+      });
+      try { sessionStorage.setItem("suite.demoOutbox", JSON.stringify(list)); } catch (e) {}
+      return { ok: true, queued: (p.shop_ids || []).map(function (id) { return names[id] || id; }), skipped: [] };
+    }
+    if (action === "tallyOutboxAction") return { ok: true };
     return { ok: false, message: "Not available in the demo company." };
   }
 

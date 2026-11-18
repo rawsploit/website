@@ -2,6 +2,8 @@
   CentraPlant Tally Link
   Reads this PC's Tally (ledgers, stock items and recent vouchers) through Tally's
   own connection on port 9000 and sends them to your company's CentraPlant.
+  It also posts into Tally what accounts approved in CentraPlant (for now: new shop
+  ledgers under Sundry Debtors), and reports back what Tally said.
 
   First time:   powershell -ExecutionPolicy Bypass -File CentraPlantTallyLink.ps1 -Install
                 (copies itself to this PC, syncs now, then every 15 minutes)
@@ -22,7 +24,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.4'
+$Agent    = 'tally-link-ps 1.5'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -92,11 +94,12 @@ function Read-Tally {
   $fyFrom = (Get-Date -Year $fy -Month 4 -Day 1).ToString('d-MMM-yyyy', $inv)
   $upTo = $today.ToString('d-MMM-yyyy', $inv)
   # 1. ledgers with their group and balances (Tally: negative = debit)
-  $x = Get-TallyCollection 'Ledger' 'NAME,PARENT,OPENINGBALANCE,CLOSINGBALANCE,PARTYGSTIN' $fyFrom $upTo
+  $x = Get-TallyCollection 'Ledger' 'NAME,PARENT,OPENINGBALANCE,CLOSINGBALANCE,PARTYGSTIN,LEDGERMOBILE,LEDGERPHONE' $fyFrom $upTo
   $ledgers = @()
   foreach ($l in (Nodes $x.ENVELOPE.BODY.DATA.COLLECTION 'LEDGER')) {
     $ledgers += @{ name = (NameOf $l); group = (Txt $l 'PARENT'); opening = (Num (Txt $l 'OPENINGBALANCE'));
-                   closing = (Num (Txt $l 'CLOSINGBALANCE')); gstin = (Txt $l 'PARTYGSTIN') }
+                   closing = (Num (Txt $l 'CLOSINGBALANCE')); gstin = (Txt $l 'PARTYGSTIN');
+                   phone = $(if (Txt $l 'LEDGERMOBILE') { Txt $l 'LEDGERMOBILE' } else { Txt $l 'LEDGERPHONE' }) }
   }
   # 2. stock items with closing quantity and value
   $x = Get-TallyCollection 'StockItem' 'NAME,PARENT,BASEUNITS,CLOSINGBALANCE,CLOSINGVALUE' $fyFrom $upTo
@@ -154,6 +157,82 @@ function Tell-Problem([string]$msg) {
   try { Send-ToCentraPlant @{ action = 'tallyProblem'; key = $LinkKey; message = $msg } | Out-Null } catch { }
 }
 
+
+# ---------------- posting into Tally ----------------
+function Post-ToTally([string]$xml) {
+  # safety: refuse anything that would delete, alter or cancel in Tally
+  if ($xml -match 'ACTION="(?!Create")[^"]*"' -or $xml -match '(?i)<(DELETE|ALTER|CANCEL)\b') { throw 'Refused: this link only creates new entries in Tally.' }
+  $res = Invoke-WebRequest -Uri $TallyUrl -Method Post -Body ([Text.Encoding]::UTF8.GetBytes($xml)) `
+           -ContentType 'text/xml; charset=utf-8' -UseBasicParsing -TimeoutSec 120
+  return [string]$res.Content
+}
+
+# what Tally answered to an import: counts and any line errors
+function Read-ImportResult([string]$text) {
+  $get = { param($tag) $m = [regex]::Match($text, '<' + $tag + '>\s*(-?\d+)\s*</' + $tag + '>'); if ($m.Success) { [int]$m.Groups[1].Value } else { 0 } }
+  $errs = @([regex]::Matches($text, '<LINEERROR>(.*?)</LINEERROR>', 'Singleline') | ForEach-Object { $_.Groups[1].Value.Trim() } | Where-Object { $_ })
+  return @{ created = (& $get 'CREATED'); altered = (& $get 'ALTERED'); errors = (& $get 'ERRORS'); exceptions = (& $get 'EXCEPTIONS');
+            message = ($errs -join '; ') }
+}
+
+function Import-Envelope([string]$inner) {
+  return '<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC>' +
+         '<REPORTNAME>All Masters</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>' + (XmlEsc $Company) + '</SVCURRENTCOMPANY></STATICVARIABLES>' +
+         '</REQUESTDESC><REQUESTDATA><TALLYMESSAGE xmlns:UDF="TallyUDF">' + $inner + '</TALLYMESSAGE></REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
+}
+
+# a new ledger; $full = $false leaves out address and GST details (used if Tally refuses them)
+# This script only ever CREATES ledgers. It never deletes or alters anything in Tally.
+function Ledger-Xml($p, [bool]$full) {
+  $n = XmlEsc ([string]$p.name)
+  $x = '<LEDGER NAME="' + $n + '" ACTION="Create"><NAME.LIST TYPE="String"><NAME>' + $n + '</NAME></NAME.LIST>' +
+       '<PARENT>' + (XmlEsc ([string]$p.parent)) + '</PARENT><ISBILLWISEON>Yes</ISBILLWISEON>'
+  if ($full) {
+    if ($p.address) { $x += '<ADDRESS.LIST TYPE="String"><ADDRESS>' + (XmlEsc ([string]$p.address)) + '</ADDRESS></ADDRESS.LIST>' }
+    if ($p.state)   { $x += '<LEDSTATENAME>' + (XmlEsc ([string]$p.state)) + '</LEDSTATENAME><COUNTRYNAME>India</COUNTRYNAME>' }
+    if ($p.phone)   { $x += '<LEDGERMOBILE>' + (XmlEsc ([string]$p.phone)) + '</LEDGERMOBILE>' }
+    if ($p.gstin)   { $x += '<GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><PARTYGSTIN>' + (XmlEsc ([string]$p.gstin)) + '</PARTYGSTIN>' }
+  }
+  return $x + '</LEDGER>'
+}
+
+# Collect what accounts approved, post each into Tally, report back. Returns how many were created.
+function Send-Outbox($ledgers) {
+  $res = Send-ToCentraPlant @{ action = 'tallyOutboxPull'; key = $LinkKey }
+  if (-not $res.ok) { Write-Log ('Outbox: ' + $res.message); return 0 }
+  $items = @($res.items | Where-Object { $_ })
+  if ($items.Count -eq 0) { return 0 }
+  $have = @{}
+  foreach ($l in $ledgers) { if ($l.name) { $have[([string]$l.name).Trim().ToLower()] = $true } }
+  $results = @(); $made = 0; $there = 0; $bad = 0
+  foreach ($it in $items) {
+    $r = @{ id = $it.id; status = 'failed'; message = '' }
+    try {
+      if ($it.kind -ne 'ledger') { $r.message = 'This Tally Link is too old for "' + $it.kind + '". Download it again from Company setup > Accounts.' }
+      elseif ($have.ContainsKey(([string]$it.payload.name).Trim().ToLower())) { $r.status = 'exists'; $r.message = 'Already in Tally'; $there++ }
+      else {
+        $ans = Read-ImportResult (Post-ToTally (Import-Envelope (Ledger-Xml $it.payload $true)))
+        if ($ans.created -lt 1 -and $ans.altered -lt 1) {
+          # try again with just the name and group, in case this Tally refused the address or GST fields
+          $first = $ans.message
+          $ans = Read-ImportResult (Post-ToTally (Import-Envelope (Ledger-Xml $it.payload $false)))
+          if ($ans.created -ge 1) { $ans.message = 'Created in Tally without address/GST details (Tally said: ' + $first + '). Add them in Tally.' }
+        }
+        if ($ans.created -ge 1 -or $ans.altered -ge 1) {
+          $r.status = 'posted'; if (-not $ans.message) { $ans.message = 'Created in Tally' }; $r.message = $ans.message; $made++
+          $have[([string]$it.payload.name).Trim().ToLower()] = $true
+        } elseif ($ans.message -match 'already exists|duplicate') { $r.status = 'exists'; $r.message = 'Already in Tally'; $there++ }
+        else { $r.message = $(if ($ans.message) { 'Tally said: ' + $ans.message } else { "Tally didn't accept it (no reason given)." }); $bad++ }
+      }
+    } catch { $r.message = 'Problem posting: ' + $_.Exception.Message; $bad++ }
+    $results += $r
+  }
+  $back = Send-ToCentraPlant @{ action = 'tallyOutboxResult'; key = $LinkKey; results = $results }
+  Write-Log ('Posted to Tally: ' + $made + ' created, ' + $there + ' already there, ' + $bad + ' failed.')
+  if (-not $back.ok) { Write-Log ('CentraPlant said: ' + $back.message) }
+  return $made
+}
+
 # ---------------- install / uninstall ----------------
 if ($Uninstall) {
   schtasks.exe /Delete /TN $TaskName /F 2>$null | Out-Null
@@ -183,6 +262,10 @@ try {
   $data = Read-Tally
   Write-Log ('Found ' + $data.ledgers.Count + ' ledgers, ' + $data.items.Count + ' stock items, ' + $data.vouchers.Count + ' vouchers.')
   if ($Check) { Write-Log 'Check only: nothing sent.'; exit 0 }
+  # first post what accounts approved, then send Tally (with anything just created) to CentraPlant
+  $made = 0
+  try { $made = Send-Outbox $data.ledgers } catch { Write-Log ('Outbox problem: ' + $_.Exception.Message) }
+  if ($made -gt 0) { $data = Read-Tally }
   $payload = @{ action = 'tallyPush'; key = $LinkKey; company = $Company; agent = $Agent;
                 from = $data.from; to = $data.to; ledgers = $data.ledgers; items = $data.items; vouchers = $data.vouchers }
   $res = Send-ToCentraPlant $payload
