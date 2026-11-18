@@ -579,3 +579,11 @@ body.has-accent.login-page .login-card h2, body.has-accent .main-bar h2 { color:
   body.branded.rail .side:not(.peek) nav h4 { background: rgba(255,255,255,.22); }
   body.branded.rail .side.peek .side-pin, body.branded .side-toggle { color: var(--b-ink); border-color: rgba(255,255,255,.4); }
 }
+
+/* ---------- desktop: the portal fills the window exactly; the menu and the page scroll on their own ---------- */
+@media (min-width: 901px) {
+  .shell { height: 100vh; min-height: 0; }
+  .side { height: 100vh; overflow: hidden; }
+  .main { height: 100vh; overflow-y: auto; }
+  .main-bar { position: sticky; top: 0; z-index: 5; flex: none; }
+}

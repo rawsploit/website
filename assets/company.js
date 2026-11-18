@@ -86,6 +86,7 @@
     if (i < STEPS.length - 1) step = STEPS[i + 1].id;
     paint(root);
     window.scrollTo(0, 0);
+    var mainEl = document.querySelector(".main"); if (mainEl) mainEl.scrollTop = 0;
   }
   function flash(el, text) { el.textContent = text; el.classList.add("ok-msg"); }
   function opt(list, sel) { return list.map(function (v) { return '<option' + (v === sel ? " selected" : "") + ">" + esc(v) + "</option>"; }).join(""); }

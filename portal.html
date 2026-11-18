@@ -108,6 +108,8 @@
   /* ---- sidebar ---- */
   function abbr(id, name) {
     if (id === "home") return "\u2302";
+    if (id === "password") return "PW";
+    if (id === "storefront") return "SF";
     var w = String(name).replace(/&/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").split(/[\s\-\/]+/)
       .filter(function (x) { return x && ["and", "of", "the", "my"].indexOf(x.toLowerCase()) === -1; });
     if (!w.length) return "?";
@@ -287,6 +289,7 @@
     }
     current = id;
     window.scrollTo(0, 0);
+    document.querySelector(".main").scrollTop = 0;
   }
   window.addEventListener("popstate", function (e) {
     var id = (e.state && e.state.m) || new URLSearchParams(location.search).get("m") || "home";
