@@ -50,14 +50,29 @@
   function load() {
     if (Suite.isDemo()) { OB = demoOutbox(); return Promise.resolve(demoData()); }
     var s = Suite.getSession();
-    var soft = function (a) { return Suite.api(a, { token: s.token }).catch(function () { return { ok: false }; }); };
-    return Promise.all([Suite.api("tallyBooks", { token: s.token }), soft("tallyOutbox"), soft("tallySetup"), soft("tallyBills")]).then(function (all) {
-      var r = all[0];
+    // one request for the whole screen; a busy server gets one quiet retry
+    var once = function () { return Suite.api("tallyBooksAll", { token: s.token }); };
+    // an older Core without tallyBooksAll: ask for the parts one after another (never all at once)
+    var oldCore = function () {
+      var out = { ok: true }, soft = function (a) { return Suite.api(a, { token: s.token }).catch(function () { return { ok: false }; }); };
+      return Suite.api("tallyBooks", { token: s.token }).then(function (b) {
+        if (!b.ok) return b;
+        out.books = b;
+        return soft("tallyOutbox").then(function (x) { out.outbox = x; return soft("tallySetup"); })
+          .then(function (x) { out.setup = x; return soft("tallyBills"); })
+          .then(function (x) { out.bills = x; return out; });
+      });
+    };
+    return once().then(function (r) {
+      if (r && !r.ok && r.message === "Unknown action.") return oldCore();
+      return r && r.busy ? new Promise(function (ok) { setTimeout(ok, 2500); }).then(once) : r;
+    }).then(function (r) {
       if (!r.ok) throw new Error(r.message || "Couldn't open Tally Books.");
-      OB = all[1] && all[1].ok ? all[1].items || [] : [];
-      SETUP = all[2] && all[2].ok ? all[2] : null;
-      BILLS = all[3] && all[3].ok ? all[3] : null;
-      return r;
+      var part = function (x) { return x && x.ok ? x : null; };
+      OB = part(r.outbox) ? r.outbox.items || [] : [];
+      SETUP = part(r.setup);
+      BILLS = part(r.bills);
+      return r.books;
     });
   }
   function demoOutbox() {
@@ -83,7 +98,10 @@
       try { sessionStorage.setItem("suite.demoTallyBatch", JSON.stringify(OB)); } catch (e) {}
       return Promise.resolve({ ok: true, done: (payload.ids || [1]).length, queued: [], skipped: [] });
     }
-    return Suite.api(action, Object.assign({ token: Suite.getSession().token }, payload)).then(function (r) {
+    var send = function () { return Suite.api(action, Object.assign({ token: Suite.getSession().token }, payload)); };
+    return send().then(function (r) {
+      return r && r.busy ? new Promise(function (ok) { setTimeout(ok, 2500); }).then(send) : r;
+    }).then(function (r) {
       if (!r.ok) throw new Error(r.message || "That didn't work.");
       return r;
     });
