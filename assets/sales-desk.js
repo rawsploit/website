@@ -289,7 +289,7 @@
       items.slice(0, 50).map(function (x) {
         var acts = viewOnly() ? "" : (x.status === "failed" ? '<button class="btn btn-line btn-small" type="button" data-ob="retry" data-id="' + esc(x.id) + '">Try again</button> ' : "") +
           (x.status === "approved" || x.status === "failed" || x.status === "pending" ? '<button class="btn btn-line btn-small" type="button" data-ob="cancel" data-id="' + esc(x.id) + '">Cancel</button>' : "");
-        return "<tr><td>" + esc(String(x.created).replace("T", " ").slice(0, 16)) + "</td><td>New ledger: " + esc(x.name) + "<br><small class=\"muted\">by " + esc(x.created_by) +
+        return "<tr><td>" + esc(String(x.created).replace("T", " ").slice(0, 16)) + "</td><td>" + (x.kind === "sales" ? "Sales bill: " : x.kind === "item" ? "New stock item: " : "New ledger: ") + esc(x.name) + "<br><small class=\"muted\">by " + esc(x.created_by) +
           "</small></td><td>" + esc(OB_LABEL[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td>" + acts + "</td></tr>";
       }).join("") + "</tbody></table></div></details>";
   }

@@ -10,7 +10,7 @@
 (function () {
   "use strict";
   var esc = Suite.esc;
-  var D = null, OB = [], tab = "", filt = { q: "", type: "", ledger: "" }, open = {};
+  var D = null, OB = [], SETUP = null, BILLS = null, tab = "", filt = { q: "", type: "", ledger: "" }, open = {};
 
   /* ---------- data ---------- */
   function demoData() {
@@ -50,13 +50,13 @@
   function load() {
     if (Suite.isDemo()) { OB = demoOutbox(); return Promise.resolve(demoData()); }
     var s = Suite.getSession();
-    return Promise.all([
-      Suite.api("tallyBooks", { token: s.token }),
-      Suite.api("tallyOutbox", { token: s.token }).catch(function () { return { ok: false }; })
-    ]).then(function (both) {
-      var r = both[0];
+    var soft = function (a) { return Suite.api(a, { token: s.token }).catch(function () { return { ok: false }; }); };
+    return Promise.all([Suite.api("tallyBooks", { token: s.token }), soft("tallyOutbox"), soft("tallySetup"), soft("tallyBills")]).then(function (all) {
+      var r = all[0];
       if (!r.ok) throw new Error(r.message || "Couldn't open Tally Books.");
-      OB = both[1] && both[1].ok ? both[1].items || [] : [];
+      OB = all[1] && all[1].ok ? all[1].items || [] : [];
+      SETUP = all[2] && all[2].ok ? all[2] : null;
+      BILLS = all[3] && all[3].ok ? all[3] : null;
       return r;
     });
   }
@@ -81,7 +81,7 @@
         if (action === "tallyOutboxAction") x.status = payload.what === "cancel" ? "cancelled" : "approved";
       });
       try { sessionStorage.setItem("suite.demoTallyBatch", JSON.stringify(OB)); } catch (e) {}
-      return Promise.resolve({ ok: true, done: (payload.ids || [1]).length });
+      return Promise.resolve({ ok: true, done: (payload.ids || [1]).length, queued: [], skipped: [] });
     }
     return Suite.api(action, Object.assign({ token: Suite.getSession().token }, payload)).then(function (r) {
       if (!r.ok) throw new Error(r.message || "That didn't work.");
@@ -89,11 +89,17 @@
     });
   }
   function canAct() { var s = Suite.getSession(); return !!s && (s.role === "admin" || s.role === "accounts"); }
-  function pendingCount() { return OB.filter(function (x) { return x.status === "pending"; }).length; }
+  function pendingCount() {
+    return OB.filter(function (x) { return x.status === "pending"; }).length +
+      (BILLS ? BILLS.bills.length : 0);
+  }
+  function kindLabel(x) { return x.kind === "sales" ? "Sales bill: " : x.kind === "item" ? "New stock item: " : "New ledger: "; }
 
   /* ---------- formatting ---------- */
   function inr(n) { return Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function drcr(n) { return n === 0 ? "–" : inr(n) + (n < 0 ? " Dr" : " Cr"); }
+  function money(n) { return "\u20b9" + inr(Number(n) || 0); }
+  function disp(ymd) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || "")); return m ? m[3] + "-" + m[2] + "-" + m[1] : String(ymd || ""); }
   function day(iso) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return esc(iso);
     var d = new Date(iso + "T00:00:00");
@@ -227,23 +233,133 @@
         (act ? '<p class="form-error" id="obErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="obApprove">Approve ticked</button>' +
                '<button class="btn btn-line btn-small" type="button" id="obReject">Reject ticked…</button></div>' : "");
     }
-    if (queued.length) html += '<p class="demo-hint" style="margin:16px 0 0">' + queued.length + " approved, waiting for the Tally Link (it runs every 15 minutes while Tally is open).</p>";
+    var setupFirst = BILLS && BILLS.bills.some(function (b) { return b.problems.length; });
+    if (setupFirst) html += setupHtml(act);
+    html += billsHtml(act);
+    if (queued.length) {
+      var held = queued.filter(function (x) { return /^Waiting for/.test(x.result || ""); });
+      html += '<p class="demo-hint" style="margin:16px 0 0">' + queued.length + " approved, waiting for the Tally Link (it runs every 15 minutes while Tally is open)." +
+        (held.length ? " " + held.length + " of them can't go yet: " + held.slice(0, 3).map(function (x) { return esc(x.name) + " (" + esc(x.result.replace(/^Waiting for /, "needs ")) + ")"; }).join("; ") + (held.length > 3 ? "…" : "") : "") + "</p>";
+    }
+    if (!setupFirst) html += setupHtml(act);
     if (failed.length) {
       html += '<h3 style="margin:20px 0 8px">Didn\'t go into Tally (' + failed.length + ")</h3>" + '<div class="tbl-wrap"><table class="tbl"><tbody>' +
         failed.map(function (x) {
-          return "<tr><td><b>New ledger:</b> " + esc(x.name) + "<br><small>" + esc(x.result) + "</small></td><td>" +
+          return "<tr><td><b>" + kindLabel(x) + "</b>" + esc(x.name) + "<br><small>" + esc(x.result) + "</small></td><td>" +
             (act ? '<button class="btn btn-line btn-small" type="button" data-retry="' + esc(x.id) + '">Try again</button> <button class="btn btn-line btn-small" type="button" data-cancel="' + esc(x.id) + '">Cancel</button>' : "") + "</td></tr>";
         }).join("") + "</tbody></table></div>";
     }
     if (done.length) {
       html += '<details style="margin-top:20px"><summary style="cursor:pointer"><b>Done lately</b> <span class="muted">(' + done.length + ")</span></summary>" +
         '<div class="tbl-wrap" style="margin-top:8px"><table class="tbl"><tbody>' + done.map(function (x) {
-          return "<tr><td>New ledger: " + esc(x.name) + "</td><td>" + esc(OB_STATUS[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td><small>" + esc(when(x.done || x.created)) + "</small></td></tr>";
+          return "<tr><td>" + kindLabel(x) + esc(x.name) + "</td><td>" + esc(OB_STATUS[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td><small>" + esc(when(x.done || x.created)) + "</small></td></tr>";
         }).join("") + "</tbody></table></div></details>";
     }
     return html;
   }
+
+  /* ---------- sales bills not yet in Tally ---------- */
+  function billsHtml(act) {
+    if (!BILLS) return "";
+    var list = BILLS.bills;
+    var html = '<h3 style="margin:22px 0 8px">Sales bills not in Tally' + (list.length ? " (" + list.length + ")" : "") + '</h3>';
+    if (!list.length) return html + '<p class="muted">Every bill since ' + esc(disp(BILLS.from)) + ' is in Tally or on its way.</p>';
+    var ready = list.filter(function (b) { return !b.problems.length; }).length;
+    html += '<p class="muted" style="margin:0 0 8px">Approved bills go in as <b>' + esc((SETUP && SETUP.settings.vtype) || "Sales") + "</b> vouchers with their items and GST. " +
+      "A bill whose shop, items or ledgers aren't in Tally yet waits and goes in right after them.</p>";
+    html += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + (act ? '<th><input type="checkbox" id="blAll"' + (ready ? " checked" : "") + ' aria-label="Tick all"></th>' : "") +
+      '<th>Date</th><th>Bill</th><th>Shop</th><th>By</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>' +
+      list.map(function (b) {
+        var bad = b.problems.length;
+        var st = bad ? '<span class="status" style="background:#FDECEA;color:#9B1C1C">Fix setup first</span><br><small>' + esc(b.problems.join("; ")) + "</small>"
+          : b.waiting.length ? '<span class="status soon">Will wait for</span><br><small>' + esc(b.waiting.join(", ")) + "</small>"
+          : '<span class="status live">Ready</span>';
+        return "<tr>" + (act ? '<td><input type="checkbox" data-bill="' + esc(b.uuid) + '"' + (bad ? " disabled" : " checked") + "></td>" : "") +
+          "<td>" + esc(disp(b.date)) + "</td><td>" + esc(b.bill_no) + "</td><td>" + esc(b.shop) + "</td><td>" + esc(b.by) +
+          '</td><td class="num">' + money(b.total) + "</td><td>" + st + "</td></tr>";
+      }).join("") + "</tbody></table></div>" + (BILLS.more ? '<p class="muted">…and ' + BILLS.more + " more.</p>" : "") +
+      (act ? '<p class="form-error" id="blErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="blApprove">Approve ticked bills</button></div>' : "");
+    return html;
+  }
+
+  /* ---------- setup: ledgers and product ↔ Tally item ---------- */
+  function setupHtml(act) {
+    if (!SETUP) return "";
+    var S = SETUP.settings, missingItems = SETUP.products.filter(function (p) { return !p.tally; });
+    var needsLedgers = !S.sales || !S.cgst || !S.sgst || !S.round;
+    var open = needsLedgers || missingItems.length;
+    var opt = function (cur, list, blank) {
+      return '<option value="">' + (blank || "(choose)") + "</option>" + list.map(function (n) { return '<option' + (n === cur ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("");
+    };
+    var ledNames = SETUP.ledgers.map(function (l) { return l.name; });
+    var stdMissing = SETUP.std.filter(function (x) { return !x.exists && !x.coming; });
+    var row = function (key, label) {
+      return '<label class="field" style="margin:0"><span>' + label + (SETUP.guessed[key] ? ' <small class="muted">(suggested)</small>' : "") + '</span><select data-led="' + key + '"' + (act ? "" : " disabled") + ">" + opt(S[key], ledNames) + "</select></label>";
+    };
+    var html = '<details class="panel" style="margin:22px 0 0"' + (open ? " open" : "") + '><summary style="cursor:pointer"><b>Tally setup for bills</b> <span class="muted">· ' +
+      (open ? (needsLedgers ? "ledgers to choose" : "") + (needsLedgers && missingItems.length ? ", " : "") + (missingItems.length ? missingItems.length + " product" + (missingItems.length === 1 ? "" : "s") + " to match" : "") : "all set") +
+      "</span></summary>" +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0">' +
+      row("sales", "Sales ledger") + row("cgst", "CGST ledger") + row("sgst", "SGST ledger") + row("igst", "IGST ledger (other states)") + row("round", "Round off ledger") +
+      '<label class="field" style="margin:0"><span>Voucher type</span><input data-led="vtype" value="' + esc(S.vtype || "Sales") + '"' + (act ? "" : " disabled") + "></label></div>" +
+      (act && stdMissing.length ? '<p style="margin:0 0 12px"><button class="btn btn-line btn-small" type="button" id="suStd">Create ' + stdMissing.map(function (x) { return esc(x.name); }).join(", ") +
+        ' in Tally</button> <small class="muted">GST ledgers under Duties &amp; Taxes, round off under Indirect Expenses</small></p>' : "") +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th>Pack</th><th>Tally stock item</th>' + (act ? "<th>Create in Tally</th>" : "") + "</tr></thead><tbody>" +
+      SETUP.products.map(function (p) {
+        var items = SETUP.items.map(function (i) { return i.name; });
+        if (p.tally && items.indexOf(p.tally) === -1) items.push(p.tally);
+        return "<tr><td>" + esc(p.name) + "</td><td>" + esc(p.pack || p.uom) + '</td><td><select data-item="' + esc(p.sku) + '"' + (act ? "" : " disabled") + ">" + opt(p.tally, items, "(not matched)") + "</select>" +
+          (p.how && p.how !== "matched" ? ' <small class="muted">' + esc(p.how) + "</small>" : "") + "</td>" +
+          (act ? "<td>" + (p.tally ? "" : '<label><input type="checkbox" data-mk="' + esc(p.sku) + '"> as “' + esc(p.name) + "” (" + esc(p.uom || "Nos") + ")</label>") + "</td>" : "") + "</tr>";
+      }).join("") + "</tbody></table></div>" +
+      (act ? '<p class="form-error" id="suErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="suSave">Save setup</button>' +
+             (missingItems.length ? '<button class="btn btn-line btn-small" type="button" id="suMake">Create ticked items in Tally</button>' : "") + "</div>" : "") +
+      "</details>";
+    return html;
+  }
+
+  function bindBillsSetup(root) {
+    var all = root.querySelector("#blAll");
+    if (all) all.onchange = function () { var on = this.checked; root.querySelectorAll("[data-bill]:not(:disabled)").forEach(function (c) { c.checked = on; }); };
+    var ap = root.querySelector("#blApprove");
+    if (ap) ap.onclick = function () {
+      var ids = []; root.querySelectorAll("[data-bill]:checked").forEach(function (c) { ids.push(c.dataset.bill); });
+      var err = root.querySelector("#blErr");
+      if (!ids.length) { err.textContent = "Tick at least one bill."; return; }
+      ap.disabled = true; err.textContent = "";
+      obCall("tallySendBills", { uuids: ids }).then(function (r) {
+        if (r.skipped && r.skipped.length) window.alert("Not sent:\n" + r.skipped.join("\n"));
+        render(root, "totally");
+      }).catch(function (e) { err.textContent = e.message; ap.disabled = false; });
+    };
+    var err2 = root.querySelector("#suErr");
+    var save = root.querySelector("#suSave");
+    if (save) save.onclick = function () {
+      var settings = {}, items = {};
+      root.querySelectorAll("[data-led]").forEach(function (el) { settings[el.dataset.led] = el.value; });
+      root.querySelectorAll("[data-item]").forEach(function (el) { items[el.dataset.item] = el.value; });
+      save.disabled = true; err2.textContent = "";
+      obCall("tallySaveSetup", { settings: settings, items: items }).then(function () { render(root, "totally"); })
+        .catch(function (e) { err2.textContent = e.message; save.disabled = false; });
+    };
+    var make = root.querySelector("#suMake");
+    if (make) make.onclick = function () {
+      var skus = []; root.querySelectorAll("[data-mk]:checked").forEach(function (c) { skus.push(c.dataset.mk); });
+      if (!skus.length) { err2.textContent = "Tick the products to create in Tally."; return; }
+      make.disabled = true; err2.textContent = "";
+      obCall("tallyCreateMasters", { skus: skus }).then(function () { render(root, "totally"); })
+        .catch(function (e) { err2.textContent = e.message; make.disabled = false; });
+    };
+    var std = root.querySelector("#suStd");
+    if (std) std.onclick = function () {
+      std.disabled = true;
+      obCall("tallyCreateMasters", { standardLedgers: true }).then(function () { render(root, "totally"); })
+        .catch(function (e) { err2.textContent = e.message; std.disabled = false; });
+    };
+  }
+
   function bindToTally(root) {
+    bindBillsSetup(root);
     var all = root.querySelector("#obAll");
     if (all) all.onchange = function () { var on = this.checked; root.querySelectorAll("[data-ob]").forEach(function (c) { c.checked = on; }); };
     var picked = function () { var ids = []; root.querySelectorAll("[data-ob]:checked").forEach(function (c) { ids.push(c.dataset.ob); }); return ids; };
