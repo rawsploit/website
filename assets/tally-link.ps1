@@ -25,7 +25,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.6'
+$Agent    = 'tally-link-ps 1.7'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -171,7 +171,7 @@ function Post-ToTally([string]$xml) {
 # what Tally answered to an import: counts and any line errors
 function Read-ImportResult([string]$text) {
   $get = { param($tag) $m = [regex]::Match($text, '<' + $tag + '>\s*(-?\d+)\s*</' + $tag + '>'); if ($m.Success) { [int]$m.Groups[1].Value } else { 0 } }
-  $errs = @([regex]::Matches($text, '<LINEERROR>(.*?)</LINEERROR>', 'Singleline') | ForEach-Object { $_.Groups[1].Value.Trim() } | Where-Object { $_ })
+  $errs = @([regex]::Matches($text, '<LINEERROR>(.*?)</LINEERROR>', 'Singleline') | ForEach-Object { [System.Net.WebUtility]::HtmlDecode($_.Groups[1].Value.Trim()) } | Where-Object { $_ })
   return @{ created = (& $get 'CREATED'); altered = (& $get 'ALTERED'); errors = (& $get 'ERRORS'); exceptions = (& $get 'EXCEPTIONS');
             message = ($errs -join '; ') }
 }
@@ -180,10 +180,12 @@ function Read-ImportResult([string]$text) {
 # a new stock item; $full = $false leaves out HSN/GST (used if Tally refuses them)
 function Item-Xml($p, [bool]$full) {
   $n = XmlEsc ([string]$p.name)
-  $x = '<STOCKITEM NAME="' + $n + '" ACTION="Create"><NAME.LIST TYPE="String"><NAME>' + $n + '</NAME></NAME.LIST>' +
-       '<PARENT>' + (XmlEsc $(if ($p.parent) { [string]$p.parent } else { 'Primary' })) + '</PARENT>' +
-       '<BASEUNITS>' + (XmlEsc $(if ($p.unit) { [string]$p.unit } else { 'Nos' })) + '</BASEUNITS>'
-  if ($full -and $p.hsn) { $x += '<GSTAPPLICABLE>&#4; Applicable</GSTAPPLICABLE><HSNCODE>' + (XmlEsc ([string]$p.hsn)) + '</HSNCODE>' }
+  # a top-level item has no group in Tally's XML ("Primary" is only how the screen shows it)
+  $grp = [string]$p.parent
+  $x = '<STOCKITEM NAME="' + $n + '" ACTION="Create"><NAME.LIST TYPE="String"><NAME>' + $n + '</NAME></NAME.LIST>'
+  if ($grp -and $grp -ne 'Primary') { $x += '<PARENT>' + (XmlEsc $grp) + '</PARENT>' }
+  $x += '<BASEUNITS>' + (XmlEsc $(if ($p.unit) { [string]$p.unit } else { 'Nos' })) + '</BASEUNITS>'
+  if ($full -and $p.hsn) { $x += '<HSNCODE>' + (XmlEsc ([string]$p.hsn)) + '</HSNCODE>' }
   return $x + '</STOCKITEM>'
 }
 
@@ -260,7 +262,7 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
   foreach ($l in $ledgers) { if ($l.name) { $have[([string]$l.name).Trim().ToLower()] = $true } }
   foreach ($i in $stock) { if ($i.name) { $haveItem[([string]$i.name).Trim().ToLower()] = $true } }
   foreach ($v in $vouchers) { if ($v.number) { $haveVch[([string]$v.type + '|' + [string]$v.number).ToLower()] = $true } }
-  $results = @(); $made = 0; $there = 0; $bad = 0
+  $results = @(); $made = 0; $there = 0; $bad = 0; $held = 0; $failedNames = @{}
   foreach ($it in $items) {
     $r = @{ id = $it.id; status = 'failed'; message = '' }
     try {
@@ -273,11 +275,15 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
             if ($ans.created -ge 1) { $ans.message = 'Created in Tally without HSN/GST details (Tally said: ' + $first + '). Add them in Tally.' } }
           if ($ans.created -ge 1) { $r.status = 'posted'; $r.message = $(if ($ans.message) { $ans.message } else { 'Created in Tally' }); $made++; $haveItem[$key] = $true }
           elseif ($ans.message -match 'already exists|duplicate') { $r.status = 'exists'; $r.message = 'Already in Tally'; $there++ }
-          else { $r.message = $(if ($ans.message) { 'Tally said: ' + $ans.message } else { "Tally didn't accept it (no reason given)." }); $bad++ }
+          else { $r.message = $(if ($ans.message) { 'Tally said: ' + $ans.message } else { "Tally didn't accept it (no reason given)." }); $bad++; $failedNames[$key] = $true }
         }
         $results += $r; continue
       }
       if ($it.kind -eq 'sales') {
+        $blocked = @()
+        foreach ($n in @($it.payload.needs.items)) { if ($n -and $failedNames.ContainsKey(([string]$n).Trim().ToLower())) { $blocked += [string]$n } }
+        foreach ($n in @($it.payload.needs.ledgers) + @($it.payload.party)) { if ($n -and $failedNames.ContainsKey(([string]$n).Trim().ToLower())) { $blocked += [string]$n } }
+        if ($blocked.Count) { $r.status = 'held'; $r.message = 'Waiting for ' + (($blocked | Select-Object -Unique) -join ', ') + " (couldn't be created in Tally)"; $held++; $results += $r; continue }
         $key = ([string]$it.payload.vtype + '|' + [string]$it.payload.number).ToLower()
         if ($haveVch.ContainsKey($key)) { $r.status = 'exists'; $r.message = 'A ' + $it.payload.vtype + ' voucher with this number is already in Tally'; $there++ }
         else {
@@ -301,13 +307,13 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
           $r.status = 'posted'; if (-not $ans.message) { $ans.message = 'Created in Tally' }; $r.message = $ans.message; $made++
           $have[([string]$it.payload.name).Trim().ToLower()] = $true
         } elseif ($ans.message -match 'already exists|duplicate') { $r.status = 'exists'; $r.message = 'Already in Tally'; $there++ }
-        else { $r.message = $(if ($ans.message) { 'Tally said: ' + $ans.message } else { "Tally didn't accept it (no reason given)." }); $bad++ }
+        else { $r.message = $(if ($ans.message) { 'Tally said: ' + $ans.message } else { "Tally didn't accept it (no reason given)." }); $bad++; $failedNames[([string]$it.payload.name).Trim().ToLower()] = $true }
       }
     } catch { $r.message = 'Problem posting: ' + $_.Exception.Message; $bad++ }
     $results += $r
   }
   $back = Send-ToCentraPlant @{ action = 'tallyOutboxResult'; key = $LinkKey; results = $results }
-  Write-Log ('Posted to Tally: ' + $made + ' created, ' + $there + ' already there, ' + $bad + ' failed.')
+  Write-Log ('Posted to Tally: ' + $made + ' created, ' + $there + ' already there, ' + $bad + ' failed' + $(if ($held) { ', ' + $held + ' waiting' } else { '' }) + '.')
   if (-not $back.ok) { Write-Log ('CentraPlant said: ' + $back.message) }
   return $made
 }
