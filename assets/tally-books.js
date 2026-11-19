@@ -308,9 +308,9 @@
       SETUP.products.map(function (p) {
         var items = SETUP.items.map(function (i) { return i.name; });
         if (p.tally && items.indexOf(p.tally) === -1) items.push(p.tally);
-        return "<tr><td>" + esc(p.name) + "</td><td>" + esc(p.pack || p.uom) + '</td><td><select data-item="' + esc(p.sku) + '"' + (act ? "" : " disabled") + ">" + opt(p.tally, items, "(not matched)") + "</select>" +
+        return "<tr><td>" + esc(p.name) + (p.notInList ? ' <small class="muted">(on recent bills, not in the product list)</small>' : "") + "</td><td>" + esc(p.pack || p.uom) + '</td><td><select data-item="' + esc(p.sku) + '"' + (act ? "" : " disabled") + ">" + opt(p.tally, items, "(not matched)") + "</select>" +
           (p.how && p.how !== "matched" ? ' <small class="muted">' + esc(p.how) + "</small>" : "") + "</td>" +
-          (act ? "<td>" + (p.tally ? "" : '<label><input type="checkbox" data-mk="' + esc(p.sku) + '"> as “' + esc(p.name) + "” (" + esc(p.uom || "Nos") + ")</label>") + "</td>" : "") + "</tr>";
+          (act ? "<td>" + (p.tally ? "" : '<label><input type="checkbox" data-mk="' + esc(p.sku) + '"> as “' + esc(p.tallyName || p.name) + "” (Nos)</label>") + "</td>" : "") + "</tr>";
       }).join("") + "</tbody></table></div>" +
       (act ? '<p class="form-error" id="suErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="suSave">Save setup</button>' +
              (missingItems.length ? '<button class="btn btn-line btn-small" type="button" id="suMake">Create ticked items in Tally</button>' : "") + "</div>" : "") +
