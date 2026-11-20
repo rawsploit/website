@@ -246,7 +246,7 @@
         pend.map(function (x) {
           return "<tr>" + (act ? '<td><input type="checkbox" data-ob="' + esc(x.id) + '" checked></td>' : "") +
             "<td><b>New ledger:</b> " + esc(x.name) + (x.result ? '<br><span class="status soon" style="white-space:normal;display:inline-block;margin-top:4px">' + esc(x.result.replace(/^Check:\s*/, "Check: ")) + "</span>" : "") +
-            "</td><td><small>" + detail(x) + "</small></td><td><small>" + esc(x.created_by) + "<br>" + esc(when(x.created)) + "</small></td></tr>";
+            "</td><td><small>" + detail(x) + "</small></td><td><small>" + (x.created_by === "auto" ? "Needed by a bill (shop not in Tally)" : esc(x.created_by)) + "<br>" + esc(when(x.created)) + "</small></td></tr>";
         }).join("") + "</tbody></table></div>" +
         (act ? '<p class="form-error" id="obErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="obApprove">Approve ticked</button>' +
                '<button class="btn btn-line btn-small" type="button" id="obReject">Reject ticked…</button></div>' : "");
@@ -282,28 +282,34 @@
     var list = BILLS.bills;
     var html = '<h3 style="margin:22px 0 8px">Sales bills not in Tally' + (list.length ? " (" + list.length + ")" : "") + '</h3>';
     if (!list.length) return html + '<p class="muted">Every bill since ' + esc(disp(BILLS.from)) + ' is in Tally or on its way.</p>';
-    var ready = list.filter(function (b) { return !b.problems.length; }).length;
-    html += '<p class="muted" style="margin:0 0 8px">Approved bills go in as <b>' + esc((SETUP && SETUP.settings.vtype) || "Sales") + "</b> vouchers with their items and GST. " +
-      "A bill whose shop, items or ledgers aren't in Tally yet waits and goes in right after them.</p>";
-    html += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + (act ? '<th><input type="checkbox" id="blAll"' + (ready ? " checked" : "") + ' aria-label="Tick all"></th>' : "") +
+    var auto = BILLS.auto || {};
+    var manual = function (b) { return b.goes !== "auto"; };
+    var ready = list.filter(function (b) { return !b.problems.length && manual(b); }).length;
+    var vt = esc((SETUP && SETUP.settings.vtype) || "Sales");
+    html += '<p class="muted" style="margin:0 0 8px">' + (auto.on
+      ? "Bills dated from <b>" + esc(disp(auto.from)) + "</b> go into Tally <b>automatically</b> as " + vt + " vouchers on the next Tally Link run. " +
+        "Only a <b>new shop</b> needs your approval; its bills follow once you approve it. Check the money side in Trade Recon."
+      : "Approved bills go in as <b>" + vt + "</b> vouchers with their items and GST. A bill whose shop, items or ledgers aren't in Tally yet waits and goes in right after them.") + "</p>";
+    html += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' + (act && ready ? '<th><input type="checkbox" id="blAll" checked aria-label="Tick all"></th>' : act ? "<th></th>" : "") +
       '<th>Date</th><th>Bill</th><th>Shop</th><th>By</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>' +
       list.map(function (b) {
         var bad = b.problems.length;
         var st = bad ? '<span class="status" style="background:#FDECEA;color:#9B1C1C">Fix setup first</span><br><small>' + esc(b.problems.join("; ")) + "</small>"
           : b.waiting.length ? '<span class="status soon">Will wait for</span><br><small>' + esc(b.waiting.join(", ")) + "</small>"
-          : '<span class="status live">Ready</span>';
-        return "<tr>" + (act ? '<td><input type="checkbox" data-bill="' + esc(b.uuid) + '"' + (bad ? " disabled" : " checked") + "></td>" : "") +
+          : manual(b) ? '<span class="status live">Ready</span>' + (auto.on ? '<br><small>Before the automatic start date: approve it by hand</small>' : "")
+          : '<span class="status live">Goes automatically</span>';
+        return "<tr>" + (act ? "<td>" + (manual(b) ? '<input type="checkbox" data-bill="' + esc(b.uuid) + '"' + (bad ? " disabled" : " checked") + ">" : "") + "</td>" : "") +
           "<td>" + esc(disp(b.date)) + "</td><td>" + esc(b.bill_no) + "</td><td>" + esc(b.shop) + "</td><td>" + esc(b.by) +
           '</td><td class="num">' + money(b.total) + "</td><td>" + st + "</td></tr>";
       }).join("") + "</tbody></table></div>" + (BILLS.more ? '<p class="muted">…and ' + BILLS.more + " more.</p>" : "") +
-      (act ? '<p class="form-error" id="blErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="blApprove">Approve ticked bills</button></div>' : "");
+      (act && list.some(manual) ? '<p class="form-error" id="blErr"></p><div class="row-btns"><button class="btn btn-ink btn-small" type="button" id="blApprove">Approve ticked bills</button></div>' : "");
     return html;
   }
 
   /* ---------- setup: ledgers and product ↔ Tally item ---------- */
   function setupHtml(act) {
     if (!SETUP) return "";
-    var S = SETUP.settings, missingItems = SETUP.products.filter(function (p) { return !p.tally; });
+    var S = SETUP.settings, A = SETUP.auto || {}, missingItems = SETUP.products.filter(function (p) { return !p.tally; });
     var needsLedgers = !S.sales || !S.cgst || !S.sgst || !S.round;
     var open = needsLedgers || missingItems.length;
     var opt = function (cur, list, blank) {
@@ -320,6 +326,10 @@
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0">' +
       row("sales", "Sales ledger") + row("cgst", "CGST ledger") + row("sgst", "SGST ledger") + row("igst", "IGST ledger (other states)") + row("round", "Round off ledger") +
       '<label class="field" style="margin:0"><span>Voucher type</span><input data-led="vtype" value="' + esc(S.vtype || "Sales") + '"' + (act ? "" : " disabled") + "></label></div>" +
+      '<div style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:0 0 12px">' +
+        '<label><input type="checkbox" id="suAuto"' + (A.on ? " checked" : "") + (act ? "" : " disabled") + "> Send bills to Tally <b>automatically</b> (only new shops need approval)</label>" +
+        '<label class="muted">from <input type="date" id="suFrom" value="' + esc(A.from || "") + '"' + (act ? "" : " disabled") + "></label>" +
+        '<small class="muted">Bills dated before this need approving by hand, so bills already typed into Tally aren\'t sent twice.</small></div>' +
       (act && stdMissing.length ? '<p style="margin:0 0 12px"><button class="btn btn-line btn-small" type="button" id="suStd">Create ' + stdMissing.map(function (x) { return esc(x.name); }).join(", ") +
         ' in Tally</button> <small class="muted">GST ledgers under Duties &amp; Taxes, round off under Indirect Expenses</small></p>' : "") +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th>Pack</th><th>Tally stock item</th>' + (act ? "<th>Create in Tally</th>" : "") + "</tr></thead><tbody>" +
@@ -357,7 +367,9 @@
       root.querySelectorAll("[data-led]").forEach(function (el) { settings[el.dataset.led] = el.value; });
       root.querySelectorAll("[data-item]").forEach(function (el) { items[el.dataset.item] = el.value; });
       save.disabled = true; err2.textContent = "";
-      obCall("tallySaveSetup", { settings: settings, items: items }).then(function () { render(root, "totally"); })
+      var au = root.querySelector("#suAuto"), fr = root.querySelector("#suFrom");
+      var auto = au ? { on: au.checked, from: fr ? fr.value : "" } : undefined;
+      obCall("tallySaveSetup", { settings: settings, items: items, auto: auto }).then(function () { render(root, "totally"); })
         .catch(function (e) { err2.textContent = e.message; save.disabled = false; });
     };
     var make = root.querySelector("#suMake");
