@@ -112,7 +112,9 @@
   /* ---------- talking to the office ---------- */
   function call(action, payload) {
     if (Suite.isDemo()) return Promise.resolve(demo(action, payload || {}));
-    return Suite.api(action, Object.assign({ token: st.who.token }, payload || {})).then(function (res) {
+    // sending bills is safe to repeat (the office ignores ones it already has), so don't wait forever
+    var opts = action === "salesSync" ? { timeout: 60000 } : undefined;
+    return Suite.api(action, Object.assign({ token: st.who.token }, payload || {}), opts).then(function (res) {
       if (!res.ok) {
         var e = new Error(res.message || "That didn't work.");
         if (/session has ended|sign in again/i.test(res.message || "")) e.session = true;
@@ -165,6 +167,7 @@
       if (manual) flash(res.failed && res.failed.length ? res.failed.length + " entr" + (res.failed.length === 1 ? "y" : "ies") + " couldn't be saved. Open Day summary to see why." : "All sent to the office.", res.failed && res.failed.length ? "err" : "ok");
     }).catch(function (e) {
       if (e.session) { st.needLogin = true; save(); if (manual) askLogin(); }
+      else if (e.timeout) flash("The office is slow to answer right now. Your bills are safe on the phone and will be sent again automatically.", "warn");
       else if (manual) flash((e.message || "Couldn't reach the office.") + " Your bills are safe on the phone.", "warn");
     }).then(function () { syncing = false; status(); refreshIfList(); });
   }

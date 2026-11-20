@@ -42,14 +42,24 @@
 
   /* ---------- backend call (client core Apps Script) ----------
      text/plain avoids a CORS preflight, which Apps Script can't answer. */
-  function api(action, payload) {
+  /* opts.timeout (ms): give up waiting after that long. The server may still finish the request,
+     so only use it for actions that are safe to send twice. */
+  function api(action, payload, opts) {
+    var ctl = opts && opts.timeout && typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, opts.timeout) : null;
     return fetch(client().api, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+      signal: ctl ? ctl.signal : undefined
     }).then(function (r) {
+      if (timer) clearTimeout(timer);
       if (!r.ok) throw new Error("The server didn't respond (" + r.status + "). Try again in a minute.");
       return r.json();
+    }, function (e) {
+      if (timer) clearTimeout(timer);
+      if (e && e.name === "AbortError") { var t = new Error("The office is taking too long to answer."); t.timeout = true; throw t; }
+      throw e;
     });
   }
 
