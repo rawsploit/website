@@ -43,24 +43,62 @@
   function nowTime() { return new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); }
 
   /* Same as salesLineCalc_ on the server. */
-  function lineCalc(rate, qty, gst, inclusive, inter) {
+  function lineCalc(rate, qty, gst, inclusive, inter, disc) {
     rate = Number(rate) || 0; qty = Number(qty) || 0; gst = Number(gst) || 0;
-    var gross = rate * qty;
+    disc = Math.min(100, Math.max(0, Number(disc) || 0));
+    var gross = rate * qty * (1 - disc / 100);
     var taxable = r2(inclusive ? gross / (1 + gst / 100) : gross);
     var half = r2(taxable * gst / 200), igst = r2(taxable * gst / 100);
     return { taxable: taxable, cgst: inter ? 0 : half, sgst: inter ? 0 : half, igst: inter ? igst : 0, total: r2(taxable + (inter ? igst : half * 2)) };
   }
-  function billTotals(shop, lines) {
+  /* a shop return gives back exactly what the shop paid; the tax is worked out of that */
+  function retCalc(rate, qty, gst, inclusive, inter) {
+    if (!inclusive) return lineCalc(rate, qty, gst, inclusive, inter, 0);
+    var tot = r2((Number(rate) || 0) * (Number(qty) || 0)), tax = r2(tot - tot / (1 + (Number(gst) || 0) / 100)), half = r2(tax / 2);
+    return { taxable: r2(tot - tax), cgst: inter ? 0 : half, sgst: inter ? 0 : r2(tax - half), igst: inter ? tax : 0, total: tot };
+  }
+  /* items sold - shop returns - shop credit used = total; returns bigger than the purchase leave credit on the shop's account */
+  function billTotals(shop, lines, creditUse) {
     var inter = !!(gstState(shop.gstin) && gstState(st.boot.company.gstin) && gstState(shop.gstin) !== gstState(st.boot.company.gstin));
-    var t = { taxable: 0, cgst: 0, sgst: 0, igst: 0, sum: 0, inter: inter };
+    var t = { taxable: 0, cgst: 0, sgst: 0, igst: 0, sales: 0, returns: 0, inter: inter };
     lines.forEach(function (l) {
-      var m = lineCalc(l.rate, l.qty, l.gst, st.boot.inclusive, inter);
+      var m = l.ret ? retCalc(l.rate, l.qty, l.gst, st.boot.inclusive, inter) : lineCalc(l.rate, l.qty, l.gst, st.boot.inclusive, inter, l.disc);
       l.taxable = m.taxable; l.cgst = m.cgst; l.sgst = m.sgst; l.igst = m.igst; l.total = m.total;
-      t.taxable += m.taxable; t.cgst += m.cgst; t.sgst += m.sgst; t.igst += m.igst; t.sum += m.total;
+      var g = l.ret ? -1 : 1;
+      t.taxable += g * m.taxable; t.cgst += g * m.cgst; t.sgst += g * m.sgst; t.igst += g * m.igst;
+      if (l.ret) t.returns += m.total; else t.sales += m.total;
     });
-    t.sum = r2(t.sum); t.total = Math.round(t.sum); t.round = r2(t.total - t.sum);
+    t.sales = r2(t.sales); t.returns = r2(t.returns);
+    var due = r2(t.sales - t.returns);
+    t.creditUsed = 0; t.creditLeft = 0;
+    if (due > 0 && creditUse > 0) { t.creditUsed = r2(Math.min(creditUse, due)); due = r2(due - t.creditUsed); }
+    if (due < 0) { t.creditLeft = Math.round(-due); t.total = 0; t.round = r2(-t.creditLeft - due); }
+    else { t.total = Math.round(due); t.round = r2(t.total - due); }
+    t.sum = due;
     t.taxable = r2(t.taxable); t.cgst = r2(t.cgst); t.sgst = r2(t.sgst); t.igst = r2(t.igst);
     return t;
+  }
+  /* the shop's standing discount for an item: its pack, else the product, else "all" */
+  function ruleDisc(shop, p) {
+    var r = shop && shop.discounts; if (!r || !p) return 0;
+    var sku = String(p.sku).toUpperCase(), nm = String(p.name).toLowerCase().replace(/\s+/g, " ");
+    if (r.skus && Object.prototype.hasOwnProperty.call(r.skus, sku)) return Number(r.skus[sku]) || 0;
+    if (r.names && Object.prototype.hasOwnProperty.call(r.names, nm)) return Number(r.names[nm]) || 0;
+    return Number(r.all) || 0;
+  }
+  /* a return is credited at what the shop last paid (the office checks it again) */
+  function retRate(shop, p) {
+    var lr = (st.boot.lastRates || {})[shop.shop_id + "|" + p.sku];
+    return lr ? { rate: lr.rate, from: "last bill " + lr.bill_no } : { rate: r2(p.price * (1 - ruleDisc(shop, p) / 100)), from: "price list" };
+  }
+  /* the shop's credit: the office's figure at start of day, plus what this phone added or used since */
+  function shopCredit(shop) {
+    var c = Number((st.boot.credits || {})[shop.shop_id]) || 0;
+    st.entries.forEach(function (e) {
+      // not yet in the office's figure: made after the download, or not sent yet
+      if (e.shop_id === shop.shop_id && e.kind === "BILL" && ((e.saved_at || 0) > (st.bootAt || 0) || e.state !== "sent")) c += (Number(e.credit_left) || 0) - (Number(e.credit_used) || 0);
+    });
+    return Math.max(0, r2(c));
   }
 
   function shopById(id) { return (st.boot.shops || []).filter(function (s) { return s.shop_id === id; })[0]; }
@@ -137,13 +175,15 @@
     var bills = batch.filter(function (e) { return e.kind !== "SKIP"; }).map(function (e) {
       return { uuid: e.uuid, bill_no: e.bill_no, kind: e.kind, bill_date: e.date, created_at: e.created_at, shop_id: e.shop_id,
                shop_name: e.shop_name, pay_mode: e.pay_mode, paid: e.paid, note: e.note,
-               lines: (e.lines || []).map(function (l) { return { sku: l.sku, qty: l.qty, free_qty: l.free_qty, rate: l.rate, gst: l.gst }; }) };
+               credit_use: e.kind === "BILL" ? Number(e.credit_used) || 0 : undefined,
+               lines: (e.lines || []).map(function (l) { return { sku: l.sku, qty: l.qty, free_qty: l.free_qty, rate: l.rate, gst: l.gst, disc: l.disc, ret: l.ret ? "Y" : "" }; }) };
     });
     var skips = batch.filter(function (e) { return e.kind === "SKIP"; }).map(function (e) {
       return { uuid: e.uuid, skip_date: e.date, created_at: e.created_at, shop_id: e.shop_id, reason: e.reason };
     });
     var newShops = shopsOut.map(function (n) { return { uuid: n.uuid, name: n.shop.name, route_id: n.shop.route_id, address: n.shop.address, phone: n.shop.phone, gstin: n.shop.gstin }; });
     return call("salesSync", { bills: bills, skips: skips, newShops: newShops }).then(function (res) {
+      if (res.company && st.boot) st.boot.company = res.company;      // office changes (UPI ID, QR, address) arrive with each send
       // new shops: swap the phone's temporary id for the office's real one everywhere
       var ids = res.shopIds || {}, shopBad = {};
       (res.shopFailed || []).forEach(function (f) { shopBad[f.uuid] = f; });
@@ -315,8 +355,9 @@
       '<button class="btn btn-line" type="button" id="renameShop">Change the name and send again</button></div></div>' : "";
     $("main").innerHTML = '<div id="flash"></div>' + fix + '<div class="card"><h2>' + esc(s.name) + '</h2><p class="muted" style="margin:0">' +
       [s.address, s.phone, s.gstin ? "GSTIN " + s.gstin : "", s.credit ? "Credit allowed" : "Cash only"].filter(Boolean).map(esc).join(" · ") + "</p></div>" +
-      '<div class="acts"><button class="main" type="button" data-act="BILL">New bill</button><button type="button" data-act="RETURN">Return</button>' +
-      '<button type="button" data-act="COLLECTION">Collection</button><button type="button" data-act="SKIP" style="grid-column:1/-1">Not billed today (skip)</button></div>' +
+      (shopCredit(s) ? '<div class="msg ok" style="margin-top:10px">Shop credit ' + money(shopCredit(s)) + ': it comes off the next bill.</div>' : "") +
+      '<div class="acts"><button class="main" type="button" data-act="BILL">New bill / returns</button>' +
+      '<button type="button" data-act="COLLECTION">Collection</button><button type="button" data-act="SKIP">Not billed today (skip)</button></div>' +
       (es.length ? '<div class="card" style="margin-top:12px"><h2 style="font-size:16px">Today at this shop</h2>' + es.map(entryLine).join("") + "</div>" : "");
     paintFlash($("flash"));
     $("main").querySelector(".acts").onclick = function (e) {
@@ -414,65 +455,101 @@
     });
   }
 
-  /* New bill or return. */
+  /* New bill: items sold (with the shop's discount, any % allowed; 100% = free) and shop returns
+     (credited at what the shop last paid). Returns and the shop's credit come off the bill. */
   function viewBill(id, kind) {
     var s = shopById(id);
-    var isRet = kind === "RETURN";
-    header(isRet ? "Return · " + s.name : "Bill · " + s.name, isRet ? "Items taken back" : "Tap + to add items");
-    var cart = {};          // sku -> { qty, free }
-    var modes = st.boot.payModes[kind].filter(function (m) { return m !== "Credit" || s.credit; });
+    kind = "BILL";
+    header("Bill · " + s.name, "Tap + to add items");
+    var cart = {};          // sold: sku -> { qty, disc }
+    var rcart = {};         // shop returns: sku -> { qty }
+    var tab = "sold";
+    var credit = shopCredit(s), useCredit = credit > 0;
+    var modes = st.boot.payModes.BILL.filter(function (m) { return m !== "Credit" || s.credit; });
     var pay = modes[0];
-    $("main").innerHTML = '<div id="flash"></div><input class="search" id="q" type="search" placeholder="Search item" aria-label="Search item"><div class="card" id="items" style="padding-top:4px;padding-bottom:4px"></div>' +
-      '<div class="card"><h2 style="font-size:16px">' + (isRet ? "Refund" : "Payment") + '</h2><div class="chips" id="pay">' +
+    $("main").innerHTML = '<div id="flash"></div>' +
+      '<div class="chips" id="tabs" style="margin-bottom:10px"><button type="button" data-t="sold" aria-pressed="true">Items sold</button>' +
+      '<button type="button" data-t="ret" aria-pressed="false">Shop returns <span id="retN"></span></button></div>' +
+      '<p class="muted" id="tabHint" style="margin:0 0 8px;font-size:13px"></p>' +
+      '<input class="search" id="q" type="search" placeholder="Search item" aria-label="Search item"><div class="card" id="items" style="padding-top:4px;padding-bottom:4px"></div>' +
+      (credit ? '<div class="card"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="useCr" checked> Use the shop\'s credit of <b>' + money(credit) + "</b></label></div>" : "") +
+      '<div class="card"><h2 style="font-size:16px">Payment</h2><div class="chips" id="pay">' +
       modes.map(function (m) { return '<button type="button" data-m="' + esc(m) + '" aria-pressed="' + (m === pay) + '">' + esc(m) + "</button>"; }).join("") + "</div>" +
       '<label class="field" id="paidBox" hidden><span>Paid now (rest on credit)</span><input id="paid" type="number" inputmode="decimal" min="0" step="0.01" value="0"></label>' +
-      '<label class="field" style="margin-bottom:0"><span>Note (optional)</span><input id="note" maxlength="300" placeholder="' + (isRet ? "Reason: damaged, expired…" : "Anything the office should know") + '"></label></div>';
+      '<label class="field" style="margin-bottom:0"><span>Note (optional)</span><input id="note" maxlength="300" placeholder="Anything the office should know, e.g. returns damaged or expired"></label></div>';
     paintFlash($("flash"));
     function paintItems() {
-      var q = $("q").value.trim().toLowerCase();
+      var q = $("q").value.trim().toLowerCase(), ret = tab === "ret", box = ret ? rcart : cart;
+      $("tabHint").textContent = ret ? "Items the shop gives back. They're credited at what this shop last paid, and the credit comes off this bill."
+                                     : "The shop's discount fills in by itself. Change it if the owner agreed a different one; 100% = free.";
       var list = st.boot.products.filter(function (p) { return !q || (p.name + " " + p.pack + " " + p.sku).toLowerCase().indexOf(q) !== -1; });
-      list.sort(function (a, b) { return (cart[b.sku] ? 1 : 0) - (cart[a.sku] ? 1 : 0); });
+      list.sort(function (a, b) { return (box[b.sku] ? 1 : 0) - (box[a.sku] ? 1 : 0); });
       $("items").innerHTML = list.length ? list.map(function (p) {
-        var c = cart[p.sku] || { qty: 0, free: 0 };
-        return '<div class="item"><div class="nm"><b>' + esc(p.name) + "</b><span>" + esc(p.pack) + " · " + money(p.price) + "</span>" +
-          (c.qty && !isRet ? '<label class="free">Free <input type="number" inputmode="numeric" min="0" data-free="' + esc(p.sku) + '" value="' + (c.free || 0) + '"></label>' : "") +
+        var c = box[p.sku] || { qty: 0 }, rule = ruleDisc(s, p), rr = ret ? retRate(s, p) : null;
+        var sub = ret ? "credit " + money(rr.rate) + ' <small>(' + esc(rr.from) + ")</small>"
+                      : money(p.price) + (rule ? " · shop discount " + rule + "%" : "");
+        return '<div class="item"><div class="nm"><b>' + esc(p.name) + "</b><span>" + esc(p.pack) + " · " + sub + "</span>" +
+          (c.qty && !ret ? '<label class="free">Discount <input type="number" inputmode="decimal" min="0" max="100" step="0.5" data-disc="' + esc(p.sku) + '" value="' + c.disc + '"> %' +
+            (Number(c.disc) === 100 ? " <b>free</b>" : Number(c.disc) > rule ? " <span style=\"color:#b45309\">above the shop's " + rule + "%</span>" : "") + "</label>" : "") +
           '</div><span class="qstep"><button type="button" data-dec="' + esc(p.sku) + '" aria-label="One less">−</button><input type="number" inputmode="numeric" min="0" data-qty="' +
           esc(p.sku) + '" value="' + (c.qty || 0) + '" aria-label="Quantity"><button type="button" data-inc="' + esc(p.sku) + '" aria-label="One more">+</button></span></div>';
       }).join("") : '<p class="muted" style="padding:10px 0">No item matches.</p>';
+      var rn = Object.keys(rcart).reduce(function (n, k) { return n + rcart[k].qty; }, 0);
+      $("retN").textContent = rn ? "(" + rn + ")" : "";
     }
     function lines() {
-      return Object.keys(cart).filter(function (k) { return cart[k].qty > 0 || cart[k].free > 0; }).map(function (k) {
+      var sold = Object.keys(cart).filter(function (k) { return cart[k].qty > 0; }).map(function (k) {
         var p = productBySku(k);
-        return { sku: k, product: p.name, pack: p.pack, hsn: p.hsn, qty: cart[k].qty, free_qty: isRet ? 0 : (cart[k].free || 0), rate: p.price, gst: p.gst };
+        return { sku: k, product: p.name, pack: p.pack, hsn: p.hsn, qty: cart[k].qty, free_qty: 0, rate: p.price, gst: p.gst,
+                 disc: Math.min(100, Math.max(0, Number(cart[k].disc) || 0)), disc_rule: ruleDisc(s, p) };
       });
+      var back = Object.keys(rcart).filter(function (k) { return rcart[k].qty > 0; }).map(function (k) {
+        var p = productBySku(k), rr = retRate(s, p);
+        return { sku: k, product: p.name, pack: p.pack, hsn: p.hsn, qty: rcart[k].qty, free_qty: 0, rate: rr.rate, gst: p.gst, ret: true, rate_from: rr.from };
+      });
+      return sold.concat(back);
     }
+    function totals() { return billTotals(s, lines(), useCredit ? credit : 0); }
     function paintBar() {
-      var ls = lines(), t = billTotals(s, ls);
-      var n = ls.reduce(function (a, l) { return a + l.qty; }, 0);
+      var ls = lines(), t = totals();
+      var n = ls.filter(function (l) { return !l.ret; }).reduce(function (a, l) { return a + l.qty; }, 0);
+      var bits = [n + " item" + (n === 1 ? "" : "s")];
+      if (t.returns) bits.push("returns −" + money(t.returns));
+      if (t.creditUsed) bits.push("credit −" + money(t.creditUsed));
+      if (t.creditLeft) bits.push(money(t.creditLeft) + " to shop credit");
       $("bar").hidden = false;
-      $("barIn").innerHTML = '<div class="tot"><b>' + money(t.total) + "</b><span>" + n + " item" + (n === 1 ? "" : "s") + " · tax " + money(r2(t.cgst + t.sgst + t.igst)) +
-        '</span></div><button class="btn btn-ink" id="saveBill" type="button"' + (ls.length ? "" : " disabled") + ">Save " + (isRet ? "return" : "bill") + "</button>";
+      $("barIn").innerHTML = '<div class="tot"><b>' + money(t.total) + "</b><span>" + bits.join(" · ") +
+        '</span></div><button class="btn btn-ink" id="saveBill" type="button"' + (ls.length ? "" : " disabled") + ">Save bill</button>";
       $("saveBill").onclick = saveIt;
     }
     function setQty(sku, q) {
       q = Math.max(0, Math.min(100000, Math.floor(Number(q) || 0)));
-      if (!cart[sku]) cart[sku] = { qty: 0, free: 0 };
-      cart[sku].qty = q;
-      if (!q && !cart[sku].free) delete cart[sku];
+      var box = tab === "ret" ? rcart : cart;
+      if (!box[sku]) box[sku] = tab === "ret" ? { qty: 0 } : { qty: 0, disc: ruleDisc(s, productBySku(sku)) };
+      box[sku].qty = q;
+      if (!q) delete box[sku];
     }
+    $("tabs").onclick = function (e) {
+      var b = e.target.closest("[data-t]"); if (!b) return;
+      tab = b.dataset.t;
+      $("tabs").querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", x === b); });
+      paintItems();
+    };
     $("items").onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return;
       var sku = b.dataset.inc || b.dataset.dec; if (!sku) return;
-      setQty(sku, ((cart[sku] && cart[sku].qty) || 0) + (b.dataset.inc ? 1 : -1));
+      var box = tab === "ret" ? rcart : cart;
+      setQty(sku, ((box[sku] && box[sku].qty) || 0) + (b.dataset.inc ? 1 : -1));
       paintItems(); paintBar();
     };
     $("items").onchange = function (e) {
       var i = e.target;
       if (i.dataset.qty) setQty(i.dataset.qty, i.value);
-      if (i.dataset.free && cart[i.dataset.free]) cart[i.dataset.free].free = Math.max(0, Math.min(100000, Math.floor(Number(i.value) || 0)));
+      if (i.dataset.disc && cart[i.dataset.disc]) cart[i.dataset.disc].disc = Math.min(100, Math.max(0, Math.round((Number(i.value) || 0) * 100) / 100));
       paintItems(); paintBar();
     };
     $("q").oninput = paintItems;
+    if ($("useCr")) $("useCr").onchange = function () { useCredit = this.checked; paintBar(); };
     $("pay").onclick = function (e) {
       var b = e.target.closest("[data-m]"); if (!b) return;
       pay = b.dataset.m;
@@ -482,12 +559,13 @@
     function saveIt() {
       var ls = lines();
       if (!ls.length) return;
-      var t = billTotals(s, ls);
-      var paid = kind === "BILL" ? (pay === "Credit" ? Math.min(Math.max(Number($("paid").value) || 0, 0), t.total) : t.total) : (pay === "Cash refund" ? t.total : 0);
+      var t = billTotals(s, ls, useCredit ? credit : 0);
+      var paid = pay === "Credit" ? Math.min(Math.max(Number($("paid").value) || 0, 0), t.total) : t.total;
       var e = {
         uuid: uuid(), kind: kind, bill_no: nextNo(kind, s.route_id, st.day.date), date: st.day.date, time: nowTime(), created_at: new Date().toISOString(),
-        shop_id: s.shop_id, shop_name: s.name, shop_gstin: s.gstin, shop_phone: s.phone, route_id: s.route_id, pay_mode: pay, paid: r2(paid),
+        saved_at: Date.now(), shop_id: s.shop_id, shop_name: s.name, shop_gstin: s.gstin, shop_phone: s.phone, route_id: s.route_id, pay_mode: pay, paid: r2(paid),
         note: $("note").value.trim().slice(0, 300), lines: ls, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, round_off: t.round, total: t.total,
+        sales_value: t.sales, returns_value: t.returns, credit_used: t.creditUsed, credit_left: t.creditLeft,
         state: "wait"
       };
       st.entries.push(e);
@@ -561,7 +639,7 @@
   function rule(ch) { return new Array(W + 1).join(ch || "-"); }
 
   /* prices include GST: the shop sees qty x price on each line (the tax split's paise go to round off) */
-  function lineAmt(l) { return st.boot && st.boot.inclusive !== false ? r2(l.qty * l.rate) : l.total; }
+  function lineAmt(l) { return st.boot && st.boot.inclusive !== false ? r2(l.qty * l.rate * (l.ret ? 1 : 1 - (Number(l.disc) || 0) / 100)) : l.total; }
   function receiptText(e) {
     var c = st.boot.company, out = [];
     out.push(centre(c.name || ""));
@@ -579,19 +657,32 @@
       var c4 = cols(), L = W - 12;
       out.push(padR("Item", c4[0]) + padL("Qty", c4[1]) + padL("Rate", c4[2]) + padL("Amt", c4[3]));
       out.push(rule());
-      e.lines.forEach(function (l) {
+      var one = function (l) {
         var nm = l.product + " " + l.pack;
         out.push(nm.slice(0, W));
-        out.push(padR(l.free_qty ? "  +" + l.free_qty + " free" : "", c4[0]) + padL(l.qty, c4[1]) + padL(Number(l.rate).toFixed(W === 32 ? 0 : 2), c4[2]) + padL(num(lineAmt(l)), c4[3]));
-      });
+        var tag = l.free_qty ? "  +" + l.free_qty + " free" : Number(l.disc) === 100 ? "  FREE" : Number(l.disc) ? "  less " + l.disc + "%" : "";
+        out.push(padR(tag, c4[0]) + padL(l.qty, c4[1]) + padL(Number(l.rate).toFixed(W === 32 ? 0 : 2), c4[2]) + padL(num(lineAmt(l)), c4[3]));
+      };
+      e.lines.filter(function (l) { return !l.ret; }).forEach(one);
+      var back = e.lines.filter(function (l) { return l.ret; });
+      if (back.length) {
+        out.push(rule());
+        out.push(padR("Items sold", L) + padL(num(e.sales_value), 12));
+        out.push(rule());
+        out.push(centre("SHOP RETURNS (credit note)"));
+        back.forEach(one);
+        out.push(padR("Credit note", L) + padL("-" + num(e.returns_value), 12));
+      }
       out.push(rule());
       out.push(padR("Taxable", L) + padL(num(e.taxable), 12));
       if (e.igst) out.push(padR("IGST", L) + padL(num(e.igst), 12));
       else { out.push(padR("CGST", L) + padL(num(e.cgst), 12)); out.push(padR("SGST", L) + padL(num(e.sgst), 12)); }
+      if (e.credit_used) out.push(padR("Shop credit used", L) + padL("-" + num(e.credit_used), 12));
       if (e.round_off) out.push(padR("Round off", L) + padL(num(e.round_off), 12));
     }
     out.push(rule("="));
     out.push(padR("TOTAL", W - 16) + padL("Rs " + num(e.total), 16));
+    if (e.kind === "BILL" && e.credit_left) out.push(padR("Added to your credit", W - 12) + padL(num(e.credit_left), 12));
     if (e.kind === "BILL") {
       out.push(padR("Paid (" + e.pay_mode + ")", W - 12) + padL(num(e.paid), 12));
       if (e.total - e.paid > 0.005) out.push(padR("Balance (credit)", W - 12) + padL(num(e.total - e.paid), 12));
@@ -620,9 +711,18 @@
   function whatsappText(e) {
     var c = st.boot.company;
     var lines = ["*" + (c.name || "") + "*", (e.kind === "RETURN" ? "Sales return" : e.kind === "COLLECTION" ? "Payment receipt" : "Bill") + " " + e.bill_no + " · " + niceDate(e.date), "To: " + e.shop_name, ""];
-    (e.lines || []).forEach(function (l) {
-      lines.push("• " + l.product + " " + l.pack + " × " + l.qty + (l.free_qty ? " (+" + l.free_qty + " free)" : "") + " = ₹" + num(l.total));
+    (e.lines || []).filter(function (l) { return !l.ret; }).forEach(function (l) {
+      lines.push("• " + l.product + " " + l.pack + " × " + l.qty + (l.free_qty ? " (+" + l.free_qty + " free)" : "") +
+                 (Number(l.disc) === 100 ? " (free)" : Number(l.disc) ? " (less " + l.disc + "%)" : "") + " = ₹" + num(l.total));
     });
+    var wb = (e.lines || []).filter(function (l) { return l.ret; });
+    if (wb.length) {
+      lines.push("", "_Shop returns (credit note)_");
+      wb.forEach(function (l) { lines.push("• " + l.product + " " + l.pack + " × " + l.qty + " = −₹" + num(l.total)); });
+      lines.push("Credit note −₹" + num(e.returns_value));
+    }
+    if (e.credit_used) lines.push("Shop credit used −₹" + num(e.credit_used));
+    if (e.credit_left) lines.push("Added to your credit ₹" + num(e.credit_left));
     if (e.lines && e.lines.length) {
       lines.push("");
       lines.push("Taxable ₹" + num(e.taxable) + (e.igst ? " · IGST ₹" + num(e.igst) : " · CGST ₹" + num(e.cgst) + " · SGST ₹" + num(e.sgst)));
@@ -854,7 +954,7 @@
     var t = { bills: 0, sales: 0, returns: 0, cash: 0, upi: 0, cheque: 0, credit: 0, collections: 0, collected: 0, skips: 0 };
     todays().forEach(function (e) {
       if (e.kind === "BILL") {
-        t.bills++; t.sales += e.total;
+        t.bills++; t.sales += e.sales_value !== undefined ? e.sales_value : e.total; t.returns += Number(e.returns_value) || 0;
         if (e.pay_mode === "UPI") t.upi += e.paid; else if (e.pay_mode === "Cheque") t.cheque += e.paid; else t.cash += e.paid;
         t.credit += e.total - e.paid;
       } else if (e.kind === "RETURN") { t.returns += e.total; if (e.pay_mode === "Cash refund") t.cash -= e.total; }
@@ -884,7 +984,23 @@
     paintFlash($("flash"));
     bindEntryLines();
     $("sendNow").onclick = function () { sync(true); };
-    $("fresh").onclick = function () { stack = []; show(viewStart); };
+    // download shops, prices and company details now, keeping today's route and bills
+    $("fresh").onclick = function () {
+      var btn = this;
+      if (!navigator.onLine && !Suite.isDemo()) { flash("No signal. Find signal once to download the list.", "warn"); paintFlash($("flash")); return; }
+      btn.disabled = true; btn.textContent = "Downloading…";
+      call("salesBootstrap", {}).then(function (res) {
+        st.boot = res; st.bootAt = Date.now();
+        st.newShops = pendingShops();
+        keepNewShops();
+        save();
+        flash("Shops, prices and company details are up to date.", "ok");
+        show(viewDay, [], false);
+      }).catch(function (e) {
+        btn.disabled = false; btn.textContent = "Download fresh shop and price list";
+        flash((e && e.message) || "Couldn't download. Try again.", "err"); paintFlash($("flash"));
+      });
+    };
     $("printerSet").onclick = function () { show(viewPrinter, null, true); };
     $("out").onclick = function () {
       if (pending().length) { flash("Send your " + pending().length + " waiting entr" + (pending().length === 1 ? "y" : "ies") + " first. Signing out would lose them.", "err"); paintFlash($("flash")); return; }

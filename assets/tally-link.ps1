@@ -25,7 +25,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.7'
+$Agent    = 'tally-link-ps 1.8'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -193,35 +193,46 @@ function Amt($v) { return ([double]$v).ToString('0.00', [Globalization.CultureIn
 function Qty($v) { return ([double]$v).ToString('0.###', [Globalization.CultureInfo]::InvariantCulture) }
 
 # a Sales voucher (item invoice): party Dr total; items Cr at taxable value into the sales ledger; GST and round off
+# A Sales voucher, or (dir = "in") a Credit Note for shop returns: the same shape with the sides reversed.
+# Sales: shop debited, items/sales + GST credited.  Credit Note: shop credited, items/sales + GST debited.
+# Tally writes a debit as a negative AMOUNT with ISDEEMEDPOSITIVE Yes, a credit as positive with No.
 function Sales-Xml($p) {
+  $in = ([string]$p.dir -eq 'in')
   $vt = XmlEsc ([string]$p.vtype); $party = XmlEsc ([string]$p.party); $no = XmlEsc ([string]$p.number)
   $date = ([string]$p.date) -replace '-', ''
+  $dr = { param($a) '<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-' + (Amt $a) + '</AMOUNT>' }
+  $cr = { param($a) '<ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>' + (Amt $a) + '</AMOUNT>' }
+  $partySide = $(if ($in) { & $cr $p.total } else { & $dr $p.total })
   $x = '<VOUCHER VCHTYPE="' + $vt + '" ACTION="Create" OBJVIEW="Invoice Voucher View">' +
        '<DATE>' + $date + '</DATE><VOUCHERTYPENAME>' + $vt + '</VOUCHERTYPENAME><VOUCHERNUMBER>' + $no + '</VOUCHERNUMBER>' +
-       '<REFERENCE>' + $no + '</REFERENCE><PARTYLEDGERNAME>' + $party + '</PARTYLEDGERNAME><PARTYNAME>' + $party + '</PARTYNAME>' +
+       '<REFERENCE>' + $(if ($p.against) { XmlEsc ([string]$p.against) } else { $no }) + '</REFERENCE><PARTYLEDGERNAME>' + $party + '</PARTYLEDGERNAME><PARTYNAME>' + $party + '</PARTYNAME>' +
        '<BASICBUYERNAME>' + $party + '</BASICBUYERNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><ISINVOICE>Yes</ISINVOICE>' +
        '<VCHENTRYMODE>Item Invoice</VCHENTRYMODE><NARRATION>' + (XmlEsc ([string]$p.narration)) + '</NARRATION>' +
-       '<LEDGERENTRIES.LIST><LEDGERNAME>' + $party + '</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><ISPARTYLEDGER>Yes</ISPARTYLEDGER>' +
-       '<AMOUNT>-' + (Amt $p.total) + '</AMOUNT><BILLALLOCATIONS.LIST><NAME>' + $no + '</NAME><BILLTYPE>New Ref</BILLTYPE>' +
-       '<AMOUNT>-' + (Amt $p.total) + '</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST>'
+       '<LEDGERENTRIES.LIST><LEDGERNAME>' + $party + '</LEDGERNAME>' + $partySide + '<ISPARTYLEDGER>Yes</ISPARTYLEDGER>' +
+       '<BILLALLOCATIONS.LIST><NAME>' + $no + '</NAME><BILLTYPE>New Ref</BILLTYPE>' +
+       '<AMOUNT>' + $(if ($in) { Amt $p.total } else { '-' + (Amt $p.total) }) + '</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST>'
   foreach ($l in @($p.lines)) {
     $u = XmlEsc ([string]$l.unit)
-    $billed = [double]$l.qty; $actual = $billed + [double]$l.free
-    $x += '<ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>' + (XmlEsc ([string]$l.item)) + '</STOCKITEMNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>' +
+    $billed = [double]$l.qty; $actual = $billed + [double]$l.free; $amt = [double]$l.amount
+    $side = $(if ($in) { & $dr $amt } else { & $cr $amt })
+    $x += '<ALLINVENTORYENTRIES.LIST><STOCKITEMNAME>' + (XmlEsc ([string]$l.item)) + '</STOCKITEMNAME>' + $side +
           '<RATE>' + ([double]$l.rate).ToString('0.####', [Globalization.CultureInfo]::InvariantCulture) + '/' + $u + '</RATE>' +
-          '<AMOUNT>' + (Amt $l.amount) + '</AMOUNT><ACTUALQTY> ' + (Qty $actual) + ' ' + $u + '</ACTUALQTY><BILLEDQTY> ' + (Qty $billed) + ' ' + $u + '</BILLEDQTY>' +
-          '<ACCOUNTINGALLOCATIONS.LIST><LEDGERNAME>' + (XmlEsc ([string]$p.sales)) + '</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>' +
-          '<AMOUNT>' + (Amt $l.amount) + '</AMOUNT></ACCOUNTINGALLOCATIONS.LIST></ALLINVENTORYENTRIES.LIST>'
+          '<ACTUALQTY> ' + (Qty $actual) + ' ' + $u + '</ACTUALQTY><BILLEDQTY> ' + (Qty $billed) + ' ' + $u + '</BILLEDQTY>'
+    # a free line has no value: it moves stock only
+    if ($amt -ne 0) {
+      $x += '<ACCOUNTINGALLOCATIONS.LIST><LEDGERNAME>' + (XmlEsc ([string]$p.sales)) + '</LEDGERNAME>' + $side + '</ACCOUNTINGALLOCATIONS.LIST>'
+    }
+    $x += '</ALLINVENTORYENTRIES.LIST>'
   }
   foreach ($t in @($p.taxes)) {
     if (-not $t) { continue }
-    $x += '<LEDGERENTRIES.LIST><LEDGERNAME>' + (XmlEsc ([string]$t.ledger)) + '</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>' +
-          '<AMOUNT>' + (Amt $t.amount) + '</AMOUNT></LEDGERENTRIES.LIST>'
+    $x += '<LEDGERENTRIES.LIST><LEDGERNAME>' + (XmlEsc ([string]$t.ledger)) + '</LEDGERNAME>' + $(if ($in) { & $dr $t.amount } else { & $cr $t.amount }) + '</LEDGERENTRIES.LIST>'
   }
   if ($p.round) {
+    # Sales: a positive round-off is credited. Credit Note: a positive round-off is debited.
     $r = [double]$p.round.amount
-    $x += '<LEDGERENTRIES.LIST><LEDGERNAME>' + (XmlEsc ([string]$p.round.ledger)) + '</LEDGERNAME><ISDEEMEDPOSITIVE>' + $(if ($r -lt 0) { 'Yes' } else { 'No' }) + '</ISDEEMEDPOSITIVE>' +
-          '<AMOUNT>' + (Amt $r) + '</AMOUNT></LEDGERENTRIES.LIST>'
+    $credit = $(if ($in) { $r -lt 0 } else { $r -gt 0 })
+    $x += '<LEDGERENTRIES.LIST><LEDGERNAME>' + (XmlEsc ([string]$p.round.ledger)) + '</LEDGERNAME>' + $(if ($credit) { & $cr ([math]::Abs($r)) } else { & $dr ([math]::Abs($r)) }) + '</LEDGERENTRIES.LIST>'
   }
   return $x + '</VOUCHER>'
 }
@@ -279,7 +290,7 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
         }
         $results += $r; continue
       }
-      if ($it.kind -eq 'sales') {
+      if ($it.kind -eq 'sales' -or $it.kind -eq 'cnote') {
         $blocked = @()
         foreach ($n in @($it.payload.needs.items)) { if ($n -and $failedNames.ContainsKey(([string]$n).Trim().ToLower())) { $blocked += [string]$n } }
         foreach ($n in @($it.payload.needs.ledgers) + @($it.payload.party)) { if ($n -and $failedNames.ContainsKey(([string]$n).Trim().ToLower())) { $blocked += [string]$n } }
@@ -288,7 +299,7 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
         if ($haveVch.ContainsKey($key)) { $r.status = 'exists'; $r.message = 'A ' + $it.payload.vtype + ' voucher with this number is already in Tally'; $there++ }
         else {
           $ans = Read-ImportResult (Post-ToTally (Import-Envelope (Sales-Xml $it.payload) 'Vouchers'))
-          if ($ans.created -ge 1) { $r.status = 'posted'; $r.message = 'Sales voucher created in Tally'; $made++; $haveVch[$key] = $true }
+          if ($ans.created -ge 1) { $r.status = 'posted'; $r.message = $(if ($it.kind -eq 'cnote') { 'Credit note created in Tally' } else { 'Sales voucher created in Tally' }); $made++; $haveVch[$key] = $true }
           else { $r.message = $(if ($ans.message) { 'Tally said: ' + $ans.message } else { "Tally didn't accept the voucher (no reason given)." }); $bad++ }
         }
         $results += $r; continue

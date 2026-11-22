@@ -111,7 +111,7 @@
     return OB.filter(function (x) { return x.status === "pending"; }).length +
       (BILLS ? BILLS.bills.length : 0);
   }
-  function kindLabel(x) { return x.kind === "sales" ? "Sales bill: " : x.kind === "item" ? "New stock item: " : "New ledger: "; }
+  function kindLabel(x) { return x.kind === "sales" ? "Sales bill: " : x.kind === "cnote" ? "Credit note (shop returns): " : x.kind === "item" ? "New stock item: " : "New ledger: "; }
 
   /* ---------- formatting ---------- */
   function inr(n) { return Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -325,7 +325,8 @@
       "</span></summary>" +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0">' +
       row("sales", "Sales ledger") + row("cgst", "CGST ledger") + row("sgst", "SGST ledger") + row("igst", "IGST ledger (other states)") + row("round", "Round off ledger") +
-      '<label class="field" style="margin:0"><span>Voucher type</span><input data-led="vtype" value="' + esc(S.vtype || "Sales") + '"' + (act ? "" : " disabled") + "></label></div>" +
+      '<label class="field" style="margin:0"><span>Voucher type</span><input data-led="vtype" value="' + esc(S.vtype || "Sales") + '"' + (act ? "" : " disabled") + "></label>" +
+      '<label class="field" style="margin:0"><span>Shop returns voucher type</span><input data-led="vtypeCn" value="' + esc(S.vtypeCn || "Credit Note") + '"' + (act ? "" : " disabled") + "></label></div>" +
       '<div style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:0 0 12px">' +
         '<label><input type="checkbox" id="suAuto"' + (A.on ? " checked" : "") + (act ? "" : " disabled") + "> Send bills to Tally <b>automatically</b> (only new shops need approval)</label>" +
         '<label class="muted">from <input type="date" id="suFrom" value="' + esc(A.from || "") + '"' + (act ? "" : " disabled") + "></label>" +

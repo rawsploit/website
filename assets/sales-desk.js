@@ -9,7 +9,7 @@
   var esc = Suite.esc;
   var TABS = [["today", "Today"], ["bills", "Bills"], ["shops", "Shops"], ["reports", "Reports"]];
   var REPORTS = [["bills", "Customer bills"], ["items", "Item sales"], ["receipts", "Sales and receipts"], ["dsr", "Daily sales summary (DSR)"],
-                 ["returns", "Sales returns"], ["collections", "Collections"], ["skips", "Skipped shops"]];
+                 ["returns", "Sales returns"], ["discounts", "Discounts above the shop's rule"], ["collections", "Collections"], ["skips", "Skipped shops"]];
   var routesCache = null;
   function viewOnly() { var s = Suite.getSession(); return !!(s && s.role === "viewer"); }
 
@@ -139,6 +139,7 @@
     body.innerHTML = "<p>Loading shops…</p>";
     call("listShops").then(function (r) {
       routesCache = r.routes || routesCache;
+      productsCache = r.products || productsCache;
       var shops = r.shops || [];
       body.innerHTML = '<div class="row-head" style="flex-wrap:wrap;gap:10px"><div><h3>Shops</h3><p class="muted" style="margin:4px 0 0">' + shops.length +
         ' shops. Sales staff see the shops on their route in Billing.</p></div>' + (viewOnly() ? "" : '<div class="row-btns"><button class="btn btn-ink btn-small" id="shAdd" type="button">Add a shop</button>' +
@@ -289,7 +290,7 @@
       items.slice(0, 50).map(function (x) {
         var acts = viewOnly() ? "" : (x.status === "failed" ? '<button class="btn btn-line btn-small" type="button" data-ob="retry" data-id="' + esc(x.id) + '">Try again</button> ' : "") +
           (x.status === "approved" || x.status === "failed" || x.status === "pending" ? '<button class="btn btn-line btn-small" type="button" data-ob="cancel" data-id="' + esc(x.id) + '">Cancel</button>' : "");
-        return "<tr><td>" + esc(String(x.created).replace("T", " ").slice(0, 16)) + "</td><td>" + (x.kind === "sales" ? "Sales bill: " : x.kind === "item" ? "New stock item: " : "New ledger: ") + esc(x.name) + "<br><small class=\"muted\">by " + esc(x.created_by) +
+        return "<tr><td>" + esc(String(x.created).replace("T", " ").slice(0, 16)) + "</td><td>" + (x.kind === "sales" ? "Sales bill: " : x.kind === "cnote" ? "Credit note: " : x.kind === "item" ? "New stock item: " : "New ledger: ") + esc(x.name) + "<br><small class=\"muted\">by " + esc(x.created_by) +
           "</small></td><td>" + esc(OB_LABEL[x.status] || x.status) + "</td><td><small>" + esc(x.result) + "</small></td><td>" + acts + "</td></tr>";
       }).join("") + "</tbody></table></div></details>";
   }
@@ -367,6 +368,33 @@
     }).catch(function (e) { box.innerHTML = '<p class="form-error">' + esc(e.message) + "</p>"; });
   }
 
+  /* a shop's standing discounts: one % for everything, plus products (every pack) or single packs with their own % */
+  var productsCache = [];
+  function discRows(d) {
+    d = d || { all: 0, names: {}, skus: {} };
+    var rows = [];
+    Object.keys(d.names || {}).forEach(function (n) { rows.push({ key: "n:" + n, pct: d.names[n] }); });
+    Object.keys(d.skus || {}).forEach(function (k) { rows.push({ key: "s:" + k, pct: d.skus[k] }); });
+    return rows;
+  }
+  function discOptions(sel) {
+    var names = {}, out = '<option value="">Choose a product…</option>';
+    productsCache.forEach(function (p) { names[p.name.toLowerCase().replace(/\s+/g, " ")] = p.name; });
+    Object.keys(names).sort().forEach(function (n) {
+      out += '<option value="n:' + esc(n) + '"' + (sel === "n:" + n ? " selected" : "") + ">" + esc(names[n]) + " (every pack)</option>";
+    });
+    productsCache.forEach(function (p) {
+      var v = "s:" + String(p.sku).toUpperCase();
+      out += '<option value="' + esc(v) + '"' + (sel === v ? " selected" : "") + ">" + esc(p.name + " " + p.pack) + " (this pack only)</option>";
+    });
+    return out;
+  }
+  function discRowHtml(r) {
+    return '<div class="sd-disc" style="display:flex;gap:8px;align-items:center;margin:4px 0"><select data-dk style="flex:1;min-width:0">' + discOptions(r.key) + "</select>" +
+      '<input type="number" data-dp min="0" max="100" step="0.5" value="' + esc(r.pct) + '" style="width:80px"> %' +
+      '<button class="btn btn-line btn-small" type="button" data-drm aria-label="Remove">✕</button></div>';
+  }
+
   function shopForm(body, s, done) {
     s = s || { name: "", route_id: (routesCache[0] || {}).route_id || "", address: "", phone: "", gstin: "", type: "", credit: true, active: true };
     var box = body.querySelector("#shForm");
@@ -381,13 +409,26 @@
       '<label class="field"><span>Shop type</span><input name="type" maxlength="20" value="' + esc(s.type) + '" placeholder="e.g. A, B, Supermarket"></label></div>' +
       '<label class="ca-check" style="margin:4px 0 8px"><input type="checkbox" name="credit"' + (s.credit ? " checked" : "") + "> Credit allowed</label>" +
       '<label class="ca-check" style="margin:0 0 12px"><input type="checkbox" name="active"' + (s.active ? " checked" : "") + "> Active (shows in Billing)</label>" +
+      '<fieldset class="panel" style="margin:0 0 12px;padding:12px"><legend style="font-weight:700;padding:0 6px">Standing discount</legend>' +
+      '<p class="muted" style="margin:0 0 8px;font-size:13px">Fills in on the salesman\'s bill. He can still change it on the spot (e.g. the owner agreed a different % on a call); ' +
+      'anything above these shows in the report "Discounts above the shop\'s rule".</p>' +
+      '<label class="field" style="max-width:260px"><span>Every item</span><input name="discAll" type="number" min="0" max="100" step="0.5" value="' + esc((s.discounts && s.discounts.all) || 0) + '"></label>' +
+      '<div id="discList">' + discRows(s.discounts).map(discRowHtml).join("") + "</div>" +
+      '<button class="btn btn-line btn-small" type="button" id="discAdd">+ A product with its own %</button></fieldset>' +
       '<p class="form-error" role="alert"></p><div class="row-actions"><button class="btn btn-ink" type="submit">Save</button><button class="btn btn-line" type="button" data-x>Close</button></div></form>';
     var f = box.querySelector("form");
     f.querySelector("[data-x]").onclick = function () { box.innerHTML = ""; };
+    f.querySelector("#discAdd").onclick = function () { f.querySelector("#discList").insertAdjacentHTML("beforeend", discRowHtml({ key: "", pct: 5 })); };
+    f.querySelector("#discList").onclick = function (e) { var b = e.target.closest("[data-drm]"); if (b) b.closest(".sd-disc").remove(); };
     f.onsubmit = function (e) {
       e.preventDefault();
+      var discounts = { all: Number(f.discAll.value) || 0, names: {}, skus: {} };
+      f.querySelectorAll(".sd-disc").forEach(function (row) {
+        var k = row.querySelector("[data-dk]").value, pct = Number(row.querySelector("[data-dp]").value) || 0;
+        if (/^n:/.test(k)) discounts.names[k.slice(2)] = pct; else if (/^s:/.test(k)) discounts.skus[k.slice(2)] = pct;
+      });
       var data = { shop_id: s.shop_id || "", name: f.name.value.trim(), route_id: f.route_id.value, address: f.address.value.trim(), phone: f.phone.value.trim(),
-                   gstin: f.gstin.value.trim(), type: f.type.value.trim(), credit: f.credit.checked, active: f.active.checked, isNew: !s.shop_id };
+                   gstin: f.gstin.value.trim(), type: f.type.value.trim(), credit: f.credit.checked, active: f.active.checked, isNew: !s.shop_id, discounts: discounts };
       if (!data.name) { f.querySelector(".form-error").textContent = "Enter the shop name."; return; }
       var warnBox = f.querySelector(".sd-warn") || f.insertBefore(Object.assign(document.createElement("div"), { className: "sd-warn" }), f.querySelector(".row-actions"));
       f.querySelector(".form-error").textContent = "";
