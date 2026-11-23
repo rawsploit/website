@@ -310,12 +310,14 @@
   function setupHtml(act) {
     if (!SETUP) return "";
     var S = SETUP.settings, A = SETUP.auto || {}, missingItems = SETUP.products.filter(function (p) { return !p.tally; });
-    var needsLedgers = !S.sales || !S.cgst || !S.sgst || !S.round;
+    var ledNames = SETUP.ledgers.map(function (l) { return l.name; });
+    // a chosen ledger counts only if it's in the Tally being used now (or on its way there)
+    var have = function (k) { return !!S[k] && (ledNames.indexOf(S[k]) !== -1 || (SETUP.std || []).some(function (x) { return x.name === S[k] && x.coming; })); };
+    var needsLedgers = !have("sales") || !have("cgst") || !have("sgst") || !have("round");
     var open = needsLedgers || missingItems.length;
     var opt = function (cur, list, blank) {
       return '<option value="">' + (blank || "(choose)") + "</option>" + list.map(function (n) { return '<option' + (n === cur ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("");
     };
-    var ledNames = SETUP.ledgers.map(function (l) { return l.name; });
     var stdMissing = SETUP.std.filter(function (x) { return !x.exists && !x.coming; });
     var row = function (key, label) {
       return '<label class="field" style="margin:0"><span>' + label + (SETUP.guessed[key] ? ' <small class="muted">(suggested)</small>' : "") + '</span><select data-led="' + key + '"' + (act ? "" : " disabled") + ">" + opt(S[key], ledNames) + "</select></label>";
