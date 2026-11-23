@@ -25,7 +25,7 @@ $Company  = '__COMPANY__'
 $TallyUrl = 'http://localhost:9000'
 $Days     = 45                       # vouchers from the last 45 days are sent each time
 $Every    = 15                       # minutes between syncs
-$Agent    = 'tally-link-ps 1.8'
+$Agent    = 'tally-link-ps 1.9'
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -237,6 +237,15 @@ function Sales-Xml($p) {
   return $x + '</VOUCHER>'
 }
 
+# A unit of measure (a new Tally company has none): created before the first item that uses it.
+function Unit-Xml($name) {
+  $formal = @{ 'nos' = 'Numbers'; 'pcs' = 'Pieces'; 'pkt' = 'Packets'; 'kg' = 'Kilograms'; 'g' = 'Grams'; 'ltr' = 'Litres'; 'l' = 'Litres'; 'ml' = 'Millilitres'; 'bag' = 'Bags'; 'box' = 'Boxes'; 'btl' = 'Bottles'; 'doz' = 'Dozens' }[([string]$name).ToLower()]
+  if (-not $formal) { $formal = [string]$name }
+  $n = XmlEsc ([string]$name)
+  return '<UNIT NAME="' + $n + '" ACTION="Create"><NAME>' + $n + '</NAME><ISSIMPLEUNIT>Yes</ISSIMPLEUNIT>' +
+         '<ORIGINALNAME>' + (XmlEsc $formal) + '</ORIGINALNAME><DECIMALPLACES>0</DECIMALPLACES></UNIT>'
+}
+
 function Import-Envelope([string]$inner, [string]$report = 'All Masters') {
   return '<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC>' +
          '<REPORTNAME>' + $report + '</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>' + (XmlEsc $Company) + '</SVCURRENTCOMPANY></STATICVARIABLES>' +
@@ -273,7 +282,7 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
   foreach ($l in $ledgers) { if ($l.name) { $have[([string]$l.name).Trim().ToLower()] = $true } }
   foreach ($i in $stock) { if ($i.name) { $haveItem[([string]$i.name).Trim().ToLower()] = $true } }
   foreach ($v in $vouchers) { if ($v.number) { $haveVch[([string]$v.type + '|' + [string]$v.number).ToLower()] = $true } }
-  $results = @(); $made = 0; $there = 0; $bad = 0; $held = 0; $failedNames = @{}
+  $results = @(); $made = 0; $there = 0; $bad = 0; $held = 0; $failedNames = @{}; $unitsDone = @{}
   foreach ($it in $items) {
     $r = @{ id = $it.id; status = 'failed'; message = '' }
     try {
@@ -281,6 +290,12 @@ function Send-Outbox($ledgers, $stock, $vouchers) {
         $key = ([string]$it.payload.name).Trim().ToLower()
         if ($haveItem.ContainsKey($key)) { $r.status = 'exists'; $r.message = 'Already in Tally'; $there++ }
         else {
+          # its unit first (once a run; "already exists" is fine)
+          $uName = ([string]$it.payload.unit).Trim()
+          if ($uName -and -not $unitsDone.ContainsKey($uName.ToLower())) {
+            try { [void](Read-ImportResult (Post-ToTally (Import-Envelope (Unit-Xml $uName)))) } catch {}
+            $unitsDone[$uName.ToLower()] = $true
+          }
           $ans = Read-ImportResult (Post-ToTally (Import-Envelope (Item-Xml $it.payload $true)))
           if ($ans.created -lt 1) { $first = $ans.message; $ans = Read-ImportResult (Post-ToTally (Import-Envelope (Item-Xml $it.payload $false)))
             if ($ans.created -ge 1) { $ans.message = 'Created in Tally without HSN/GST details (Tally said: ' + $first + '). Add them in Tally.' } }
